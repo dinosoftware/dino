@@ -32,11 +32,11 @@ export const getCoverArtUrl = async (
 export const scrobble = async (
   trackId: string,
   time?: number,
-  submission?: boolean
+  submission: boolean = false
 ): Promise<void> => {
   await apiClient.get('scrobble', {
     id: trackId,
     ...(time && { time }),
-    ...(submission !== undefined && { submission }),
+    submission,
   });
 };

@@ -5,6 +5,7 @@
 
 import * as Haptics from 'expo-haptics';
 import {
+  Album,
   Download,
   Heart,
   Info,
@@ -33,6 +34,7 @@ import { theme } from '../../config';
 import { trackPlayerService } from '../../services/player/TrackPlayerService';
 import { useQueueStore } from '../../stores';
 import { useFavoritesStore } from '../../stores/favoritesStore';
+import { useNavigationStore } from '../../stores/navigationStore';
 import { usePlayerStore } from '../../stores/playerStore';
 
 interface TrackMenuProps {
@@ -69,6 +71,7 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
   const { addToQueue, setQueue } = useQueueStore();
   const { isTrackStarred, toggleTrackStar } = useFavoritesStore();
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
+  const { navigate } = useNavigationStore();
 
   // Haptic feedback when menu opens
   useEffect(() => {
@@ -211,6 +214,20 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
     }, 100);
   };
 
+  const handleGoToAlbum = () => {
+    if (track?.albumId) {
+      onClose();
+      setTimeout(() => {
+        navigate({ name: 'album-detail', params: { albumId: track.albumId! } });
+      }, 100);
+    } else {
+      onClose();
+      setTimeout(() => {
+        onShowConfirm('No Album Information', `No album information available for "${track?.title}".`);
+      }, 100);
+    }
+  };
+
   const handleShowInfo = () => {
     onClose();
     setTimeout(() => onShowInfo(), 100);
@@ -283,6 +300,11 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
                 icon={<ListPlus size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                 label="Add to Playlist"
                 onPress={handleAddToPlaylist}
+              />
+              <MenuItem
+                icon={<Album size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Go to Album"
+                onPress={handleGoToAlbum}
               />
               <MenuItem
                 icon={<Download size={22} color={theme.colors.text.primary} strokeWidth={2} />}

@@ -170,8 +170,13 @@ class TrackPlayerService {
 
     TrackPlayer.addEventListener(Event.PlaybackQueueEnded, async () => {
       console.log('[TrackPlayer] Queue ended - handling track completion');
-      const { repeatMode, currentTrack } = usePlayerStore.getState();
+      const { repeatMode, currentTrack, progress } = usePlayerStore.getState();
       const { queue, currentIndex, skipToNext } = useQueueStore.getState();
+
+      // Scrobble the current track that just finished
+      if (currentTrack) {
+        await scrobblingManager.onTrackEnded(currentTrack, progress.position, progress.duration);
+      }
 
       if (repeatMode === 'track') {
         // Repeat current track

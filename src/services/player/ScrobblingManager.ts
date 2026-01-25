@@ -5,8 +5,8 @@
  */
 
 import { scrobble } from '../../api/opensubsonic/streaming';
-import { usePlayerStore } from '../../stores';
 import { Track } from '../../api/opensubsonic/types';
+import { usePlayerStore } from '../../stores';
 import { queueSyncManager } from './QueueSyncManager';
 
 interface ScrobbleState {
@@ -26,14 +26,14 @@ class ScrobblingManager {
 
   private progressUpdateInterval: ReturnType<typeof setInterval> | null = null;
   private readonly PROGRESS_UPDATE_INTERVAL = 30000; // 30 seconds
-  private readonly SCROBBLE_THRESHOLD = 0.8; // 80% of track or 4 minutes
+  private readonly SCROBBLE_THRESHOLD = 0.75; // 80% of track or 4 minutes
 
   /**
    * Start scrobbling manager
    */
   start() {
     console.log('[Scrobbling] 🚀 Starting manager with interval:', this.PROGRESS_UPDATE_INTERVAL);
-    
+
     // Clear existing interval
     this.stop();
 
@@ -42,7 +42,7 @@ class ScrobblingManager {
       console.log('[Scrobbling] ⏰ Interval triggered, calling updateProgress()');
       this.updateProgress();
     }, this.PROGRESS_UPDATE_INTERVAL);
-    
+
     console.log('[Scrobbling] ✅ Manager started, interval ID:', this.progressUpdateInterval);
   }
 
@@ -70,23 +70,23 @@ class ScrobblingManager {
       await this.onTrackPlayed(previousTrack, pos, dur, true);
     }
 
-    if (!track) {
-      this.resetState();
-      return;
-    }
+     if (!track) {
+       this.resetState();
+       return;
+     }
 
-    // Reset state for new track
-    this.state = {
-      currentTrackId: track.id,
-      hasScrobbledNowPlaying: false,
-      hasScrobbledSubmission: false,
-      lastProgressUpdate: 0,
-    };
+     // Reset state for new track
+     this.state = {
+       currentTrackId: track.id,
+       hasScrobbledNowPlaying: false,
+       hasScrobbledSubmission: false,
+       lastProgressUpdate: 0,
+     };
 
-    // Send "now playing" scrobble
+    // Send "now playing" scrobble with current timestamp
     try {
       console.log('[Scrobbling] Sending now playing for:', track.title);
-      await scrobble(track.id, undefined, false);
+      await scrobble(track.id, Date.now(), false);
       this.state.hasScrobbledNowPlaying = true;
     } catch (error) {
       console.error('[Scrobbling] Failed to send now playing:', error);
@@ -99,7 +99,9 @@ class ScrobblingManager {
    */
   async onTrackPlayed(track: Track, position: number, duration: number, force: boolean = false): Promise<void> {
     // Don't scrobble if already scrobbled (unless forced, like on track change)
-    if (!force && this.state.hasScrobbledSubmission && this.state.currentTrackId === track.id) {
+    // But always allow scrobbling if position is at or near the end of the track
+    const isAtEndOfTrack = duration > 0 && Math.abs(position - duration) < 5; // Within 5 seconds of end
+    if (!force && !isAtEndOfTrack && this.state.hasScrobbledSubmission && this.state.currentTrackId === track.id) {
       console.log('[Scrobbling] Already scrobbled this track, skipping');
       return;
     }
@@ -108,13 +110,14 @@ class ScrobblingManager {
     const playedPercentage = duration > 0 ? position / duration : 0;
     const playedMinutes = position / 60;
 
-    const shouldScrobble = playedPercentage >= this.SCROBBLE_THRESHOLD || playedMinutes >= 4;
+    const shouldScrobble = playedPercentage >= this.SCROBBLE_THRESHOLD || playedMinutes >= 4 || isAtEndOfTrack;
 
     console.log('[Scrobbling] Checking if should scrobble:', track.title, {
       position: position.toFixed(1),
       duration: duration.toFixed(1),
       percentage: (playedPercentage * 100).toFixed(1) + '%',
       playedMinutes: playedMinutes.toFixed(1),
+      isAtEndOfTrack,
       shouldScrobble,
       force,
     });
@@ -127,61 +130,61 @@ class ScrobblingManager {
       console.log('[Scrobbling] Submitting scrobble for:', track.title);
 
       // Send submission scrobble
-      await scrobble(track.id, Math.floor(Date.now() / 1000), true);
+      await scrobble(track.id, undefined, true);
       this.state.hasScrobbledSubmission = true;
 
       console.log('[Scrobbling] ✅ Successfully scrobbled:', track.title);
     } catch (error) {
       console.error('[Scrobbling] ❌ Failed to submit scrobble:', error);
     }
-  }
+   }
 
-  /**
-   * Update playback progress periodically (every 30 seconds)
-   * This also triggers queue sync with current position
-   */
-  private async updateProgress(): Promise<void> {
-    const { currentTrack, playbackState, progress } = usePlayerStore.getState();
+   /**
+    * Update playback progress periodically (every 30 seconds)
+    * This also triggers queue sync with current position
+    */
+   private async updateProgress(): Promise<void> {
+     const { currentTrack, playbackState, progress } = usePlayerStore.getState();
 
-    // Only update if playing
-    if (playbackState !== 'playing' || !currentTrack) {
-      return;
-    }
+     // Only update if playing
+     if (playbackState !== 'playing' || !currentTrack) {
+       return;
+     }
 
-    const now = Date.now();
-    
-    // Don't update too frequently (though interval should prevent this)
-    if (now - this.state.lastProgressUpdate < this.PROGRESS_UPDATE_INTERVAL - 1000) {
-      return;
-    }
+     const now = Date.now();
 
-    this.state.lastProgressUpdate = now;
+     // Don't update too frequently (though interval should prevent this)
+     if (now - this.state.lastProgressUpdate < this.PROGRESS_UPDATE_INTERVAL - 1000) {
+       return;
+     }
 
-    const position = progress.position;
-    const duration = progress.duration || currentTrack.duration;
+     this.state.lastProgressUpdate = now;
 
-    console.log('[Scrobbling] Updating progress:', {
-      track: currentTrack.title,
-      position: position.toFixed(1),
-      duration: duration.toFixed(1),
-    });
+     const position = progress.position;
+     const duration = progress.duration || currentTrack.duration;
 
-    // Check if we should submit scrobble (50% or 4 minutes)
-    await this.onTrackPlayed(currentTrack, position, duration);
+     console.log('[Scrobbling] Updating progress:', {
+       track: currentTrack.title,
+       position: position.toFixed(1),
+       duration: duration.toFixed(1),
+     });
 
-    // IMPORTANT: Sync queue to server with current position
-    // This is where queue sync happens together with progress updates
-    try {
-      console.log('[Scrobbling] Syncing queue with position:', position.toFixed(1));
-      await queueSyncManager.syncToServer(position);
-    } catch (error) {
-      console.error('[Scrobbling] Failed to sync queue during progress update:', error);
-    }
-  }
+     // Check if we should submit scrobble (80% or 4 minutes)
+     await this.onTrackPlayed(currentTrack, position, duration);
 
-  /**
-   * Handle playback state change
-   */
+     // IMPORTANT: Sync queue to server with current position
+     // This is where queue sync happens together with progress updates
+     try {
+       console.log('[Scrobbling] Syncing queue with position:', position.toFixed(1));
+       await queueSyncManager.syncToServer(position);
+     } catch (error) {
+       console.error('[Scrobbling] Failed to sync queue during progress update:', error);
+     }
+   }
+
+   /**
+    * Handle playback state change
+    */
   async onPlaybackStateChange(state: 'playing' | 'paused' | 'stopped'): Promise<void> {
     if (state === 'stopped') {
       // Track stopped - check if we should scrobble
@@ -200,6 +203,15 @@ class ScrobblingManager {
   }
 
   /**
+   * Handle natural track end (queue ended or track finished)
+   */
+  async onTrackEnded(track: Track, position: number, duration: number): Promise<void> {
+    console.log('[Scrobbling] Track ended naturally:', track.title);
+    // Force scrobble with full duration for natural endings
+    await this.onTrackPlayed(track, duration, duration, true);
+  }
+
+  /**
    * Handle seek - update progress immediately
    */
   async onSeek(position: number): Promise<void> {
@@ -207,31 +219,31 @@ class ScrobblingManager {
     await queueSyncManager.syncToServer(position);
   }
 
-  /**
-   * Reset scrobble state
-   */
-  private resetState(): void {
-    this.state = {
-      currentTrackId: null,
-      hasScrobbledNowPlaying: false,
-      hasScrobbledSubmission: false,
-      lastProgressUpdate: 0,
-    };
-  }
+   /**
+    * Reset scrobble state
+    */
+   private resetState(): void {
+     this.state = {
+       currentTrackId: null,
+       hasScrobbledNowPlaying: false,
+       hasScrobbledSubmission: false,
+       lastProgressUpdate: 0,
+     };
+   }
 
-  /**
-   * Force immediate progress update and queue sync
-   * Useful for app backgrounding or user-initiated sync
-   */
-  async forceUpdate(): Promise<void> {
-    const { currentTrack, playbackState, progress } = usePlayerStore.getState();
+   /**
+    * Force immediate progress update and queue sync
+    * Useful for app backgrounding or user-initiated sync
+    */
+   async forceUpdate(): Promise<void> {
+     const { currentTrack, playbackState } = usePlayerStore.getState();
 
-    if (playbackState === 'playing' && currentTrack) {
-      console.log('[Scrobbling] Force updating progress and queue');
-      this.state.lastProgressUpdate = 0; // Reset to allow immediate update
-      await this.updateProgress();
-    }
-  }
+     if (playbackState === 'playing' && currentTrack) {
+       console.log('[Scrobbling] Force updating progress and queue');
+       this.state.lastProgressUpdate = 0; // Reset to allow immediate update
+       await this.updateProgress();
+     }
+   }
 }
 
 export const scrobblingManager = new ScrobblingManager();
