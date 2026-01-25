@@ -1,50 +1,82 @@
-# Welcome to your Expo app 👋
+![Dino Banner](banner.png)
+# Dino Music
+Dino is a premium mobile music streaming application for iOS and Android that connects to OpenSubsonic servers. Features Tidal-inspired design with dynamic blurred backgrounds, robust offline support, intelligent queue management with server sync, synchronized lyrics, radio/instant mix, Chromecast integration, and deep linking for shared content.
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+> [!IMPORTANT] AI Disclosure
+> This application is fully made with AI. All code, design, and implementation has been generated using artificial intelligence tools. If you dislike Vibe Coded apps, you are free to ignore this app.
 
-## Get started
+## Features (Implemented)
 
-1. Install dependencies
+- OpenSubsonic API integration with multi-server support
+- Streaming with quality selection and smart caching
+- Background playback with lock screen controls
+- Search across entire library
+- Favorites/starred content
+- Queue management with server synchronization
+- Network-adaptive streaming
+- Scrobbling (play count tracking and progress updates)
+- Cross-device playback continuity (resume on another device)
 
+## Planned Features (Not Yet Implemented)
+
+- Share feature with deep linking (Deep linking only supported with [Dinosonic](https://github.com/sonicdino/dinosonic) servers)
+- Downloads and Offline Playback (individual tracks, albums, playlists)
+- Synchronized lyrics as dedicated screen
+- Radio/Instant Mix
+- Chromecast support
+- Android Auto integration
+- Google Assistant voice commands
+
+## Technology Stack
+
+- React Native via Expo
+- TypeScript for type safety
+- OpenSubsonic API integration
+- Premium Tidal-inspired UI with glassmorphism effects
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js and npm installed
+- Expo CLI (`npm install -g expo-cli`)
+- An OpenSubsonic server to connect to
+
+### Installation
+
+1. Install dependencies:
    ```bash
    npm install
    ```
 
-2. Start the app
+2. Build development app using EAS:
+   ```bash
+   eas build --platform ios --profile preview
+   eas build --platform android --profile preview
+   ```
 
+3. Start the app:
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+Scan the QR code with your development app (built from step 2). Expo Go is not supported for this project.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## First Launch
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+On first launch, you'll be prompted to add your OpenSubsonic server connection. The app supports multiple servers that you can switch between at any time.
 
-## Get a fresh project
+## AI-Generated Content
 
-When you're ready, run:
+This entire project, including but not limited to:
+- All source code
+- UI/UX design
+- Documentation
+- Configuration files
+- Build scripts
 
-```bash
-npm run reset-project
-```
+Has been generated using artificial intelligence tools without human manual coding.
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+---
 
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+*Built entirely with AI tools*

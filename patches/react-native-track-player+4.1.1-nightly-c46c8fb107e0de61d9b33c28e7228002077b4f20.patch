@@ -1,0 +1,37 @@
+diff --git a/node_modules/react-native-track-player/android/build.gradle b/node_modules/react-native-track-player/android/build.gradle
+index ac33473..49ce42f 100644
+--- a/node_modules/react-native-track-player/android/build.gradle
++++ b/node_modules/react-native-track-player/android/build.gradle
+@@ -50,7 +50,9 @@ repositories {
+ }
+ 
+ dependencies {
+-    implementation 'com.github.doublesymmetry:kotlinaudio:v2.1.0'
++		// my github repository https://github.com/sawyerf/KotlinAudio
++		implementation 'com.github.sawyerf:KotlinAudio:v2.1.1'
++    // implementation 'com.github.doublesymmetry:kotlinaudio:v2.1.0'
+     // used when building against local maven
+ //    implementation "com.github.doublesymmetry:kotlin-audio:2.1.0"
+ 
+diff --git a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
+index b2409a0..b5b956b 100644
+--- a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
++++ b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
+@@ -545,7 +545,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+         if (verifyServiceBoundOrReject(callback)) return@launch
+ 
+         if (index >= 0 && index < musicService.tracks.size) {
+-            callback.resolve(Arguments.fromBundle(musicService.tracks[index].originalItem))
++            callback.resolve(musicService.tracks[index].originalItem?.let { Arguments.fromBundle(it) })
+         } else {
+             callback.resolve(null)
+         }
+@@ -585,7 +585,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+         callback.resolve(
+             if (musicService.tracks.isEmpty()) null
+             else Arguments.fromBundle(
+-                musicService.tracks[musicService.getCurrentTrackIndex()].originalItem
++                musicService.tracks[musicService.getCurrentTrackIndex()].originalItem!!
+             )
+         )
+     }
