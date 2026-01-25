@@ -20,10 +20,8 @@ Dino is a premium mobile music streaming application for iOS and Android that co
 
 ## Planned Features (Not Yet Implemented)
 
-- Share feature with deep linking (Deep linking only supported with [Dinosonic](https://github.com/sonicdino/dinosonic) servers)
 - Downloads and Offline Playback (individual tracks, albums, playlists)
-- Synchronized lyrics as dedicated screen
-- Radio/Instant Mix
+- Share feature with deep linking (Deep linking only supported with [Dinosonic](https://github.com/sonicdino/dinosonic) servers)
 - Chromecast support
 - Android Auto integration
 - Google Assistant voice commands
@@ -33,7 +31,6 @@ Dino is a premium mobile music streaming application for iOS and Android that co
 - React Native via Expo
 - TypeScript for type safety
 - OpenSubsonic API integration
-- Premium Tidal-inspired UI with glassmorphism effects
 
 ## Getting Started
 
