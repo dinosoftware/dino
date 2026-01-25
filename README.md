@@ -2,7 +2,8 @@
 # Dino Music
 Dino is a premium mobile music streaming application for iOS and Android that connects to OpenSubsonic servers. Features Tidal-inspired design with dynamic blurred backgrounds, robust offline support, intelligent queue management with server sync, synchronized lyrics, radio/instant mix, Chromecast integration, and deep linking for shared content.
 
-> [!IMPORTANT] AI Disclosure
+> [!IMPORTANT]
+> ### AI Disclosure
 > This application is fully made with AI. All code, design, and implementation has been generated using artificial intelligence tools. If you dislike Vibe Coded apps, you are free to ignore this app.
 
 ## Features (Implemented)
