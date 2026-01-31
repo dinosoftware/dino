@@ -15,6 +15,7 @@ interface ProgressBarProps {
   buffered: number; // in seconds
   onSeek: (position: number) => void;
   color?: string; // Optional color override
+  qualityText?: string; // Optional quality indicator
 }
 
 const formatTime = (seconds: number): string => {
@@ -29,6 +30,7 @@ export const ProgressBar = memo<ProgressBarProps>(({
   buffered,
   onSeek,
   color,
+  qualityText,
 }) => {
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPosition, setSeekPosition] = useState(0);
@@ -101,6 +103,15 @@ export const ProgressBar = memo<ProgressBarProps>(({
       {/* Time Labels - BELOW the progress bar, inline */}
       <View style={styles.timeContainer}>
         <Text style={styles.timeText}>{currentTimeText}</Text>
+        <View style={styles.centerBadgeContainer}>
+          {qualityText && (
+            <View style={[styles.qualityBadge, { borderColor: color || theme.colors.accent }]}>
+              <Text style={[styles.qualityText, { color: color || theme.colors.accent }]}>
+                {qualityText}
+              </Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.timeText}>{durationText}</Text>
       </View>
     </View>
@@ -122,13 +133,35 @@ const styles = StyleSheet.create({
   timeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginTop: -8, // Negative margin to bring time very close to progress bar
     paddingHorizontal: 16, // Match slider padding
   },
   timeText: {
-    fontSize: theme.typography.fontSize.sm, // Bigger text
-    color: theme.colors.text.secondary, // More visible
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.text.secondary,
     fontFamily: theme.typography.fontFamily.medium,
+    minWidth: 40, // Fixed width to prevent shifting
+  },
+  centerBadgeContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'none', // Allow touches to pass through
+  },
+  qualityBadge: {
+    borderWidth: 1.5,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: 'transparent',
+  },
+  qualityText: {
+    fontSize: theme.typography.fontSize.xs,
+    fontFamily: theme.typography.fontFamily.semibold,
+    letterSpacing: 0.5,
   },
   trackContainer: {
     position: 'relative',

@@ -12,18 +12,58 @@ import TrackPlayer, {
 } from 'react-native-track-player';
 import { getCoverArtUrl, getStreamUrl } from '../../api/opensubsonic/streaming';
 import { usePlayerStore, useQueueStore, useSettingsStore } from '../../stores';
-import { PlaybackService } from './PlaybackService';
+import { useDownloadStore } from '../../stores/downloadStore';
+import { setClearRestoredPositionCallback, setSyncQueueCallback } from '../../stores/queueStore';
 import { queueSyncManager } from './QueueSyncManager';
 import { scrobblingManager } from './ScrobblingManager';
+
+// Playback service function (replaces PlaybackService.ts to avoid circular dependency)
+async function PlaybackService() {
+  // Remote control event handlers
+  TrackPlayer.addEventListener(Event.RemotePlay, () => {
+    console.log('[PlaybackService] Remote play');
+    trackPlayerService.togglePlayPause();
+  });
+
+  TrackPlayer.addEventListener(Event.RemotePause, () => {
+    console.log('[PlaybackService] Remote pause');
+    trackPlayerService.togglePlayPause();
+  });
+
+  TrackPlayer.addEventListener(Event.RemoteNext, () => {
+    console.log('[PlaybackService] Remote next');
+    trackPlayerService.skipToNext();
+  });
+
+  TrackPlayer.addEventListener(Event.RemotePrevious, () => {
+    console.log('[PlaybackService] Remote previous');
+    trackPlayerService.skipToPrevious();
+  });
+
+  TrackPlayer.addEventListener(Event.RemoteSeek, (event) => {
+    console.log('[PlaybackService] Remote seek:', event.position);
+    trackPlayerService.seekTo(event.position);
+  });
+
+  TrackPlayer.addEventListener(Event.RemoteSkip, (event) => {
+    console.log('[PlaybackService] Remote skip to index:', event.index);
+    trackPlayerService.playTrack(event.index);
+  });
+
+  TrackPlayer.addEventListener(Event.RemoteStop, () => {
+    console.log('[PlaybackService] Remote stop');
+    TrackPlayer.stop();
+  });
+}
 
 // Register the playback service
 TrackPlayer.registerPlaybackService(() => PlaybackService);
 
 class TrackPlayerService {
-  private isInitialized = false;
-  private intervalId: ReturnType<typeof setInterval> | null = null;
-  private networkCheckInterval: ReturnType<typeof setInterval> | null = null;
-  private lastNetworkType: 'wifi' | 'mobile' | 'unknown' = 'unknown';
+  isInitialized = false;
+  intervalId: ReturnType<typeof setInterval> | null = null;
+  networkCheckInterval: ReturnType<typeof setInterval> | null = null;
+  lastNetworkType: 'wifi' | 'mobile' | 'unknown' = 'unknown';
 
   /**
    * Initialize the player service
@@ -71,6 +111,18 @@ class TrackPlayerService {
 
       // Start monitoring network changes
       this.startNetworkMonitoring();
+      
+      // Register callback to clear restored position when user starts new queue
+      setClearRestoredPositionCallback(() => {
+        usePlayerStore.setState({ restoredPosition: null });
+      });
+      
+      // Register callback to sync queue with TrackPlayer when queue is modified
+      setSyncQueueCallback(() => this.syncQueueWithTrackPlayer());
+
+      // Load settings from storage first
+      await useSettingsStore.getState().loadFromStorage();
+      console.log('[TrackPlayer] Settings loaded');
 
       // Load queue from local storage first
       await useQueueStore.getState().loadFromStorage();
@@ -110,7 +162,7 @@ class TrackPlayerService {
   /**
    * Setup event listeners
    */
-  private setupEventListeners() {
+  setupEventListeners() {
     TrackPlayer.addEventListener(Event.PlaybackState, async (event) => {
       const { setPlaybackState } = usePlayerStore.getState();
 
@@ -145,14 +197,45 @@ class TrackPlayerService {
     TrackPlayer.addEventListener(Event.PlaybackTrackChanged, async (event) => {
       // Get previous track info for scrobbling
       const { currentTrack: previousTrack, progress: previousProgress } = usePlayerStore.getState();
-      
+
       if (event.nextTrack !== undefined) {
         const track = await TrackPlayer.getTrack(event.nextTrack);
         if (track) {
-          const { queue } = useQueueStore.getState();
+          const { queue, currentIndex, skipToTrack } = useQueueStore.getState();
           const trackData = queue.find(t => t.id === track.id);
           if (trackData) {
+            // Find the correct index in the queue
+            const newIndex = queue.findIndex(t => t.id === track.id);
+            
+            // CRITICAL FIX: Update queue index to match the actual playing track
+            // Only sync if indices are different (prevents unnecessary store updates)
+            if (newIndex !== -1 && newIndex !== currentIndex) {
+              skipToTrack(newIndex);
+            }
+            
             usePlayerStore.getState().setCurrentTrack(trackData);
+            
+            // Update streaming info based on whether track is downloaded
+            const downloadedTrack = useDownloadStore.getState().getDownloadedTrack(trackData.id);
+            if (downloadedTrack) {
+              usePlayerStore.getState().setStreamingInfo({
+                quality: '0',
+                format: 'Downloaded',
+                displayText: 'Downloaded',
+                networkType: 'unknown',
+              });
+            } else {
+              // Update with current network settings
+              this.getActiveStreamingSettings().then(streamingSettings => {
+                usePlayerStore.getState().setStreamingInfo({
+                  quality: streamingSettings.quality,
+                  format: streamingSettings.formatName,
+                  displayText: streamingSettings.displayText,
+                  networkType: streamingSettings.networkType,
+                });
+              }).catch(err => console.error('[TrackPlayer] Failed to update streaming info:', err));
+            }
+            
             // Notify scrobbling manager about track change with previous track info
             scrobblingManager.onTrackChange(
               trackData,
@@ -160,6 +243,13 @@ class TrackPlayerService {
               previousProgress.position,
               previousProgress.duration
             );
+
+            // Preload next tracks for gapless playback (async, don't await)
+            const updatedIndex = useQueueStore.getState().currentIndex;
+            const updatedQueue = useQueueStore.getState().queue;
+            this.preloadNextTracks(updatedIndex, updatedQueue).catch(err => {
+              console.error('[TrackPlayer] Failed to preload tracks:', err);
+            });
           }
         }
       } else {
@@ -217,7 +307,7 @@ class TrackPlayerService {
   /**
    * Get active streaming settings based on network type
    */
-  private async getActiveStreamingSettings() {
+  async getActiveStreamingSettings() {
     const {
       streamingQualityWiFi,
       streamingQualityMobile,
@@ -281,6 +371,124 @@ class TrackPlayerService {
   }
 
   /**
+   * Build track object for TrackPlayer
+   */
+  async buildTrackObject(track: any, streamingSettings: any) {
+    // Check if track is downloaded
+    const downloadedTrack = useDownloadStore.getState().getDownloadedTrack(track.id);
+    
+    let url: string;
+    let coverArtUrl;
+    
+    if (downloadedTrack) {
+      // Use local file
+      url = downloadedTrack.localUri;
+      // Use cached cover art if available
+      coverArtUrl = downloadedTrack.coverArtUri || (track.coverArt ? await getCoverArtUrl(track.coverArt, 500) : undefined);
+      console.log(`[TrackPlayer] Using downloaded file for track ${track.id}`);
+    } else {
+      // Stream from server
+      url = await getStreamUrl(
+        track.id,
+        streamingSettings.maxBitRate,
+        streamingSettings.format
+      );
+      
+      // Fetch cover art
+      if (track.coverArt) {
+        coverArtUrl = await getCoverArtUrl(track.coverArt, 500);
+      }
+    }
+
+    return {
+      id: track.id,
+      url,
+      title: track.title,
+      artist: track.artist || 'Unknown Artist',
+      album: track.album || 'Unknown Album',
+      artwork: coverArtUrl,
+      duration: track.duration,
+    };
+  }
+
+  /**
+   * Preload next tracks for gapless playback (initial load)
+   */
+  async preloadNextTracksInitial(currentIndex: number, queue: any[], streamingSettings: any) {
+    try {
+      // Check if gapless playback is enabled
+      const settings = useSettingsStore.getState();
+      if (!settings || !settings.gaplessPlayback) {
+        return;
+      }
+
+      const tracksToPreload = 2; // Preload next 2 tracks
+
+      for (let i = 1; i <= tracksToPreload; i++) {
+        const nextIndex = currentIndex + i;
+        if (nextIndex < queue.length) {
+          const nextTrack = queue[nextIndex];
+          if (!nextTrack || !nextTrack.id) {
+            console.warn('[TrackPlayer] Skipping undefined track at index:', nextIndex);
+            continue;
+          }
+          try {
+            const nextTrackObj = await this.buildTrackObject(nextTrack, streamingSettings);
+            await TrackPlayer.add(nextTrackObj);
+            console.log('[TrackPlayer] Preloaded next track for gapless:', nextTrack.title);
+          } catch (error) {
+            console.error('[TrackPlayer] Failed to preload track:', error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[TrackPlayer] preloadNextTracksInitial error:', error);
+    }
+  }
+
+  /**
+   * Preload next tracks for gapless playback (during playback)
+   */
+  async preloadNextTracks(currentIndex: number, queue: any[]) {
+    try {
+      // Check if gapless playback is enabled
+      const settings = useSettingsStore.getState();
+      if (!settings || !settings.gaplessPlayback) {
+        return;
+      }
+
+      const playerQueue = await TrackPlayer.getQueue();
+      const playerQueueLength = playerQueue.length;
+
+      // If we have less than 2 tracks in the player queue, add more
+      if (playerQueueLength < 2) {
+        const streamingSettings = await this.getActiveStreamingSettings();
+        const tracksToAdd = 2 - playerQueueLength;
+
+        for (let i = 1; i <= tracksToAdd; i++) {
+          const nextIndex = currentIndex + i;
+          if (nextIndex < queue.length) {
+            const nextTrack = queue[nextIndex];
+            if (!nextTrack || !nextTrack.id) {
+              console.warn('[TrackPlayer] Skipping undefined track at index:', nextIndex);
+              continue;
+            }
+            try {
+              const nextTrackObj = await this.buildTrackObject(nextTrack, streamingSettings);
+              await TrackPlayer.add(nextTrackObj);
+              console.log('[TrackPlayer] Preloaded next track for gapless:', nextTrack.title);
+            } catch (error) {
+              console.error('[TrackPlayer] Failed to preload track:', error);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[TrackPlayer] preloadNextTracks error:', error);
+    }
+  }
+
+  /**
    * Play a track
    */
   async play() {
@@ -294,7 +502,10 @@ class TrackPlayerService {
     console.log('[TrackPlayer] Playing:', currentTrack.title);
 
     try {
-      // Get active streaming settings based on network
+      // Check if track is downloaded
+      const downloadedTrack = useDownloadStore.getState().getDownloadedTrack(currentTrack.id);
+      
+      // Get active streaming settings based on network (only if not downloaded)
       const streamingSettings = await this.getActiveStreamingSettings();
 
       console.log('[TrackPlayer] Streaming settings:', {
@@ -304,44 +515,37 @@ class TrackPlayerService {
         display: streamingSettings.displayText,
         maxBitRateForApi: streamingSettings.maxBitRate,
         formatForApi: streamingSettings.format,
+        isDownloaded: !!downloadedTrack,
       });
 
       // Update streaming info in store
-      usePlayerStore.getState().setStreamingInfo({
-        quality: streamingSettings.quality,
-        format: streamingSettings.formatName,
-        displayText: streamingSettings.displayText,
-        networkType: streamingSettings.networkType,
-      });
-
-      // Get stream URL with transcoding parameters
-      console.log('[TrackPlayer] Building stream URL with params:', {
-        trackId: currentTrack.id,
-        maxBitRate: streamingSettings.maxBitRate,
-        format: streamingSettings.format,
-      });
-
-      const streamUrl = await getStreamUrl(
-        currentTrack.id,
-        streamingSettings.maxBitRate,
-        streamingSettings.format
-      );
-
-      console.log('[TrackPlayer] Stream URL built:', streamUrl);
-
-      let coverArtUrl;
-      if (currentTrack.coverArt) {
-        coverArtUrl = await getCoverArtUrl(currentTrack.coverArt, 500);
+      if (downloadedTrack) {
+        // Show "Downloaded" badge for local files
+        usePlayerStore.getState().setStreamingInfo({
+          quality: '0',
+          format: 'Downloaded',
+          displayText: 'Downloaded',
+          networkType: 'unknown',
+        });
+      } else {
+        usePlayerStore.getState().setStreamingInfo({
+          quality: streamingSettings.quality,
+          format: streamingSettings.formatName,
+          displayText: streamingSettings.displayText,
+          networkType: streamingSettings.networkType,
+        });
       }
 
+      // Build current track object
+      const currentTrackObj = await this.buildTrackObject(currentTrack, streamingSettings);
+
       await TrackPlayer.reset();
-      await TrackPlayer.add({
-        id: currentTrack.id,
-        url: streamUrl,
-        title: currentTrack.title,
-        artist: currentTrack.artist || 'Unknown Artist',
-        artwork: coverArtUrl,
-        duration: currentTrack.duration,
+      await TrackPlayer.add(currentTrackObj);
+
+      // Preload next tracks for gapless playback (async, non-blocking)
+      const { queue, currentIndex } = useQueueStore.getState();
+      this.preloadNextTracksInitial(currentIndex, queue, streamingSettings).catch(err => {
+        console.error('[TrackPlayer] Failed to preload initial tracks:', err);
       });
 
       // Check if we need to restore a position (from server queue)
@@ -378,34 +582,93 @@ class TrackPlayerService {
   }
 
   async skipToNext() {
-    const { skipToNext } = useQueueStore.getState();
-    const hasNext = skipToNext();
-    if (hasNext) {
-      const { queue, currentIndex } = useQueueStore.getState();
-      const nextTrack = queue[currentIndex];
-      if (nextTrack) {
-        usePlayerStore.getState().setCurrentTrack(nextTrack);
-        await this.play();
-      }
+    const { queue, currentIndex, skipToNext: incrementIndex } = useQueueStore.getState();
+    
+    // Check if there's a next track
+    if (currentIndex >= queue.length - 1 || queue.length === 0) {
+      console.log('[TrackPlayer] No next track available');
+      return;
     }
+
+    // Increment index first
+    const hasNext = incrementIndex();
+    if (!hasNext) {
+      console.log('[TrackPlayer] Could not increment index');
+      return;
+    }
+
+    // Get the updated queue state after incrementing
+    const { queue: updatedQueue, currentIndex: newIndex } = useQueueStore.getState();
+    const nextTrack = updatedQueue[newIndex];
+    
+    if (!nextTrack) {
+      console.error('[TrackPlayer] Next track not found at index', newIndex);
+      return;
+    }
+
+    // Update current track in player store
+    usePlayerStore.getState().setCurrentTrack(nextTrack);
+
+    // Try to use native skip if track is already loaded (for gapless)
+    try {
+      const settings = useSettingsStore.getState();
+      if (settings && settings.gaplessPlayback) {
+        const playerQueue = await TrackPlayer.getQueue();
+        
+        if (playerQueue.find((t: any) => t.id === nextTrack.id)) {
+          console.log('[TrackPlayer] Using native skip for gapless playback');
+          await TrackPlayer.skipToNext();
+          return;
+        }
+      }
+    } catch (error) {
+      console.warn('[TrackPlayer] Could not use native skip, falling back to play:', error);
+    }
+
+    // Otherwise, play the track normally
+    await this.play();
   }
 
   async skipToPrevious() {
     const position = await TrackPlayer.getPosition();
+    const { queue, currentIndex } = useQueueStore.getState();
+    
+    // If more than 10 seconds into track, restart current track
     if (position > 10) {
       await TrackPlayer.seekTo(0);
       return;
     }
-    const { skipToPrevious } = useQueueStore.getState();
-    const hasPrevious = skipToPrevious();
-    if (hasPrevious) {
-      const { queue, currentIndex } = useQueueStore.getState();
-      const previousTrack = queue[currentIndex];
-      if (previousTrack) {
-        usePlayerStore.getState().setCurrentTrack(previousTrack);
-        await this.play();
-      }
+    
+    // Check if there's a previous track
+    if (currentIndex <= 0 || queue.length === 0) {
+      console.log('[TrackPlayer] No previous track available');
+      await TrackPlayer.seekTo(0); // Just restart current track
+      return;
     }
+    
+    // Decrement index
+    const { skipToPrevious: decrementIndex } = useQueueStore.getState();
+    const hasPrevious = decrementIndex();
+    
+    if (!hasPrevious) {
+      console.log('[TrackPlayer] Could not decrement index');
+      await TrackPlayer.seekTo(0);
+      return;
+    }
+    
+    // Get the updated queue state after decrementing
+    const { queue: updatedQueue, currentIndex: newIndex } = useQueueStore.getState();
+    const previousTrack = updatedQueue[newIndex];
+    
+    if (!previousTrack) {
+      console.error('[TrackPlayer] Previous track not found at index', newIndex);
+      await TrackPlayer.seekTo(0);
+      return;
+    }
+    
+    // Update current track and play
+    usePlayerStore.getState().setCurrentTrack(previousTrack);
+    await this.play();
   }
 
   async seekTo(positionSeconds: number) {
@@ -431,7 +694,7 @@ class TrackPlayerService {
     usePlayerStore.getState().setVolume(volume);
   }
 
-  private startProgressTracking() {
+  startProgressTracking() {
     if (this.intervalId) return;
     this.intervalId = setInterval(async () => {
       try {
@@ -442,12 +705,12 @@ class TrackPlayerService {
         setProgress(position, duration);
         setBufferedProgress(bufferedPosition);
       } catch (error) {
-        console.warn('[TrackPlayer] Progress tracking error:', error);
+        // Silent fail - don't spam console during normal operation
       }
-    }, 1000); // Changed from 250ms to 1000ms - Much less frequent updates
+    }, 1000); // 1 second updates for better performance
   }
 
-  private stopProgressTracking() {
+  stopProgressTracking() {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
@@ -464,9 +727,71 @@ class TrackPlayerService {
   }
 
   /**
+   * Sync TrackPlayer's internal queue with Zustand queue
+   * This is critical when queue is modified (remove/reorder) to keep everything in sync
+   */
+  async syncQueueWithTrackPlayer() {
+    try {
+      const { queue, currentIndex } = useQueueStore.getState();
+      const { currentTrack } = usePlayerStore.getState();
+      
+      if (!currentTrack || queue.length === 0) {
+        console.log('[TrackPlayer] No track playing, skipping queue sync');
+        return;
+      }
+
+      // Verify current track is still in queue at currentIndex
+      const trackAtCurrentIndex = queue[currentIndex];
+      if (!trackAtCurrentIndex || trackAtCurrentIndex.id !== currentTrack.id) {
+        console.warn('[TrackPlayer] Current track mismatch after queue modification');
+        // Update to the track at currentIndex
+        const newCurrentTrack = queue[currentIndex];
+        if (newCurrentTrack) {
+          usePlayerStore.getState().setCurrentTrack(newCurrentTrack);
+          await this.play(); // Play the new current track
+          return;
+        }
+      }
+
+      // Current track is still correct, just need to sync the preloaded tracks
+      console.log('[TrackPlayer] Current track unchanged, syncing preloaded tracks');
+      
+      // Get TrackPlayer's current queue
+      const playerQueue = await TrackPlayer.getQueue();
+      
+      // Check if gapless playback is enabled
+      const settings = useSettingsStore.getState();
+      if (!settings || !settings.gaplessPlayback) {
+        console.log('[TrackPlayer] Gapless playback disabled, no sync needed');
+        return;
+      }
+      
+      // Remove all tracks except the first one (currently playing)
+      // TrackPlayer keeps index 0 as the current track
+      for (let i = playerQueue.length - 1; i > 0; i--) {
+        await TrackPlayer.remove(i);
+      }
+      
+      console.log('[TrackPlayer] Cleared preloaded tracks');
+      
+      // Get streaming settings
+      const streamingSettings = await this.getActiveStreamingSettings();
+
+      // Preload next tracks based on updated queue
+      this.preloadNextTracksInitial(currentIndex, queue, streamingSettings).catch(err => {
+        console.error('[TrackPlayer] Failed to preload tracks after queue sync:', err);
+      });
+
+      console.log('[TrackPlayer] Queue sync completed - preloaded tracks updated');
+    } catch (error) {
+      console.error('[TrackPlayer] Failed to sync queue:', error);
+    }
+  }
+
+  /**
    * Start monitoring network changes
    */
-  private startNetworkMonitoring() {
+  startNetworkMonitoring() {
     // Initial network detection
     this.detectInitialNetwork();
 
@@ -482,7 +807,7 @@ class TrackPlayerService {
   /**
    * Detect initial network type on startup
    */
-  private async detectInitialNetwork() {
+  async detectInitialNetwork() {
     try {
       const networkState = await Network.getNetworkStateAsync();
       if (networkState.type === Network.NetworkStateType.WIFI) {
@@ -502,7 +827,7 @@ class TrackPlayerService {
   /**
    * Setup network event listener (if available)
    */
-  private setupNetworkEventListener() {
+  setupNetworkEventListener() {
     try {
       // Try to use network state change event if available
       Network.addNetworkStateListener((networkState) => {
@@ -533,7 +858,7 @@ class TrackPlayerService {
   /**
    * Check for network changes (polling fallback)
    */
-  private async checkNetworkChange() {
+  async checkNetworkChange() {
     try {
       const networkState = await Network.getNetworkStateAsync();
       let currentNetworkType: 'wifi' | 'mobile' | 'unknown';
@@ -562,7 +887,7 @@ class TrackPlayerService {
   /**
    * Stop monitoring network changes
    */
-  private stopNetworkMonitoring() {
+  stopNetworkMonitoring() {
     if (this.networkCheckInterval) {
       clearInterval(this.networkCheckInterval);
       this.networkCheckInterval = null;
@@ -572,13 +897,56 @@ class TrackPlayerService {
   /**
    * Handle network change - ALWAYS switch immediately for consistency
    */
-  private async handleNetworkChange(newNetworkType: 'wifi' | 'mobile' | 'unknown') {
+  async handleNetworkChange(newNetworkType: 'wifi' | 'mobile' | 'unknown') {
     const { currentTrack, playbackState } = usePlayerStore.getState();
 
     // Only handle network change if something is currently playing or paused
     if (!currentTrack || playbackState === 'stopped') {
       console.log('[TrackPlayer] No active track, skipping network change handling');
       return;
+    }
+
+    // Check if track is downloaded - no need to handle network changes for local files
+    const downloadedTrack = useDownloadStore.getState().getDownloadedTrack(currentTrack.id);
+    if (downloadedTrack) {
+      console.log('[TrackPlayer] Track is downloaded, ignoring network change');
+      return;
+    }
+
+    // Check if WiFi and Mobile settings are identical
+    const {
+      streamingQualityWiFi,
+      streamingQualityMobile,
+      streamingFormatWiFi,
+      streamingFormatMobile,
+    } = useSettingsStore.getState();
+
+    if (streamingQualityWiFi === streamingQualityMobile && 
+        streamingFormatWiFi === streamingFormatMobile) {
+      console.log('[TrackPlayer] WiFi and Mobile settings are identical - no need to switch');
+      console.log(`[TrackPlayer] Both use: ${streamingQualityWiFi} kbps ${streamingFormatWiFi}`);
+      
+      // Check if downloaded (shouldn't reach here due to earlier check, but be safe)
+      const downloadedTrack = useDownloadStore.getState().getDownloadedTrack(currentTrack.id);
+      if (downloadedTrack) {
+        usePlayerStore.getState().setStreamingInfo({
+          quality: '0',
+          format: 'Downloaded',
+          displayText: 'Downloaded',
+          networkType: 'unknown',
+        });
+      } else {
+        // Still update the badge to show current network type
+        const streamingSettings = await this.getActiveStreamingSettings();
+        usePlayerStore.getState().setStreamingInfo({
+          quality: streamingSettings.quality,
+          format: streamingSettings.formatName,
+          displayText: streamingSettings.displayText,
+          networkType: streamingSettings.networkType,
+        });
+      }
+      
+      return; // Skip the stream switch
     }
 
     const startTime = Date.now();
@@ -665,14 +1033,14 @@ class TrackPlayerService {
 
   async destroy() {
     this.stopNetworkMonitoring();
-    
+
     // Stop managers
     queueSyncManager.stop();
     scrobblingManager.stop();
-    
+
     // Force final sync before destroying
     await scrobblingManager.forceUpdate();
-    
+
     await TrackPlayer.reset();
   }
 

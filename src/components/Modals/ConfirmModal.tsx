@@ -75,14 +75,15 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
               </TouchableOpacity>
             )}
             <TouchableOpacity 
-              style={[styles.button, styles.buttonPrimary]}
+              style={[
+                styles.button, 
+                styles.buttonPrimary,
+                destructive && styles.buttonDestructive
+              ]}
               onPress={onConfirm ? handleConfirm : handleCancel}
               activeOpacity={0.7}
             >
-              <Text style={[
-                styles.buttonText,
-                destructive && styles.buttonTextDestructive
-              ]}>
+              <Text style={styles.buttonText}>
                 {confirmText}
               </Text>
             </TouchableOpacity>
@@ -145,17 +146,17 @@ const styles = StyleSheet.create({
   buttonPrimary: {
     backgroundColor: theme.colors.accent,
   },
+  buttonDestructive: {
+    backgroundColor: theme.colors.error,
+  },
   buttonText: {
     fontSize: theme.typography.fontSize.md,
     fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.background.primary,
+    color: theme.colors.text.inverse, // White text on accent button
   },
   buttonTextSecondary: {
     fontSize: theme.typography.fontSize.md,
     fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.text.secondary,
-  },
-  buttonTextDestructive: {
-    color: theme.colors.error,
+    color: theme.colors.text.primary,
   },
 });

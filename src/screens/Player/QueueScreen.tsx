@@ -16,7 +16,7 @@ import {
 import DraggableFlatList, {
   RenderItemParams,
 } from 'react-native-draggable-flatlist';
-import { X, Trash2, GripVertical } from 'lucide-react-native';
+import { X, Trash2, GripVertical, Eraser, ListPlus } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useQueueStore, usePlayerStore } from '../../stores';
 import { useCoverArt } from '../../hooks/api/useAlbums';
@@ -156,10 +156,12 @@ const QueueItem = memo<QueueItemProps>(({ track, index, isPlaying, onRemove, onL
 QueueItem.displayName = 'QueueItem';
 
 export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
-  const { queue, currentIndex, removeFromQueue, reorderQueue } = useQueueStore();
+  const { queue, currentIndex, removeFromQueue, reorderQueue, clearQueue } = useQueueStore();
   const { currentTrack } = usePlayerStore();
   const { data: coverArtUrl } = useCoverArt(currentTrack?.coverArt, 500);
   const trackMenuState = useTrackMenuState();
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showSaveToPlaylist, setShowSaveToPlaylist] = useState(false);
 
   console.log('[QueueScreen] Current index:', currentIndex, 'Queue length:', queue.length);
 
@@ -204,6 +206,17 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
 
   const translateY = useRef(new Animated.Value(0)).current;
 
+  const handleClose = useCallback(() => {
+    Animated.timing(translateY, {
+      toValue: 1000,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      translateY.setValue(0);
+      onClose();
+    });
+  }, [translateY, onClose]);
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -240,32 +253,54 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
       <BlurredBackground imageUri={coverArtUrl || undefined}>
         <Animated.View 
           style={[styles.container, { transform: [{ translateY }] }]}
-          {...panResponder.panHandlers}
         >
-          {/* Swipe Handle */}
-          <View style={styles.swipeIndicator}>
+          {/* Swipe Handle - ONLY AREA WITH GESTURE */}
+          <View 
+            style={styles.swipeIndicator}
+            {...panResponder.panHandlers}
+          >
             <View style={styles.swipeHandle} />
           </View>
 
-          {/* Header with darker background for readability */}
-          <View style={styles.headerContainer}>
+          {/* Header with darker background for readability - ALSO HAS GESTURE */}
+          <View 
+            style={styles.headerContainer}
+            {...panResponder.panHandlers}
+          >
             <View style={styles.header}>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
                 <X size={20} color={theme.colors.text.primary} strokeWidth={2} />
               </TouchableOpacity>
               <Text style={styles.headerTitle}>Queue</Text>
-              <View style={styles.placeholder} />
+              <TouchableOpacity 
+                onPress={() => setShowClearConfirm(true)} 
+                style={styles.closeButton}
+              >
+                <Eraser size={20} color={theme.colors.text.primary} strokeWidth={2} />
+              </TouchableOpacity>
             </View>
 
-            {/* Queue Info */}
+            {/* Queue Info and Actions */}
             <View style={styles.queueInfo}>
               <Text style={styles.queueInfoText}>
-                {queue.length} {queue.length === 1 ? 'song' : 'songs'} • Long press handle to reorder • Swipe to delete • Tap for options
+                {queue.length} {queue.length === 1 ? 'song' : 'songs'}
               </Text>
+              {queue.length > 0 && (
+                <TouchableOpacity 
+                  style={styles.saveButton}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setShowSaveToPlaylist(true);
+                  }}
+                >
+                  <ListPlus size={18} color={theme.colors.accent} strokeWidth={2} />
+                  <Text style={styles.saveButtonText}>Save as Playlist</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
-          {/* Queue List */}
+          {/* Queue List - NO GESTURE AT ALL */}
           <DraggableFlatList
             data={queue}
             renderItem={renderItem}
@@ -277,6 +312,11 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
             activationDistance={10}
             autoscrollThreshold={50}
             autoscrollSpeed={100}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={10}
+            updateCellsBatchingPeriod={50}
+            initialNumToRender={20}
+            windowSize={21}
           />
         </Animated.View>
 
@@ -312,6 +352,31 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
           message={trackMenuState.confirmMessage.message}
           onClose={() => trackMenuState.setShowConfirm(false)}
         />
+        
+        {/* Clear Queue Confirm */}
+        <ConfirmModal
+          visible={showClearConfirm}
+          title="Clear Queue"
+          message="Are you sure you want to clear the entire queue? This cannot be undone."
+          confirmText="Clear"
+          cancelText="Cancel"
+          onConfirm={() => {
+            clearQueue();
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            setShowClearConfirm(false);
+            onClose();
+          }}
+          onClose={() => setShowClearConfirm(false)}
+          destructive={true}
+        />
+        
+        {/* Save Queue to Playlist */}
+        <AddToPlaylistModal
+          visible={showSaveToPlaylist}
+          onClose={() => setShowSaveToPlaylist(false)}
+          songIds={queue.map(track => track.id)}
+          songTitle="Queue"
+        />
       </BlurredBackground>
     </GestureHandlerRootView>
   );
@@ -324,7 +389,7 @@ const styles = StyleSheet.create({
   swipeIndicator: {
     alignItems: 'center',
     paddingVertical: theme.spacing.sm,
-    paddingTop: theme.spacing.md,
+    paddingTop: theme.spacing.xxl,
   },
   swipeHandle: {
     width: 48,
@@ -367,6 +432,10 @@ const styles = StyleSheet.create({
   queueInfo: {
     paddingHorizontal: theme.spacing.lg,
     paddingBottom: theme.spacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: theme.spacing.md,
   },
   queueInfoText: {
     fontSize: theme.typography.fontSize.xs,
@@ -375,6 +444,22 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
+  },
+  saveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(30, 30, 30, 0.8)',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.accent + '40',
+  },
+  saveButtonText: {
+    fontSize: theme.typography.fontSize.xs,
+    fontFamily: theme.typography.fontFamily.semibold,
+    color: theme.colors.accent,
   },
   listContent: {
     paddingHorizontal: theme.spacing.md,

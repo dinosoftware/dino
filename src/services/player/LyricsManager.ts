@@ -4,21 +4,58 @@
  */
 
 import TrackPlayer from 'react-native-track-player';
+import * as FileSystem from 'expo-file-system';
 import { getLyricsBySongId } from '../../api/opensubsonic/lyrics';
 import { usePlayerStore } from '../../stores';
+import { useDownloadStore } from '../../stores/downloadStore';
 import { LYRICS_SYNC_CONFIG } from '../../config/constants';
 import { LyricLine } from '../../api/opensubsonic/types';
 
 class LyricsManager {
   private syncIntervalId: ReturnType<typeof setInterval> | null = null;
+  private lyricsCache: Map<string, any> = new Map();
 
   /**
    * Fetch and cache lyrics for a track
    */
-  async fetchLyrics(trackId: string) {
+  async fetchLyrics(trackId: string, forceRefresh: boolean = false, setInStore: boolean = true) {
     try {
-      // Set loading state
-      usePlayerStore.getState().setLyricsLoading(true, trackId);
+      // Check cache first
+      if (!forceRefresh && this.lyricsCache.has(trackId)) {
+        console.log('[Lyrics] Using cached lyrics for:', trackId);
+        const cachedLyrics = this.lyricsCache.get(trackId);
+        if (setInStore) {
+          this.setLyricsInStore(cachedLyrics);
+        }
+        return cachedLyrics;
+      }
+
+      // Check if track has downloaded lyrics
+      const downloadedTrack = useDownloadStore.getState().getDownloadedTrack(trackId);
+      if (downloadedTrack?.lyricsUri) {
+        console.log('[Lyrics] Loading from downloaded file:', downloadedTrack.lyricsUri);
+        try {
+          const lyricsContent = await FileSystem.readAsStringAsync(downloadedTrack.lyricsUri);
+          const lyrics = JSON.parse(lyricsContent);
+          
+          // Cache in memory
+          this.lyricsCache.set(trackId, lyrics);
+          
+          if (setInStore) {
+            this.setLyricsInStore(lyrics);
+          }
+          
+          return lyrics;
+        } catch (error) {
+          console.error('[Lyrics] Failed to load downloaded lyrics:', error);
+          // Fall through to fetch from server
+        }
+      }
+
+      // Set loading state only if we're setting in store
+      if (setInStore) {
+        usePlayerStore.getState().setLyricsLoading(true, trackId);
+      }
       
       // Fetch from server (skip caching for now due to MMKV serialization issues)
       console.log('[Lyrics] Fetching from server:', trackId);
@@ -52,23 +89,28 @@ class LyricsManager {
         synced: lyrics?.synced,
       });
 
-      // Don't cache - causes MMKV std::runtime_error
-      // TODO: Fix MMKV serialization or use different storage method
+      // Cache in memory
+      this.lyricsCache.set(trackId, lyrics);
 
-      this.setLyricsInStore(lyrics);
-      
-      // Clear loading state
-      usePlayerStore.getState().setLyricsLoading(false);
-      
+      // Only set in store if requested
+      if (setInStore) {
+        this.setLyricsInStore(lyrics);
+        // Clear loading state
+        usePlayerStore.getState().setLyricsLoading(false);
+      }
+
       return lyrics;
     } catch (error) {
       // Silently fail - most tracks won't have lyrics anyway
       console.log('[Lyrics] Failed to fetch:', error);
-      usePlayerStore.getState().setCurrentLyrics(null);
-      
-      // Clear loading state
-      usePlayerStore.getState().setLyricsLoading(false);
-      
+
+      // Only update store if requested
+      if (setInStore) {
+        usePlayerStore.getState().setCurrentLyrics(null);
+        // Clear loading state
+        usePlayerStore.getState().setLyricsLoading(false);
+      }
+
       return null;
     }
   }

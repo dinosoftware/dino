@@ -5,4 +5,6 @@
 
 export * from './useAlbums';
 export * from './useArtists';
+export * from './useArtistInfo';
 export * from './usePlaylists';
+export * from './useTopSongs';

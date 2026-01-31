@@ -6,8 +6,10 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { Download } from 'lucide-react-native';
 import { Album } from '../../api/opensubsonic/types';
 import { theme } from '../../config';
+import { useDownloadStore } from '../../stores/downloadStore';
 
 interface AlbumCardProps {
   album: Album;
@@ -25,6 +27,8 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({
   width,
 }) => {
   const [scaleAnim] = useState(new Animated.Value(1));
+  const { isAlbumDownloaded } = useDownloadStore();
+  const isDownloaded = isAlbumDownloaded(album.id);
 
   const handleLongPress = () => {
     if (onLongPress) {
@@ -73,6 +77,12 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({
         ) : (
           <View style={[styles.cover, styles.placeholderCover]}>
             <Text style={styles.placeholderText}>♪</Text>
+          </View>
+        )}
+        {/* Download Badge */}
+        {isDownloaded && (
+          <View style={styles.downloadBadge}>
+            <Download size={14} color={theme.colors.text.inverse} strokeWidth={2.5} />
           </View>
         )}
       </Animated.View>
@@ -132,5 +142,17 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.text.secondary,
     lineHeight: theme.typography.fontSize.sm * theme.typography.lineHeight.normal,
+  },
+  downloadBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: theme.colors.accent,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.md,
   },
 });

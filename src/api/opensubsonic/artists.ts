@@ -8,6 +8,7 @@ import {
   GetArtistsResponse,
   GetArtistResponse,
   GetArtistInfoResponse,
+  GetTopSongsResponse,
 } from './types';
 
 /**
@@ -28,15 +29,36 @@ export const getArtist = async (artistId: string): Promise<GetArtistResponse> =>
 
 /**
  * Get artist info (bio, images, similar artists)
+ * Note: Uses getArtistInfo2 for ID3 mode (v1.8.0+) - some servers may not support this endpoint
  */
 export const getArtistInfo = async (
   artistId: string,
   count?: number,
   includeNotPresent?: boolean
 ): Promise<GetArtistInfoResponse> => {
-  return await apiClient.get<GetArtistInfoResponse>('getArtistInfo2', {
-    id: artistId,
-    ...(count && { count }),
-    ...(includeNotPresent !== undefined && { includeNotPresent }),
+  try {
+    return await apiClient.get<GetArtistInfoResponse>('getArtistInfo2', {
+      id: artistId,
+      ...(count && { count }),
+      ...(includeNotPresent !== undefined && { includeNotPresent }),
+    });
+  } catch (error) {
+    console.log('getArtistInfo2 not supported by server or no data available:', error);
+    // Return empty artistInfo2 if endpoint not supported
+    return { artistInfo2: {} as any };
+  }
+};
+
+/**
+ * Get top songs for an artist
+ * Uses Last.fm data to return popular songs
+ */
+export const getTopSongs = async (
+  artistName: string,
+  count: number = 50
+): Promise<GetTopSongsResponse> => {
+  return await apiClient.get<GetTopSongsResponse>('getTopSongs', {
+    artist: artistName,
+    count,
   });
 };

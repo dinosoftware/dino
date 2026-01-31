@@ -4,18 +4,22 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, BackHandler } from 'react-native';
 import { Home, Search, Music2, Download } from 'lucide-react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HomeScreen } from '../screens/Home/HomeScreen';
 import { SearchScreen } from '../screens/Home/SearchScreen';
 import { LibraryScreen } from '../screens/Library/LibraryScreen';
 import { SettingsScreen } from '../screens/Settings/SettingsScreen';
+import { SharesScreen } from '../screens/Settings/SharesScreen';
+import { DownloadsScreen } from '../screens/Downloads/DownloadsScreen';
 import AlbumDetailScreen from '../screens/Detail/AlbumDetailScreen';
 import ArtistDetailScreen from '../screens/Detail/ArtistDetailScreen';
 import PlaylistDetailScreen from '../screens/Detail/PlaylistDetailScreen';
 import { MiniPlayer } from '../components/Player/MiniPlayer';
 import { FullPlayer } from '../components/Player/FullPlayer';
+import { ToastContainer } from '../components/common/ToastContainer';
+import { OfflineBanner } from '../components/common';
 import { usePlayerStore } from '../stores';
 import { useNavigationStore } from '../stores/navigationStore';
 import { trackPlayerService } from '../services/player/TrackPlayerService';
@@ -26,13 +30,6 @@ const queryClient = new QueryClient();
 interface MainNavigatorProps {
   onLogout: () => void;
 }
-
-const DownloadsScreen = () => (
-  <View style={styles.screen}>
-    <Text style={styles.placeholderText}>Downloads</Text>
-    <Text style={styles.placeholderSubtext}>Your downloaded music will appear here</Text>
-  </View>
-);
 
 const SettingsScreenComponent = ({ onLogout }: { onLogout: () => void }) => (
   <View style={styles.screen}>
@@ -45,15 +42,42 @@ const SettingsScreenComponent = ({ onLogout }: { onLogout: () => void }) => (
 );
 
 export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
-  const [showFullPlayer, setShowFullPlayer] = useState(false);
   const { currentTrack } = usePlayerStore();
-  const { currentScreen, navigate } = useNavigationStore();
+  const { currentScreen, navigate, goBack, canGoBack, showFullPlayer, setShowFullPlayer } = useNavigationStore();
   
   const activeTab = currentScreen.name === 'album-detail' || 
     currentScreen.name === 'artist-detail' || 
-    currentScreen.name === 'playlist-detail'
-    ? 'library'  // Keep library tab active for detail screens
+    currentScreen.name === 'playlist-detail' ||
+    currentScreen.name === 'shares'
+    ? 'library'  // Keep library tab active for detail screens and shares
     : currentScreen.name;
+
+  // Handle hardware back button
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (showFullPlayer) {
+        setShowFullPlayer(false);
+        return true; // Prevent default behavior
+      }
+      
+      if (canGoBack()) {
+        goBack();
+        return true; // Prevent default behavior
+      }
+      
+      // On home screen, allow default behavior (exit app)
+      return false;
+    });
+
+    return () => backHandler.remove();
+  }, [showFullPlayer, canGoBack, goBack]);
+
+  // Close full player when navigation changes
+  useEffect(() => {
+    if (showFullPlayer) {
+      setShowFullPlayer(false);
+    }
+  }, [currentScreen.name]);
 
   // Initialize TrackPlayer on mount
   useEffect(() => {
@@ -83,6 +107,8 @@ export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
         return <DownloadsScreen />;
       case 'settings':
         return <SettingsScreen onLogout={onLogout} />;
+      case 'shares':
+        return <SharesScreen />;
       case 'album-detail':
         return <AlbumDetailScreen albumId={currentScreen.params.albumId} />;
       case 'artist-detail':
@@ -96,6 +122,9 @@ export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
 
   return (
     <View style={styles.container}>
+      {/* Offline Banner */}
+      <OfflineBanner />
+      
       {/* Screen Content */}
       <View style={styles.content}>
         {renderScreen()}
@@ -175,6 +204,9 @@ export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
       >
         <FullPlayer onClose={() => setShowFullPlayer(false)} />
       </Modal>
+
+      {/* Toast Notifications */}
+      <ToastContainer />
     </View>
   );
 };
@@ -231,14 +263,14 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background.secondary,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
-    paddingBottom: 12, // Extra padding for Android nav bar
-    paddingTop: 6,
+    paddingBottom: 20, // Extra padding for Android nav bar
+    paddingTop: 16,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 4,
+    justifyContent: 'flex-start',
+    paddingVertical: 0,
     gap: 2,
   },
   tabText: {

@@ -11,6 +11,7 @@ export type Screen =
   | { name: 'library' }
   | { name: 'downloads' }
   | { name: 'settings' }
+  | { name: 'shares' }
   | { name: 'album-detail'; params: { albumId: string } }
   | { name: 'artist-detail'; params: { artistId: string } }
   | { name: 'playlist-detail'; params: { playlistId: string } };
@@ -18,14 +19,18 @@ export type Screen =
 interface NavigationStore {
   currentScreen: Screen;
   screenStack: Screen[];
+  showFullPlayer: boolean;
   navigate: (screen: Screen) => void;
   goBack: () => void;
   canGoBack: () => boolean;
+  setShowFullPlayer: (show: boolean) => void;
+  closeFullPlayer: () => void;
 }
 
 export const useNavigationStore = create<NavigationStore>((set, get) => ({
   currentScreen: { name: 'home' },
   screenStack: [],
+  showFullPlayer: false,
 
   navigate: (screen: Screen) =>
     set((state) => ({
@@ -45,4 +50,8 @@ export const useNavigationStore = create<NavigationStore>((set, get) => ({
     }),
 
   canGoBack: () => get().screenStack.length > 0,
+
+  setShowFullPlayer: (show: boolean) => set({ showFullPlayer: show }),
+
+  closeFullPlayer: () => set({ showFullPlayer: false }),
 }));

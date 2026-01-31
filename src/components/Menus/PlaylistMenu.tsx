@@ -22,11 +22,15 @@ import {
   Trash2,
   Edit3,
   Share2,
+  Download,
   X,
   ListMusic,
 } from 'lucide-react-native';
 import { theme } from '../../config';
 import { Playlist } from '../../api/opensubsonic/types';
+import { useDownloadStore } from '../../stores/downloadStore';
+import { useToastStore } from '../../stores/toastStore';
+import { downloadService } from '../../services/DownloadService';
 
 interface PlaylistMenuProps {
   visible: boolean;
@@ -73,6 +77,8 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
   onShare,
 }) => {
   const translateY = useRef(new Animated.Value(0)).current;
+  const { isPlaylistDownloaded } = useDownloadStore();
+  const { showToast } = useToastStore();
 
   // Haptic feedback when menu opens
   useEffect(() => {
@@ -113,6 +119,39 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
   ).current;
 
   if (!playlist) return null;
+
+  const handleDownload = async () => {
+    if (!playlist) return;
+    
+    const playlistIsDownloaded = isPlaylistDownloaded(playlist.id);
+    
+    if (playlistIsDownloaded) {
+      // Playlist is already downloaded - delete it
+      try {
+        await downloadService.deletePlaylist(playlist.id);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showToast('Playlist download removed');
+        onClose();
+      } catch (error) {
+        showToast('Failed to remove download', 'error');
+        onClose();
+      }
+      return;
+    }
+    
+    try {
+      await downloadService.downloadPlaylist(playlist);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(`Downloading ${playlist.songCount} tracks`);
+      onClose();
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to download playlist',
+        'error'
+      );
+      onClose();
+    }
+  };
 
   return (
     <Modal
@@ -178,6 +217,11 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
                 onPress={onEdit}
               />
             )}
+            <MenuItem
+              icon={<Download size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+              label={isPlaylistDownloaded(playlist.id) ? "Remove Download" : "Download Playlist"}
+              onPress={handleDownload}
+            />
             {onShare && (
               <MenuItem
                 icon={<Share2 size={22} color={theme.colors.text.primary} strokeWidth={2} />}

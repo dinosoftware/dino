@@ -78,7 +78,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
           {currentTrack.title}
         </Text>
         <Text style={styles.artist} numberOfLines={1}>
-          {currentTrack.artist || 'Unknown Artist'}
+          {currentTrack.displayArtist || currentTrack.artist || 'Unknown Artist'}
         </Text>
       </View>
 

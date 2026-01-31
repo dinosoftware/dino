@@ -259,7 +259,7 @@ export interface GetMusicDirectoryResponse {
 }
 
 export interface GetArtistInfoResponse {
-  artistInfo: ArtistInfo;
+  artistInfo2: ArtistInfo;
 }
 
 export interface GetSimilarSongsResponse {
@@ -277,6 +277,12 @@ export interface GetSimilarSongs2Response {
 export interface GetRandomSongsResponse {
   randomSongs: {
     song: Track[];
+  };
+}
+
+export interface GetTopSongsResponse {
+  topSongs: {
+    song?: Track[];
   };
 }
 

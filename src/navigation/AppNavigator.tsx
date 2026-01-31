@@ -10,6 +10,7 @@ import { AuthNavigator } from './AuthNavigator';
 import { MainNavigator } from './MainNavigator';
 import { useServerStore, useAuthStore, useSettingsStore, useQueueStore } from '../stores';
 import { useFavoritesStore } from '../stores/favoritesStore';
+import { useDownloadStore } from '../stores/downloadStore';
 import { trackPlayerService } from '../services/player/TrackPlayerService';
 import { theme } from '../config';
 
@@ -61,6 +62,7 @@ export const AppNavigator: React.FC = () => {
         await Promise.all([
           useAuthStore.getState().loadFromStorage(),
           useSettingsStore.getState().loadFromStorage(),
+          useDownloadStore.getState().loadFromStorage(),
         ]);
         console.log('[AppNavigator] Stores loaded');
         

@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { Track } from '../api/opensubsonic/types';
+import { Artist, Track } from '../api/opensubsonic/types';
 
 export const useTrackMenuState = () => {
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
@@ -13,6 +13,8 @@ export const useTrackMenuState = () => {
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState({ title: '', message: '' });
+  const [showArtistSelection, setShowArtistSelection] = useState(false);
+  const [artistsToSelect, setArtistsToSelect] = useState<Artist[]>([]);
 
   const openTrackMenu = (track: Track) => {
     setSelectedTrack(track);
@@ -36,6 +38,11 @@ export const useTrackMenuState = () => {
     setShowConfirm(true);
   };
 
+  const handleGoToArtist = (artists: Artist[]) => {
+    setArtistsToSelect(artists);
+    setShowArtistSelection(true);
+  };
+
   return {
     selectedTrack,
     showTrackMenu,
@@ -43,13 +50,17 @@ export const useTrackMenuState = () => {
     showAddToPlaylist,
     showConfirm,
     confirmMessage,
+    showArtistSelection,
+    artistsToSelect,
     openTrackMenu,
     closeTrackMenu,
     setShowSongInfo,
     setShowAddToPlaylist,
     setShowConfirm,
+    setShowArtistSelection,
     handleShowInfo,
     handleShowAddToPlaylist,
     handleShowConfirm,
+    handleGoToArtist,
   };
 };

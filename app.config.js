@@ -3,7 +3,7 @@ module.exports = {
     name: "Dino",
     slug: "dino",
     scheme: "dinosonic",
-    version: "1.0.0",
+    version: "1.1.0",
     orientation: "portrait",
     icon: "./assets/images/icon-square.png", // Square icon as main app icon
     userInterfaceStyle: "dark", // Force dark mode for Tidal-inspired design
@@ -43,7 +43,6 @@ module.exports = {
       adaptiveIcon: {
         backgroundColor: "#ffffff",
         foregroundImage: "./assets/images/icon-square.png", // Transparent dino for adaptive icon
-        monochromeImage: "./assets/images/icon-square.png" // Same for monochrome theme
       },
       package: "sonic.dino",
       edgeToEdgeEnabled: true,

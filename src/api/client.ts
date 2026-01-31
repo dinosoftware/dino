@@ -236,6 +236,23 @@ class APIClient {
   }
 
   /**
+   * Build download URL with auth params (original file, no transcoding)
+   */
+  async buildDownloadUrl(trackId: string): Promise<string> {
+    if (!this.credentials) {
+      throw new Error('No credentials set');
+    }
+
+    const authParams = await this.generateAuthParams();
+    const params = new URLSearchParams({
+      id: trackId,
+      ...authParams,
+    });
+
+    return `${this.credentials.serverUrl}/rest/download.view?${params.toString()}`;
+  }
+
+  /**
    * Build cover art URL with auth params
    */
   async buildCoverArtUrl(coverArtId: string, size?: number): Promise<string> {

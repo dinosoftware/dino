@@ -18,13 +18,15 @@ export const useArtists = () => {
   });
 };
 
-export const useArtist = (artistId: string) => {
+export const useArtist = (artistId: string | undefined) => {
   return useQuery({
     queryKey: ['artist', artistId],
     queryFn: async () => {
+      if (!artistId) return null;
       const response = await getArtist(artistId);
-      return response.artist;
+      return response.artist ?? null;
     },
     enabled: !!artistId,
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 };

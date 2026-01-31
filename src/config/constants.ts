@@ -25,24 +25,24 @@ export const STORAGE_KEYS = {
   CREDENTIALS: 'auth:credentials',
   CURRENT_SERVER_ID: 'auth:current_server_id',
   HAS_COMPLETED_SETUP: 'auth:has_completed_setup',
-  
+
   // Servers
   SERVERS: 'servers:list',
-  
+
   // Player
   QUEUE: 'player:queue',
   CURRENT_TRACK_INDEX: 'player:current_index',
   PLAYBACK_POSITION: 'player:position',
   SHUFFLE_ENABLED: 'player:shuffle',
   REPEAT_MODE: 'player:repeat',
-  
+
   // Settings
   SETTINGS: 'settings:all',
-  
+
   // Cache
   LYRICS_PREFIX: 'lyrics:',
   API_CACHE_PREFIX: 'api:',
-  
+
   // Offline
   DOWNLOADED_TRACKS: 'offline:tracks',
   DOWNLOADED_ALBUMS: 'offline:albums',
@@ -72,42 +72,45 @@ export const STREAMING_FORMAT_OPTIONS = [
 // Default Settings
 export const DEFAULT_SETTINGS = {
   // Streaming
-  streamingQualityWiFi: '320' as const,
+  streamingQualityWiFi: '0' as const,
   streamingQualityMobile: '128' as const,
-  streamingFormatWiFi: 'mp3' as const,
+  streamingFormatWiFi: 'original' as const,
   streamingFormatMobile: 'mp3' as const,
-  
+
   // Downloads
   wifiOnlyDownloads: true,
   maxConcurrentDownloads: 3,
-  
+
   // Playback
   crossfadeDuration: 0,
   gaplessPlayback: true,
   normalizeVolume: false,
-  
+
   // Radio
   radioQueueSize: 20,
-  
+
   // Storage
   storageLimit: 5120, // 5GB in MB
   streamCacheSize: 100, // 100MB
-  
+
   // Chromecast
   autoCastOnConnect: false,
-  
+
   // Lyrics
   lyricsFontSize: 'medium' as 'small' | 'medium' | 'large',
   autoScrollLyrics: true,
   showLyricsTimestamps: false,
-  
+
   // Queue Sync
   autoSyncQueue: true,
   queueSyncInterval: 30000, // 30 seconds
-  
+
   // Scrobbling
   enableScrobbling: true,
   scrobbleProgressInterval: 30000, // 30 seconds
+  
+  // Sharing
+  includeShareMessage: true, // Include "Check out X" in share messages
 };
 
 // Lyrics Font Sizes (all text stays bold, only opacity changes)
@@ -137,15 +140,15 @@ export const CACHE_CONFIG = {
   STREAM_DISK_CACHE_TRACKS: 5,
   STREAM_BUFFER_AHEAD_SECONDS: 60,
   STREAM_BUFFER_BEHIND_SECONDS: 30,
-  
+
   // Pre-caching
   PRECACHE_THRESHOLD: 0.8, // Start pre-caching next track at 80% of current
   PRECACHE_DURATION: 30, // Pre-cache first 30 seconds
-  
+
   // Lyrics Cache
   LYRICS_MAX_CACHE_SIZE: 100, // 100 tracks
   LYRICS_CACHE_EXPIRATION: 30 * 24 * 60 * 60 * 1000, // 30 days
-  
+
   // API Cache
   API_CACHE_EXPIRATION: 5 * 60 * 1000, // 5 minutes
 };
@@ -215,11 +218,11 @@ export const FEATURE_FLAGS = {
 export const UI_CONFIG = {
   // Lists
   FLASH_LIST_ESTIMATED_ITEM_SIZE: 80,
-  
+
   // Animations
   BACKGROUND_TRANSITION_DURATION: 300,
   CARD_SCALE_AMOUNT: 1.05,
-  
+
   // Debounce/Throttle
   SEARCH_DEBOUNCE: 300,
   SCROLL_THROTTLE: 16, // ~60fps

@@ -187,8 +187,8 @@ class QueueSyncManager {
           position: positionSeconds,
         });
 
-        // Load server queue
-        setQueue(serverQueue.entry, serverQueue.current || 0);
+        // Load server queue using setQueueFromServer to preserve restoredPosition
+        useQueueStore.getState().setQueueFromServer(serverQueue.entry, serverQueue.current || 0);
 
         // Store the position to restore after track is loaded
         if (serverQueue.position && positionSeconds > 0) {

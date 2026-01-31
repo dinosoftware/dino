@@ -5,8 +5,12 @@
 
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import TrackPlayer from 'react-native-track-player';
 import { Track } from '../api/opensubsonic/types';
 import { STORAGE_KEYS } from '../config/constants';
+import { usePlayerStore } from './playerStore';
+import { useNavigationStore } from './navigationStore';
+import { savePlayQueue } from '../api/opensubsonic/playqueue';
 
 export type ServerSyncStatus = 'synced' | 'syncing' | 'error' | 'offline';
 
@@ -23,6 +27,34 @@ const triggerSync = (debounced: boolean = true) => {
   }
 };
 
+// Callback to clear restored position (set by TrackPlayerService to avoid circular imports)
+let clearRestoredPositionCallback: (() => void) | null = null;
+
+export const setClearRestoredPositionCallback = (callback: () => void) => {
+  clearRestoredPositionCallback = callback;
+};
+
+const clearRestoredPosition = () => {
+  if (clearRestoredPositionCallback) {
+    clearRestoredPositionCallback();
+  }
+};
+
+// Callback to sync queue with TrackPlayer (set by TrackPlayerService)
+let syncQueueCallback: (() => Promise<void>) | null = null;
+
+export const setSyncQueueCallback = (callback: () => Promise<void>) => {
+  syncQueueCallback = callback;
+};
+
+const syncQueue = () => {
+  if (syncQueueCallback) {
+    syncQueueCallback().catch((error) => {
+      console.error('[QueueStore] Failed to sync queue with TrackPlayer:', error);
+    });
+  }
+};
+
 interface QueueStore {
   // Queue State
   queue: Track[];
@@ -36,6 +68,7 @@ interface QueueStore {
   
   // Actions
   setQueue: (queue: Track[], currentIndex?: number) => void;
+  setQueueFromServer: (queue: Track[], currentIndex?: number) => void; // Internal use only - doesn't clear restoredPosition
   addToQueue: (tracks: Track | Track[], position?: 'next' | 'end') => void;
   removeFromQueue: (index: number) => void;
   reorderQueue: (fromIndex: number, toIndex: number) => void;
@@ -71,8 +104,27 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
       currentIndex,
       originalQueue: queue,
     });
+    
+    // CRITICAL: Clear restored position when user starts a new queue
+    // This prevents server position from being applied to new queues
+    clearRestoredPosition();
+    
     get().saveToStorage();
     triggerSync(true);
+  },
+
+  // Internal method for loading from server - doesn't clear restoredPosition
+  setQueueFromServer: (queue, currentIndex = 0) => {
+    set({
+      queue,
+      currentIndex,
+      originalQueue: queue,
+    });
+    
+    // DON'T clear restoredPosition - server is restoring playback state
+    
+    get().saveToStorage();
+    // Don't trigger sync when loading FROM server
   },
 
   addToQueue: (tracks, position = 'end') => {
@@ -99,17 +151,25 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
   },
 
   removeFromQueue: (index) => {
+    const state = get();
+    const removingCurrentTrack = index === state.currentIndex;
+    const trackAtIndex = state.queue[index];
+    
     set((state) => {
       const newQueue = state.queue.filter((_, i) => i !== index);
       let newIndex = state.currentIndex;
       
       // Adjust current index if needed
       if (index < state.currentIndex) {
+        // Removed track was before current, shift index down
         newIndex = state.currentIndex - 1;
       } else if (index === state.currentIndex) {
-        // If removing current track, don't change index (will play next track)
+        // Removing current track
+        // Keep same index - this will point to the track that was "next"
+        // But clamp to valid range
         newIndex = Math.min(state.currentIndex, newQueue.length - 1);
       }
+      // If index > currentIndex, no change needed
       
       return {
         queue: newQueue,
@@ -118,6 +178,19 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     });
     
     get().saveToStorage();
+    
+    // If removing the current track and there are more tracks, we need to play the next one
+    if (removingCurrentTrack && get().queue.length > 0) {
+      const newCurrentTrack = get().queue[get().currentIndex];
+      if (newCurrentTrack) {
+        console.log('[QueueStore] Removed current track, syncing queue to play next');
+        syncQueue();
+      }
+    } else if (!removingCurrentTrack) {
+      // Sync TrackPlayer queue for normal removals
+      syncQueue();
+    }
+    
     triggerSync(true);
   },
 
@@ -144,10 +217,19 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     });
     
     get().saveToStorage();
+    
+    // DON'T sync TrackPlayer queue when reordering - it will naturally pick up
+    // the new order when the next track plays. Syncing now would interrupt playback.
+    // Only sync the server queue.
+    
     triggerSync(true);
   },
 
-  clearQueue: () => {
+  clearQueue: async () => {
+    // Stop playback and reset TrackPlayer
+    await TrackPlayer.reset();
+    
+    // Clear queue state
     set({
       queue: [],
       currentIndex: -1,
@@ -155,6 +237,22 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
       history: [],
     });
     get().saveToStorage();
+    
+    // Clear player state
+    usePlayerStore.getState().setCurrentTrack(null);
+    usePlayerStore.getState().setPlaybackState('stopped');
+    
+    // Close full player if open
+    useNavigationStore.getState().closeFullPlayer();
+    
+    // Clear server queue
+    try {
+      await savePlayQueue([], undefined, undefined);
+      console.log('[QueueStore] Server queue cleared');
+    } catch (error) {
+      console.error('[QueueStore] Failed to clear server queue:', error);
+    }
+    
     triggerSync(true);
   },
 

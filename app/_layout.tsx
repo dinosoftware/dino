@@ -3,7 +3,6 @@
  * Entry point for the application with premium fonts
  */
 
-import { View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';

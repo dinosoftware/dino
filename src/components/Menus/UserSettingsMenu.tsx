@@ -9,6 +9,7 @@ import {
   Info,
   LogOut,
   Settings,
+  Share2,
   User,
   X
 } from 'lucide-react-native';
@@ -106,6 +107,11 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
     navigate({ name: 'settings' });
   };
 
+  const handleMyShares = () => {
+    onClose();
+    navigate({ name: 'shares' });
+  };
+
   const handleAppInfo = () => {
     onClose();
     setTimeout(() => onOpenAppInfo(), 100);
@@ -164,6 +170,11 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
                 icon={<Settings size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                 label="Settings"
                 onPress={handleSettings}
+              />
+              <MenuItem
+                icon={<Share2 size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Shares"
+                onPress={handleMyShares}
               />
               <MenuItem
                 icon={<Info size={22} color={theme.colors.text.primary} strokeWidth={2} />}

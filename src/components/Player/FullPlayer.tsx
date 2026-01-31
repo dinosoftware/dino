@@ -305,24 +305,14 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
           </View>
         </View>
 
-        {/* Streaming Quality Badge (like TIDAL) */}
-        {streamingInfo && (
-          <View style={styles.qualityBadgeContainer}>
-            <View style={[styles.qualityBadge, { borderColor: albumColors.primary }]}>
-              <Text style={[styles.qualityText, { color: albumColors.primary }]}>
-                {streamingInfo.displayText}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Progress Bar */}
+        {/* Progress Bar with Quality Indicator */}
         <ProgressBar
           position={progress.position}
           duration={progress.duration}
           buffered={progress.buffered}
           onSeek={seekTo}
           color={albumColors.primary}
+          qualityText={streamingInfo?.displayText}
         />
 
         {/* Main Controls */}

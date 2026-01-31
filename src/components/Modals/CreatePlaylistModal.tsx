@@ -16,6 +16,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { X } from 'lucide-react-native';
 import { theme } from '../../config';
+import { useToastStore } from '../../stores/toastStore';
 
 interface CreatePlaylistModalProps {
   visible: boolean;
@@ -32,6 +33,7 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const { showToast } = useToastStore();
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -51,12 +53,13 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(`Playlist "${playlist.name}" created`);
       setName('');
       onSuccess(playlist.id, playlist.name);
       onClose();
     } catch (error) {
       console.error('Failed to create playlist:', error);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to create playlist', 'error');
     } finally {
       setIsCreating(false);
     }

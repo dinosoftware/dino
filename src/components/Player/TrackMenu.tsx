@@ -14,6 +14,7 @@ import {
   PlaySquare,
   Radio,
   Share2,
+  User,
   X,
 } from 'lucide-react-native';
 import React, { useEffect, useRef } from 'react';
@@ -29,13 +30,18 @@ import {
   View,
 } from 'react-native';
 import { getSimilarSongs2 } from '../../api/opensubsonic/radio';
-import { Track } from '../../api/opensubsonic/types';
+import { createShare } from '../../api/opensubsonic/share';
+import { Artist, Track } from '../../api/opensubsonic/types';
 import { theme } from '../../config';
 import { trackPlayerService } from '../../services/player/TrackPlayerService';
+import { downloadService } from '../../services/DownloadService';
 import { useQueueStore } from '../../stores';
 import { useFavoritesStore } from '../../stores/favoritesStore';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { usePlayerStore } from '../../stores/playerStore';
+import { useSettingsStore } from '../../stores/settingsStore';
+import { useDownloadStore } from '../../stores/downloadStore';
+import { useToastStore } from '../../stores/toastStore';
 
 interface TrackMenuProps {
   visible: boolean;
@@ -44,6 +50,8 @@ interface TrackMenuProps {
   onShowInfo: () => void;
   onShowAddToPlaylist: () => void;
   onShowConfirm: (title: string, message: string) => void;
+  onGoToArtist?: (artists: Artist[]) => void;
+  onCloseAll?: () => void; // Optional callback to close all player screens
 }
 
 interface MenuItemProps {
@@ -66,12 +74,14 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon, label, onPress }) => {
   );
 };
 
-export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, onShowInfo, onShowAddToPlaylist, onShowConfirm }) => {
+export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, onShowInfo, onShowAddToPlaylist, onShowConfirm, onGoToArtist, onCloseAll }) => {
   const translateY = useRef(new Animated.Value(0)).current;
   const { addToQueue, setQueue } = useQueueStore();
   const { isTrackStarred, toggleTrackStar } = useFavoritesStore();
+  const { isTrackDownloaded } = useDownloadStore();
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
   const { navigate } = useNavigationStore();
+  const { showToast } = useToastStore();
 
   // Haptic feedback when menu opens
   useEffect(() => {
@@ -127,9 +137,7 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
       const similarSongs = response.similarSongs2?.song || [];
 
       if (similarSongs.length === 0) {
-        setTimeout(() => {
-          onShowConfirm('No Similar Songs', `Could not find similar songs for "${track.title}".`);
-        }, 100);
+        showToast(`Could not find similar songs for "${track.title}"`, 'error');
         return;
       }
 
@@ -140,26 +148,23 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
       await trackPlayerService.play();
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-      setTimeout(() => {
-        onShowConfirm('Instant Mix Started', `Playing ${mixQueue.length} songs similar to "${track.title}"`);
-      }, 100);
+      showToast(`Instant Mix started • ${mixQueue.length} songs`);
     } catch (error) {
-      setTimeout(() => {
-        onShowConfirm('Error', `Failed to start instant mix: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }, 100);
+      showToast(`Failed to start instant mix: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
 
   const handlePlayNext = () => {
     addToQueue(track, 'next');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    showToast('Added to play next');
     onClose();
   };
 
   const handleAddToQueue = () => {
     addToQueue(track, 'end');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    showToast('Added to queue');
     onClose();
   };
 
@@ -169,40 +174,78 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
     try {
       await toggleTrackStar(track.id, isStarred);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(isStarred ? 'Removed from favorites' : 'Added to favorites');
       onClose();
-
-      setTimeout(() => {
-        onShowConfirm(
-          isStarred ? 'Removed from Favorites' : 'Added to Favorites',
-          `"${track.title}" has been ${isStarred ? 'removed from' : 'added to'} your favorites.`
-        );
-      }, 100);
     } catch (error) {
+      showToast(
+        `Failed to ${isStarred ? 'remove from' : 'add to'} favorites`,
+        'error'
+      );
       onClose();
-      setTimeout(() => {
-        onShowConfirm(
-          'Error',
-          `Failed to ${isStarred ? 'remove from' : 'add to'} favorites: ${error instanceof Error ? error.message : 'Unknown error'}`
-        );
-      }, 100);
     }
   };
 
-  const handleDownload = () => {
-    onClose();
-    setTimeout(() => {
-      onShowConfirm('Download', 'Download functionality coming soon!');
-    }, 100);
+  const handleDownload = async () => {
+    if (!track) return;
+    
+    const trackIsDownloaded = isTrackDownloaded(track.id);
+    
+    if (trackIsDownloaded) {
+      // Track is already downloaded - delete it
+      try {
+        await downloadService.deleteTrack(track.id);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showToast('Download removed');
+        onClose();
+      } catch (error) {
+        showToast('Failed to remove download', 'error');
+        onClose();
+      }
+      return;
+    }
+    
+    try {
+      await downloadService.downloadTrack(track);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Download started');
+      onClose();
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to download',
+        'error'
+      );
+      onClose();
+    }
   };
 
   const handleShare = async () => {
+    if (!track) return;
+    
+    const includeShareMessage = useSettingsStore.getState().includeShareMessage;
+    
     try {
+      // Create OpenSubsonic share
+      const share = await createShare(
+        [track.id],
+        `${track.title} by ${track.artist || 'Unknown Artist'}`
+      );
+
+      // Build share message based on setting
+      const message = includeShareMessage
+        ? `Check out "${track.title}" by ${track.artist || 'Unknown Artist'}\n\n${share.url}`
+        : share.url;
+
+      // Share the URL
       await Share.share({
-        message: `Check out "${track.title}" by ${track.artist || 'Unknown Artist'}`,
-        title: track.title,
+        message,
+        url: share.url,
+        title: `Share: ${track.title}`,
       });
+      
+      showToast('Share link created');
     } catch (error) {
-      console.error('Error sharing:', error);
+      console.error('Error sharing track:', error);
+      showToast('Failed to create share link', 'error');
     }
     onClose();
   };
@@ -217,6 +260,9 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
   const handleGoToAlbum = () => {
     if (track?.albumId) {
       onClose();
+      if (onCloseAll) {
+        onCloseAll(); // Close full player and all screens
+      }
       setTimeout(() => {
         navigate({ name: 'album-detail', params: { albumId: track.albumId! } });
       }, 100);
@@ -224,6 +270,45 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
       onClose();
       setTimeout(() => {
         onShowConfirm('No Album Information', `No album information available for "${track?.title}".`);
+      }, 100);
+    }
+  };
+
+  const handleGoToArtist = () => {
+    if (!track) {
+      onClose();
+      return;
+    }
+
+    // Check if track has multiple artists
+    if (track.artists && track.artists.length > 1) {
+      // Trigger modal to select artist
+      onClose();
+      setTimeout(() => {
+        if (onGoToArtist) {
+          onGoToArtist(track.artists!);
+        }
+      }, 100);
+    } else if (track.artistId) {
+      // Single artist - navigate directly
+      onClose();
+      if (onCloseAll) {
+        onCloseAll(); // Close full player and all screens
+      }
+      setTimeout(() => {
+        navigate({ name: 'artist-detail', params: { artistId: track.artistId! } });
+      }, 100);
+    } else if (track.artists && track.artists.length === 1) {
+      // Single artist in artists array
+      onClose();
+      setTimeout(() => {
+        navigate({ name: 'artist-detail', params: { artistId: track.artists![0].id } });
+      }, 100);
+    } else {
+      // No artist info available
+      onClose();
+      setTimeout(() => {
+        onShowConfirm('No Artist Information', `No artist information available for "${track?.title}".`);
       }, 100);
     }
   };
@@ -307,8 +392,13 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
                 onPress={handleGoToAlbum}
               />
               <MenuItem
+                icon={<User size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Go to Artist"
+                onPress={handleGoToArtist}
+              />
+              <MenuItem
                 icon={<Download size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-                label="Download"
+                label={isTrackDownloaded(track.id) ? "Remove Download" : "Download"}
                 onPress={handleDownload}
               />
               <MenuItem

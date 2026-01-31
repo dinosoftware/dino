@@ -17,6 +17,13 @@ export const getStreamUrl = async (
 };
 
 /**
+ * Get download URL for a track (original file, no transcoding)
+ */
+export const getDownloadUrl = async (trackId: string): Promise<string> => {
+  return await apiClient.buildDownloadUrl(trackId);
+};
+
+/**
  * Get cover art URL
  */
 export const getCoverArtUrl = async (

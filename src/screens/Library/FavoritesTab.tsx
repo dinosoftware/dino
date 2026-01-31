@@ -3,28 +3,29 @@
  * Shows all starred tracks, albums, and artists
  */
 
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, RefreshControl } from 'react-native';
-import { Play } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { useFavoritesStore } from '../../stores/favoritesStore';
-import { usePlayerStore } from '../../stores/playerStore';
-import { useQueueStore } from '../../stores/queueStore';
-import { useNavigationStore } from '../../stores/navigationStore';
-import { useCoverArt } from '../../hooks/api';
-import { trackPlayerService } from '../../services/player/TrackPlayerService';
-import { TrackRow } from '../../components/Cards/TrackRow';
+import { Play } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { FlatList, Image, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Album, Artist, Track } from '../../api/opensubsonic/types';
 import { AlbumCard } from '../../components/Cards/AlbumCard';
-import { TrackMenu } from '../../components/Player/TrackMenu';
+import { TrackRow } from '../../components/Cards/TrackRow';
 import { AlbumMenuWrapper as AlbumMenuWrapperComponent } from '../../components/Menus';
-import { useAlbumMenuState } from '../../hooks/useAlbumMenuState';
-import { useTrackMenuState } from '../../hooks/useTrackMenuState';
 import { AddToPlaylistModal } from '../../components/Modals/AddToPlaylistModal';
+import { ArtistSelectionModal } from '../../components/Modals/ArtistSelectionModal';
 import { ConfirmModal } from '../../components/Modals/ConfirmModal';
 import { SongInfoModal } from '../../components/Modals/SongInfoModal';
-import { LoadingSpinner, EmptyState } from '../../components/common';
+import { TrackMenu } from '../../components/Player/TrackMenu';
+import { EmptyState } from '../../components/common';
 import { theme } from '../../config';
-import { Track, Album, Artist } from '../../api/opensubsonic/types';
+import { useCoverArt } from '../../hooks/api';
+import { useAlbumMenuState } from '../../hooks/useAlbumMenuState';
+import { useTrackMenuState } from '../../hooks/useTrackMenuState';
+import { trackPlayerService } from '../../services/player/TrackPlayerService';
+import { useFavoritesStore } from '../../stores/favoritesStore';
+import { useNavigationStore } from '../../stores/navigationStore';
+import { usePlayerStore } from '../../stores/playerStore';
+import { useQueueStore } from '../../stores/queueStore';
 
 type SubTab = 'tracks' | 'albums' | 'artists';
 
@@ -99,18 +100,19 @@ export const FavoritesTab: React.FC = () => {
 };
 
 // Starred Tracks Component
-const StarredTracks: React.FC<{ 
+const StarredTracks: React.FC<{
   tracks: Track[];
   isRefreshing: boolean;
   onRefresh: () => void;
 }> = ({ tracks, isRefreshing, onRefresh }) => {
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
   const { setQueue } = useQueueStore();
+  const { navigate } = useNavigationStore();
   const trackMenuState = useTrackMenuState();
 
   const handlePlayAll = async () => {
     if (tracks.length === 0) return;
-    
+
     setQueue(tracks, 0);
     setCurrentTrack(tracks[0]);
     await trackPlayerService.play();
@@ -180,6 +182,7 @@ const StarredTracks: React.FC<{
         onShowInfo={trackMenuState.handleShowInfo}
         onShowAddToPlaylist={trackMenuState.handleShowAddToPlaylist}
         onShowConfirm={trackMenuState.handleShowConfirm}
+        onGoToArtist={trackMenuState.handleGoToArtist}
       />
 
       {/* Song Info Modal */}
@@ -188,7 +191,7 @@ const StarredTracks: React.FC<{
         onClose={() => trackMenuState.setShowSongInfo(false)}
         track={trackMenuState.selectedTrack}
       />
-      
+
       {/* Add to Playlist Modal */}
       <AddToPlaylistModal
         visible={trackMenuState.showAddToPlaylist}
@@ -196,7 +199,7 @@ const StarredTracks: React.FC<{
         songIds={trackMenuState.selectedTrack ? [trackMenuState.selectedTrack.id] : []}
         songTitle={trackMenuState.selectedTrack?.title}
       />
-      
+
       {/* Confirm Modal */}
       <ConfirmModal
         visible={trackMenuState.showConfirm}
@@ -204,12 +207,22 @@ const StarredTracks: React.FC<{
         message={trackMenuState.confirmMessage.message}
         onClose={() => trackMenuState.setShowConfirm(false)}
       />
+
+      {/* Artist Selection Modal */}
+      <ArtistSelectionModal
+        visible={trackMenuState.showArtistSelection}
+        onClose={() => trackMenuState.setShowArtistSelection(false)}
+        artists={trackMenuState.artistsToSelect}
+        onSelectArtist={(artistId) => {
+          navigate({ name: 'artist-detail', params: { artistId } });
+        }}
+      />
     </View>
   );
 };
 
 // Starred Albums Component
-const StarredAlbums: React.FC<{ 
+const StarredAlbums: React.FC<{
   albums: Album[];
   isRefreshing: boolean;
   onRefresh: () => void;
@@ -294,7 +307,7 @@ const AlbumMenuWrapper: React.FC<{
   album: Album;
 }> = ({ visible, onClose, album }) => {
   const albumMenuState = useAlbumMenuState();
-  
+
   // Sync visibility with parent
   React.useEffect(() => {
     if (visible && album) {
@@ -321,13 +334,11 @@ const AlbumMenuWrapper: React.FC<{
 };
 
 // Starred Artists Component
-const StarredArtists: React.FC<{ 
+const StarredArtists: React.FC<{
   artists: Artist[];
   isRefreshing: boolean;
   onRefresh: () => void;
 }> = ({ artists, isRefreshing, onRefresh }) => {
-  const { navigate } = useNavigationStore();
-
   if (artists.length === 0) {
     return (
       <EmptyState

@@ -14,6 +14,7 @@ import {
   Image,
   PanResponder,
   Animated,
+  Share,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { 
@@ -28,7 +29,12 @@ import {
 } from 'lucide-react-native';
 import { theme } from '../../config';
 import { Album } from '../../api/opensubsonic/types';
+import { createShare } from '../../api/opensubsonic/share';
 import { useFavoritesStore } from '../../stores/favoritesStore';
+import { useSettingsStore } from '../../stores/settingsStore';
+import { useDownloadStore } from '../../stores/downloadStore';
+import { useToastStore } from '../../stores/toastStore';
+import { downloadService } from '../../services/DownloadService';
 
 interface AlbumMenuProps {
   visible: boolean;
@@ -62,6 +68,8 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon, label, onPress }) => {
 export const AlbumMenu: React.FC<AlbumMenuProps> = ({ visible, onClose, album, coverArtUrl, onShowInfo, onAddToPlaylist }) => {
   const translateY = useRef(new Animated.Value(0)).current;
   const { isAlbumStarred, toggleAlbumStar } = useFavoritesStore();
+  const { isAlbumDownloaded } = useDownloadStore();
+  const { showToast } = useToastStore();
 
   // Haptic feedback when menu opens
   useEffect(() => {
@@ -109,21 +117,84 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({ visible, onClose, album, c
     try {
       await toggleAlbumStar(album.id, isStarred);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(isStarred ? 'Removed from favorites' : 'Added to favorites');
       onClose();
     } catch (error) {
       console.error('Failed to toggle album favorite:', error);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to update favorites', 'error');
       onClose();
     }
   };
 
-  const handleDownload = () => {
-    console.log('Download album:', album.name);
-    onClose();
+  const handleDownload = async () => {
+    if (!album) return;
+    
+    const albumIsDownloaded = isAlbumDownloaded(album.id);
+    
+    if (albumIsDownloaded) {
+      // Album is already downloaded - delete it
+      try {
+        await downloadService.deleteAlbum(album.id);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showToast('Album download removed');
+        onClose();
+      } catch (error) {
+        showToast('Failed to remove download', 'error');
+        onClose();
+      }
+      return;
+    }
+    
+    try {
+      await downloadService.downloadAlbum(album);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(`Downloading ${album.songCount} tracks`);
+      onClose();
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to download album',
+        'error'
+      );
+      onClose();
+    }
   };
 
-  const handleShare = () => {
-    console.log('Share album:', album.name);
+  const handleShare = async () => {
+    if (!album) return;
+    
+    const includeShareMessage = useSettingsStore.getState().includeShareMessage;
+    
+    try {
+      // Create OpenSubsonic share
+      const description = album.artist ? `${album.name} by ${album.artist}` : album.name;
+      const share = await createShare([album.id], description);
+
+      // Build message based on setting
+      let message: string;
+      if (includeShareMessage) {
+        message = `Check out "${album.name}"`;
+        if (album.artist) {
+          message += ` by ${album.artist}`;
+        }
+        if (album.year) {
+          message += ` (${album.year})`;
+        }
+        message += `\n\n${share.url}`;
+      } else {
+        message = share.url;
+      }
+
+      await Share.share({
+        message: message,
+        url: share.url,
+        title: `Share Album: ${album.name}`,
+      });
+      
+      showToast('Share link created');
+    } catch (error) {
+      console.error('Error sharing album:', error);
+      showToast('Failed to create share link', 'error');
+    }
     onClose();
   };
 
@@ -215,7 +286,7 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({ visible, onClose, album, c
             />
             <MenuItem
               icon={<Download size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-              label="Download"
+              label={isAlbumDownloaded(album.id) ? "Remove Download" : "Download Album"}
               onPress={handleDownload}
             />
             <MenuItem

@@ -4,8 +4,7 @@
  */
 
 import React from 'react';
-import { View, StyleSheet, ImageBackground } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { View, StyleSheet, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../../config';
 
@@ -32,26 +31,27 @@ export const BlurredBackground: React.FC<BlurredBackgroundProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Large blurred background image */}
-      <ImageBackground
+      {/* Solid background to prevent white flash */}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.background.primary }]} />
+      
+      {/* Static blurred background image */}
+      <Image
         source={{ uri: imageUri }}
         style={[StyleSheet.absoluteFill, { transform: [{ scale: 1.2 }] }]}
         blurRadius={50}
         resizeMode="cover"
-      >
-        {/* Lighter blur overlay for better visibility */}
-        <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill}>
-          {/* Much lighter gradient to show more of the image */}
-          <LinearGradient
-            colors={[
-              'rgba(0, 0, 0, 0.3)',   // Very light at top - shows image
-              'rgba(0, 0, 0, 0.5)',   // Medium in middle
-              'rgba(0, 0, 0, 0.7)',   // Darker at bottom for readability
-            ]}
-            style={StyleSheet.absoluteFill}
-          />
-        </BlurView>
-      </ImageBackground>
+      />
+      
+      {/* Gradient overlay for readability */}
+      <LinearGradient
+        colors={[
+          'rgba(0, 0, 0, 0.4)',   // Light at top
+          'rgba(0, 0, 0, 0.6)',   // Medium in middle
+          'rgba(0, 0, 0, 0.8)',   // Dark at bottom
+        ]}
+        style={StyleSheet.absoluteFill}
+      />
+      
       {children}
     </View>
   );

@@ -50,6 +50,9 @@ interface Settings {
   // Scrobbling
   enableScrobbling: boolean;
   scrobbleProgressInterval: number; // in milliseconds
+  
+  // Sharing
+  includeShareMessage: boolean; // "Check out X" in share messages
 }
 
 interface SettingsStore extends Settings {

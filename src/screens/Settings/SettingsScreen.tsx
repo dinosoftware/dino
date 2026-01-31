@@ -3,28 +3,29 @@
  * Beautiful settings with QAM-style modals
  */
 
+import * as Haptics from 'expo-haptics';
+import { ArrowLeft, Check, ChevronRight, Plus, Server as ServerIcon, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Modal,
+  ScrollView,
+  StyleSheet,
   Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { ArrowLeft, ChevronRight, Check, Server as ServerIcon, Plus, Trash2 } from 'lucide-react-native';
-import { useAuthStore, useServerStore, useSettingsStore } from '../../stores';
-import { useNavigationStore } from '../../stores/navigationStore';
 import { ConfirmModal } from '../../components/Modals/ConfirmModal';
 import { theme } from '../../config';
-import * as Haptics from 'expo-haptics';
+import { APP_VERSION } from '../../config/constants';
+import { useAuthStore, useServerStore, useSettingsStore } from '../../stores';
+import { useNavigationStore } from '../../stores/navigationStore';
 
 interface SettingsScreenProps {
   onLogout: () => void;
 }
 
-type ModalType = 'quality-wifi' | 'quality-mobile' | 'format-wifi' | 'format-mobile' | 'lyrics-font' | 'servers' | null;
+type ModalType = 'quality-wifi' | 'quality-mobile' | 'format-wifi' | 'format-mobile' | 'lyrics-font' | 'servers' | 'max-downloads' | 'radio-queue' | 'storage-limit' | 'cache-size' | null;
 
 interface ConfirmDialog {
   visible: boolean;
@@ -44,18 +45,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     message: '',
   });
 
-  const { 
-    servers, 
-    currentServerId, 
-    setCurrentServer, 
-    removeServer 
+  const {
+    servers,
+    currentServerId,
+    setCurrentServer,
+    removeServer
   } = useServerStore();
-  
+
   const currentServer = servers.find((s) => s.id === currentServerId);
   const getCurrentServerAuth = useAuthStore((state) => state.getCurrentServerAuth);
   const auth = getCurrentServerAuth();
   const username = auth?.username || 'Unknown';
-  
+
   const {
     streamingQualityWiFi,
     streamingQualityMobile,
@@ -65,6 +66,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     showLyricsTimestamps,
     enableScrobbling,
     autoSyncQueue,
+    gaplessPlayback,
+    includeShareMessage,
+    wifiOnlyDownloads,
+    maxConcurrentDownloads,
+    radioQueueSize,
+    storageLimit,
+    streamCacheSize,
     updateSettings,
   } = useSettingsStore();
 
@@ -92,6 +100,39 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     { value: 'large', label: 'Large', description: 'Easy to read' },
   ];
 
+  const maxDownloadsOptions = [
+    { value: 1, label: '1', description: 'One at a time' },
+    { value: 2, label: '2', description: 'Two concurrent downloads' },
+    { value: 3, label: '3', description: 'Three concurrent downloads' },
+    { value: 4, label: '4', description: 'Four concurrent downloads' },
+    { value: 5, label: '5', description: 'Five concurrent downloads' },
+  ];
+
+  const radioQueueOptions = [
+    { value: 10, label: '10', description: '10 tracks in radio queue' },
+    { value: 15, label: '15', description: '15 tracks in radio queue' },
+    { value: 20, label: '20', description: '20 tracks in radio queue' },
+    { value: 30, label: '30', description: '30 tracks in radio queue' },
+    { value: 50, label: '50', description: '50 tracks in radio queue' },
+  ];
+
+  const storageLimitOptions = [
+    { value: 1024, label: '1 GB', description: '1 GB storage limit' },
+    { value: 2048, label: '2 GB', description: '2 GB storage limit' },
+    { value: 5120, label: '5 GB', description: '5 GB storage limit' },
+    { value: 10240, label: '10 GB', description: '10 GB storage limit' },
+    { value: 20480, label: '20 GB', description: '20 GB storage limit' },
+    { value: 51200, label: '50 GB', description: '50 GB storage limit' },
+  ];
+
+  const cacheSizeOptions = [
+    { value: 50, label: '50 MB', description: '50 MB cache' },
+    { value: 100, label: '100 MB', description: '100 MB cache' },
+    { value: 200, label: '200 MB', description: '200 MB cache' },
+    { value: 500, label: '500 MB', description: '500 MB cache' },
+    { value: 1024, label: '1 GB', description: '1 GB cache' },
+  ];
+
   const getQualityLabel = (value: string) => {
     const option = qualityOptions.find(opt => opt.value === value);
     return option?.label || value;
@@ -99,12 +140,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
 
   const getFormatLabel = (value: string) => {
     const option = formatOptions.find(opt => opt.value === value);
-    return option?.label.toUpperCase() || value.toUpperCase();
+    return option?.label || value;
   };
 
   const handleSelectOption = (type: ModalType, value: any) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
+
     switch (type) {
       case 'quality-wifi':
         updateSettings({ streamingQualityWiFi: value });
@@ -121,8 +162,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
       case 'lyrics-font':
         updateSettings({ lyricsFontSize: value });
         break;
+      case 'max-downloads':
+        updateSettings({ maxConcurrentDownloads: value });
+        break;
+      case 'radio-queue':
+        updateSettings({ radioQueueSize: value });
+        break;
+      case 'storage-limit':
+        updateSettings({ storageLimit: value });
+        break;
+      case 'cache-size':
+        updateSettings({ streamCacheSize: value });
+        break;
     }
-    
+
     setActiveModal(null);
   };
 
@@ -142,12 +195,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
         onConfirm: () => {
           // Set new current server in server store
           setCurrentServer(serverId);
-          
+
           // Switch server in auth store (loads credentials into API client)
           const success = switchServer(serverId);
-          
+
           setActiveModal(null);
-          
+
           if (success) {
             // Successfully switched - navigate to home and refresh
             goBack(); // Go back to previous screen
@@ -205,62 +258,62 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
 
   const renderOptionModal = (
     title: string,
-    options: { value: string; label: string; description: string }[],
-    currentValue: string,
+    options: { value: string | number; label: string; description: string }[],
+    currentValue: string | number,
     type: ModalType
   ) => (
     <Modal
-        visible={activeModal === type}
-        transparent
-        animationType="slide"
-        statusBarTranslucent
-        onRequestClose={() => setActiveModal(null)}
-      >
+      visible={activeModal === type}
+      transparent
+      animationType="slide"
+      statusBarTranslucent
+      onRequestClose={() => setActiveModal(null)}
+    >
       <View style={styles.modalOverlay}>
-        <TouchableOpacity 
-          style={styles.modalBackdrop} 
+        <TouchableOpacity
+          style={styles.modalBackdrop}
           activeOpacity={1}
           onPress={() => setActiveModal(null)}
         />
         <View style={styles.modalContainer}>
-            {/* Swipe Handle */}
-            <View style={styles.swipeIndicator}>
-              <View style={styles.swipeHandle} />
-            </View>
+          {/* Swipe Handle */}
+          <View style={styles.swipeIndicator}>
+            <View style={styles.swipeHandle} />
+          </View>
 
-            {/* Header */}
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{title}</Text>
-            </View>
+          {/* Header */}
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{title}</Text>
+          </View>
 
-            {/* Options */}
-            <ScrollView 
-              style={styles.modalContent}
-              contentContainerStyle={styles.modalContentContainer}
-              showsVerticalScrollIndicator={false}
-            >
-              {options.map((option) => {
-                const isSelected = option.value === currentValue;
-                return (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={styles.optionItem}
-                    onPress={() => handleSelectOption(type, option.value)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.optionInfo}>
-                      <Text style={[styles.optionLabel, isSelected && styles.optionLabelSelected]}>
-                        {option.label}
-                      </Text>
-                      <Text style={styles.optionDescription}>{option.description}</Text>
-                    </View>
-                    {isSelected && (
-                      <Check size={20} color={theme.colors.accent} strokeWidth={3} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+          {/* Options */}
+          <ScrollView
+            style={styles.modalContent}
+            contentContainerStyle={styles.modalContentContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            {options.map((option) => {
+              const isSelected = option.value === currentValue;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.optionItem}
+                  onPress={() => handleSelectOption(type, option.value)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.optionInfo}>
+                    <Text style={[styles.optionLabel, isSelected && styles.optionLabelSelected]}>
+                      {option.label}
+                    </Text>
+                    <Text style={styles.optionDescription}>{option.description}</Text>
+                  </View>
+                  {isSelected && (
+                    <Check size={20} color={theme.colors.accent} strokeWidth={3} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -288,7 +341,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                 <Text style={styles.settingValue}>{username}</Text>
               </View>
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.settingItem, styles.borderTop]}
               onPress={() => setActiveModal('servers')}
               activeOpacity={0.7}
@@ -313,31 +366,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>STREAMING</Text>
           <View style={styles.sectionCard}>
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={() => setActiveModal('quality-wifi')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.settingLeft}>
-                <Text style={styles.settingLabel}>Quality (WiFi)</Text>
-                <Text style={styles.settingValue}>{getQualityLabel(streamingQualityWiFi)}</Text>
-              </View>
-              <ChevronRight size={20} color={theme.colors.text.tertiary} />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.settingItem, styles.borderTop]}
-              onPress={() => setActiveModal('quality-mobile')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.settingLeft}>
-                <Text style={styles.settingLabel}>Quality (Mobile Data)</Text>
-                <Text style={styles.settingValue}>{getQualityLabel(streamingQualityMobile)}</Text>
-              </View>
-              <ChevronRight size={20} color={theme.colors.text.tertiary} />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.settingItem, styles.borderTop]}
               onPress={() => setActiveModal('format-wifi')}
               activeOpacity={0.7}
@@ -349,7 +378,19 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
               <ChevronRight size={20} color={theme.colors.text.tertiary} />
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
+              style={styles.settingItem}
+              onPress={() => setActiveModal('quality-wifi')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Quality (WiFi)</Text>
+                <Text style={styles.settingValue}>{getQualityLabel(streamingQualityWiFi)}</Text>
+              </View>
+              <ChevronRight size={20} color={theme.colors.text.tertiary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[styles.settingItem, styles.borderTop]}
               onPress={() => setActiveModal('format-mobile')}
               activeOpacity={0.7}
@@ -357,6 +398,87 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
               <View style={styles.settingLeft}>
                 <Text style={styles.settingLabel}>Format (Mobile Data)</Text>
                 <Text style={styles.settingValue}>{getFormatLabel(streamingFormatMobile)}</Text>
+              </View>
+              <ChevronRight size={20} color={theme.colors.text.tertiary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.settingItem, styles.borderTop]}
+              onPress={() => setActiveModal('quality-mobile')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Quality (Mobile Data)</Text>
+                <Text style={styles.settingValue}>{getQualityLabel(streamingQualityMobile)}</Text>
+              </View>
+              <ChevronRight size={20} color={theme.colors.text.tertiary} />
+            </TouchableOpacity>
+
+          </View>
+        </View>
+
+        {/* Downloads Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>DOWNLOADS</Text>
+          <View style={styles.sectionCard}>
+            <View style={styles.settingItem}>
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>WiFi Only Downloads</Text>
+                <Text style={styles.settingDescription}>Only download content when connected to WiFi</Text>
+              </View>
+              <Switch
+                value={wifiOnlyDownloads}
+                onValueChange={(value) => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  updateSettings({ wifiOnlyDownloads: value });
+                }}
+                trackColor={{
+                  false: 'rgba(120, 120, 128, 0.16)',
+                  true: theme.colors.accent
+                }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor="rgba(120, 120, 128, 0.16)"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.settingItem, styles.borderTop]}
+              onPress={() => setActiveModal('max-downloads')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Max Concurrent Downloads</Text>
+                <Text style={styles.settingValue}>{maxConcurrentDownloads}</Text>
+              </View>
+              <ChevronRight size={20} color={theme.colors.text.tertiary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Storage Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>STORAGE</Text>
+          <View style={styles.sectionCard}>
+            <TouchableOpacity
+              style={styles.settingItem}
+              onPress={() => setActiveModal('storage-limit')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Download Storage Limit</Text>
+                <Text style={styles.settingValue}>{(storageLimit / 1024).toFixed(1)} GB</Text>
+              </View>
+              <ChevronRight size={20} color={theme.colors.text.tertiary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.settingItem, styles.borderTop]}
+              onPress={() => setActiveModal('cache-size')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Stream Cache Size</Text>
+                <Text style={styles.settingValue}>{streamCacheSize} MB</Text>
               </View>
               <ChevronRight size={20} color={theme.colors.text.tertiary} />
             </TouchableOpacity>
@@ -378,9 +500,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   updateSettings({ enableScrobbling: value });
                 }}
-                trackColor={{ 
-                  false: 'rgba(120, 120, 128, 0.16)', 
-                  true: theme.colors.accent 
+                trackColor={{
+                  false: 'rgba(120, 120, 128, 0.16)',
+                  true: theme.colors.accent
                 }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor="rgba(120, 120, 128, 0.16)"
@@ -398,9 +520,49 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   updateSettings({ autoSyncQueue: value });
                 }}
-                trackColor={{ 
-                  false: 'rgba(120, 120, 128, 0.16)', 
-                  true: theme.colors.accent 
+                trackColor={{
+                  false: 'rgba(120, 120, 128, 0.16)',
+                  true: theme.colors.accent
+                }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor="rgba(120, 120, 128, 0.16)"
+              />
+            </View>
+
+            <View style={[styles.settingItem, styles.borderTop]}>
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Gapless Playback</Text>
+                <Text style={styles.settingDescription}>Seamless transitions between tracks</Text>
+              </View>
+              <Switch
+                value={gaplessPlayback}
+                onValueChange={(value) => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  updateSettings({ gaplessPlayback: value });
+                }}
+                trackColor={{
+                  false: 'rgba(120, 120, 128, 0.16)',
+                  true: theme.colors.accent
+                }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor="rgba(120, 120, 128, 0.16)"
+              />
+            </View>
+
+            <View style={[styles.settingItem, styles.borderTop]}>
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Include Share Message</Text>
+                <Text style={styles.settingDescription}>Add "Check out X" when sharing content</Text>
+              </View>
+              <Switch
+                value={includeShareMessage}
+                onValueChange={(value) => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  updateSettings({ includeShareMessage: value });
+                }}
+                trackColor={{
+                  false: 'rgba(120, 120, 128, 0.16)',
+                  true: theme.colors.accent
                 }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor="rgba(120, 120, 128, 0.16)"
@@ -409,11 +571,30 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           </View>
         </View>
 
+        {/* Radio Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>RADIO</Text>
+          <View style={styles.sectionCard}>
+            <TouchableOpacity
+              style={styles.settingItem}
+              onPress={() => setActiveModal('radio-queue')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Radio Queue Size</Text>
+                <Text style={styles.settingDescription}>Number of tracks to keep in radio queue</Text>
+                <Text style={styles.settingValue}>{radioQueueSize} tracks</Text>
+              </View>
+              <ChevronRight size={20} color={theme.colors.text.tertiary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Lyrics Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>LYRICS</Text>
           <View style={styles.sectionCard}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.settingItem}
               onPress={() => setActiveModal('lyrics-font')}
               activeOpacity={0.7}
@@ -437,9 +618,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   updateSettings({ showLyricsTimestamps: value });
                 }}
-                trackColor={{ 
-                  false: 'rgba(120, 120, 128, 0.16)', 
-                  true: theme.colors.accent 
+                trackColor={{
+                  false: 'rgba(120, 120, 128, 0.16)',
+                  true: theme.colors.accent
                 }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor="rgba(120, 120, 128, 0.16)"
@@ -455,14 +636,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
             <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
                 <Text style={styles.settingLabel}>Version</Text>
-                <Text style={styles.settingValue}>1.0.0</Text>
+                <Text style={styles.settingValue}>{APP_VERSION}</Text>
               </View>
             </View>
           </View>
         </View>
 
         {/* Logout Button */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.logoutButton}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -482,6 +663,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
       {renderOptionModal('Streaming Format (WiFi)', formatOptions, streamingFormatWiFi, 'format-wifi')}
       {renderOptionModal('Streaming Format (Mobile)', formatOptions, streamingFormatMobile, 'format-mobile')}
       {renderOptionModal('Lyrics Font Size', fontSizeOptions, lyricsFontSize, 'lyrics-font')}
+      {renderOptionModal('Max Concurrent Downloads', maxDownloadsOptions, maxConcurrentDownloads, 'max-downloads')}
+      {renderOptionModal('Radio Queue Size', radioQueueOptions, radioQueueSize, 'radio-queue')}
+      {renderOptionModal('Download Storage Limit', storageLimitOptions, storageLimit, 'storage-limit')}
+      {renderOptionModal('Stream Cache Size', cacheSizeOptions, streamCacheSize, 'cache-size')}
 
       {/* Confirm Dialog */}
       <ConfirmModal
@@ -503,67 +688,67 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
         onRequestClose={() => setActiveModal(null)}
       >
         <View style={styles.modalOverlay}>
-          <TouchableOpacity 
-            style={styles.modalBackdrop} 
+          <TouchableOpacity
+            style={styles.modalBackdrop}
             activeOpacity={1}
             onPress={() => setActiveModal(null)}
           />
           <View style={styles.modalContainer}>
-              {/* Swipe Handle */}
-              <View style={styles.swipeIndicator}>
-                <View style={styles.swipeHandle} />
-              </View>
+            {/* Swipe Handle */}
+            <View style={styles.swipeIndicator}>
+              <View style={styles.swipeHandle} />
+            </View>
 
-              {/* Header */}
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Servers</Text>
-                <TouchableOpacity onPress={handleAddServer} style={styles.addButton}>
-                  <Plus size={20} color={theme.colors.accent} strokeWidth={2} />
-                </TouchableOpacity>
-              </View>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Servers</Text>
+              <TouchableOpacity onPress={handleAddServer} style={styles.addButton}>
+                <Plus size={20} color={theme.colors.accent} strokeWidth={2} />
+              </TouchableOpacity>
+            </View>
 
-              {/* Server List */}
-              <ScrollView 
-                style={styles.modalContent}
-                contentContainerStyle={styles.modalContentContainer}
-                showsVerticalScrollIndicator={false}
-              >
-                {servers.map((server) => {
-                  const isSelected = server.id === currentServerId;
-                  return (
-                    <View key={server.id} style={styles.serverItem}>
-                      <TouchableOpacity
-                        style={styles.serverInfo}
-                        onPress={() => !isSelected && handleSwitchServer(server.id)}
-                        activeOpacity={isSelected ? 1 : 0.7}
-                      >
-                        <View style={styles.serverIconContainer}>
-                          <ServerIcon size={20} color={isSelected ? theme.colors.accent : theme.colors.text.secondary} strokeWidth={2} />
-                        </View>
-                        <View style={styles.serverDetails}>
-                          <Text style={[styles.serverName, isSelected && styles.serverNameSelected]}>
-                            {server.name}
-                          </Text>
-                          <Text style={styles.serverUrl} numberOfLines={1}>
-                            {server.url}
-                          </Text>
-                        </View>
-                        {isSelected && (
-                          <Check size={20} color={theme.colors.accent} strokeWidth={3} />
-                        )}
-                      </TouchableOpacity>
-                      {servers.length > 1 && (
-                        <TouchableOpacity
-                          style={styles.deleteButton}
-                          onPress={() => handleRemoveServer(server.id, server.name)}
-                        >
-                          <Trash2 size={18} color={theme.colors.error} strokeWidth={2} />
-                        </TouchableOpacity>
+            {/* Server List */}
+            <ScrollView
+              style={styles.modalContent}
+              contentContainerStyle={styles.modalContentContainer}
+              showsVerticalScrollIndicator={false}
+            >
+              {servers.map((server) => {
+                const isSelected = server.id === currentServerId;
+                return (
+                  <View key={server.id} style={styles.serverItem}>
+                    <TouchableOpacity
+                      style={styles.serverInfo}
+                      onPress={() => !isSelected && handleSwitchServer(server.id)}
+                      activeOpacity={isSelected ? 1 : 0.7}
+                    >
+                      <View style={styles.serverIconContainer}>
+                        <ServerIcon size={20} color={isSelected ? theme.colors.accent : theme.colors.text.secondary} strokeWidth={2} />
+                      </View>
+                      <View style={styles.serverDetails}>
+                        <Text style={[styles.serverName, isSelected && styles.serverNameSelected]}>
+                          {server.name}
+                        </Text>
+                        <Text style={styles.serverUrl} numberOfLines={1}>
+                          {server.url}
+                        </Text>
+                      </View>
+                      {isSelected && (
+                        <Check size={20} color={theme.colors.accent} strokeWidth={3} />
                       )}
-                    </View>
-                  );
-                })}
-              </ScrollView>
+                    </TouchableOpacity>
+                    {servers.length > 1 && (
+                      <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={() => handleRemoveServer(server.id, server.name)}
+                      >
+                        <Trash2 size={18} color={theme.colors.error} strokeWidth={2} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
+            </ScrollView>
           </View>
         </View>
       </Modal>

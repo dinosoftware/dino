@@ -5,10 +5,12 @@
 
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { MoreVertical } from 'lucide-react-native';
+import { MoreVertical, Download } from 'lucide-react-native';
 import { Track } from '../../api/opensubsonic/types';
 import { theme } from '../../config';
 import { useNavigationStore } from '../../stores/navigationStore';
+import { useDownloadStore } from '../../stores/downloadStore';
+import { useCoverArt } from '../../hooks/api/useAlbums';
 
 interface TrackRowProps {
   track: Track;
@@ -27,14 +29,23 @@ export const TrackRow: React.FC<TrackRowProps> = ({
   onPress,
   onLongPress,
   onMenuPress,
-  coverArtUrl,
+  coverArtUrl: propCoverArtUrl,
   showArtwork = true,
   showMenu = false,
   isPlaying = false,
   enableNavigation = false,
 }) => {
   const { navigate } = useNavigationStore();
+  const { isTrackDownloaded } = useDownloadStore();
+  const isDownloaded = isTrackDownloaded(track.id);
   
+  // Fetch cover art if not provided and showArtwork is true
+  const { data: fetchedCoverArtUrl } = useCoverArt(
+    showArtwork && !propCoverArtUrl ? track.coverArt : undefined,
+    100
+  );
+  const coverArtUrl = propCoverArtUrl || fetchedCoverArtUrl;
+
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -76,17 +87,25 @@ export const TrackRow: React.FC<TrackRowProps> = ({
         {enableNavigation && track.artistId ? (
           <TouchableOpacity onPress={handleArtistPress}>
             <Text style={styles.artist} numberOfLines={1}>
-              {track.artist || 'Unknown Artist'}
+              {track.displayArtist || track.artist || 'Unknown Artist'}
             </Text>
           </TouchableOpacity>
         ) : (
           <Text style={styles.artist} numberOfLines={1}>
-            {track.artist || 'Unknown Artist'}
+            {track.displayArtist || track.artist || 'Unknown Artist'}
           </Text>
         )}
       </View>
 
-      <Text style={styles.duration}>{formatDuration(track.duration)}</Text>
+      <View style={styles.rightContent}>
+        <Text style={styles.duration}>{formatDuration(track.duration)}</Text>
+        
+        {isDownloaded && (
+          <View style={styles.downloadIndicator}>
+            <Download size={14} color={theme.colors.accent} strokeWidth={2.5} fill={theme.colors.accent} />
+          </View>
+        )}
+      </View>
 
       {showMenu && onMenuPress && (
         <TouchableOpacity 
@@ -156,13 +175,24 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.text.secondary,
   },
+  rightContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginLeft: theme.spacing.md,
+  },
   duration: {
     fontSize: theme.typography.fontSize.xs,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.text.muted,
-    marginLeft: theme.spacing.md,
     minWidth: 40,
     textAlign: 'right',
+  },
+  downloadIndicator: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   menuButton: {
     width: 40,

@@ -87,17 +87,6 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
 
   const fontSizes = LYRICS_FONT_SIZES[lyricsFontSize];
 
-  const handleClose = () => {
-    Animated.timing(translateY, {
-      toValue: SCREEN_HEIGHT,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => {
-      translateY.setValue(0);
-      onClose();
-    });
-  };
-
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -161,7 +150,7 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
 
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Lyrics</Text>
@@ -194,7 +183,7 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
 
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Lyrics</Text>
@@ -227,7 +216,7 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
 
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
             <View style={styles.headerInfo}>
@@ -279,7 +268,7 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
 
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
             <View style={styles.headerInfo}>
@@ -356,13 +345,14 @@ const styles = StyleSheet.create({
   swipeIndicator: {
     alignItems: 'center',
     paddingVertical: theme.spacing.sm,
-    paddingTop: theme.spacing.xxl,
+    paddingTop: theme.spacing.lg,
   },
   swipeHandle: {
-    width: 48,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.colors.text.tertiary,
+    opacity: 0.5,
   },
   header: {
     flexDirection: 'row',

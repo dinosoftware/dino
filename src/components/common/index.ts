@@ -8,3 +8,4 @@ export * from './EmptyState';
 export * from './ErrorView';
 export * from './BlurredBackground';
 export * from './Button';
+export * from './OfflineBanner';

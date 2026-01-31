@@ -3,36 +3,37 @@
  * Search for tracks, albums, and artists
  */
 
-import React, { useState, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Search as SearchIcon, User, X } from 'lucide-react-native';
+import React, { useState } from 'react';
 import {
-  View,
+  Image,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
-  StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  Image,
+  View,
 } from 'react-native';
-import { Search as SearchIcon, X, User } from 'lucide-react-native';
-import { useQuery } from '@tanstack/react-query';
 import { search3 } from '../../api/opensubsonic/search';
-import { useCoverArt } from '../../hooks/api';
+import { Album, Artist, Track } from '../../api/opensubsonic/types';
 import { AlbumCard } from '../../components/Cards';
 import { AlbumMenuWrapper } from '../../components/Menus';
+import { AddToPlaylistModal } from '../../components/Modals/AddToPlaylistModal';
+import { ArtistSelectionModal } from '../../components/Modals/ArtistSelectionModal';
+import { ConfirmModal } from '../../components/Modals/ConfirmModal';
+import { SongInfoModal } from '../../components/Modals/SongInfoModal';
+import { TrackMenu } from '../../components/Player/TrackMenu';
+import { AlbumCardSkeleton, ArtistRowSkeleton, TrackRowSkeleton } from '../../components/Skeletons';
+import { EmptyState } from '../../components/common';
+import { theme } from '../../config';
+import { useCoverArt } from '../../hooks/api';
 import { useAlbumMenuState } from '../../hooks/useAlbumMenuState';
 import { useTrackMenuState } from '../../hooks/useTrackMenuState';
-import { SongInfoModal } from '../../components/Modals/SongInfoModal';
-import { AddToPlaylistModal } from '../../components/Modals/AddToPlaylistModal';
-import { ConfirmModal } from '../../components/Modals/ConfirmModal';
-import { TrackMenu } from '../../components/Player/TrackMenu';
-import { AlbumCardSkeleton, TrackRowSkeleton, ArtistRowSkeleton } from '../../components/Skeletons';
-import { EmptyState } from '../../components/common';
+import { trackPlayerService } from '../../services/player/TrackPlayerService';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useQueueStore } from '../../stores/queueStore';
-import { trackPlayerService } from '../../services/player/TrackPlayerService';
-import { theme } from '../../config';
-import { Album, Artist, Track } from '../../api/opensubsonic/types';
 
 // Debounce hook
 const useDebounce = (value: string, delay: number) => {
@@ -55,7 +56,6 @@ export const SearchScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'tracks' | 'albums' | 'artists'>('all');
   const debouncedQuery = useDebounce(searchQuery, 300);
-  const { navigate } = useNavigationStore();
 
   const { data: searchResults, isLoading } = useQuery({
     queryKey: ['search', debouncedQuery],
@@ -277,6 +277,7 @@ const TrackItem: React.FC<{ track: Track }> = ({ track }) => {
   const { data: coverArtUrl } = useCoverArt(track.coverArt, 100);
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
   const { setQueue } = useQueueStore();
+  const { navigate } = useNavigationStore();
   const trackMenuState = useTrackMenuState();
 
   const handlePlayTrack = async () => {
@@ -305,7 +306,7 @@ const TrackItem: React.FC<{ track: Track }> = ({ track }) => {
           </Text>
         </View>
       </TouchableOpacity>
-      
+
       <TrackMenu
         visible={trackMenuState.showTrackMenu}
         onClose={trackMenuState.closeTrackMenu}
@@ -313,26 +314,36 @@ const TrackItem: React.FC<{ track: Track }> = ({ track }) => {
         onShowInfo={trackMenuState.handleShowInfo}
         onShowAddToPlaylist={trackMenuState.handleShowAddToPlaylist}
         onShowConfirm={trackMenuState.handleShowConfirm}
+        onGoToArtist={trackMenuState.handleGoToArtist}
       />
-      
+
       <SongInfoModal
         visible={trackMenuState.showSongInfo}
         onClose={() => trackMenuState.setShowSongInfo(false)}
         track={trackMenuState.selectedTrack}
       />
-      
+
       <AddToPlaylistModal
         visible={trackMenuState.showAddToPlaylist}
         onClose={() => trackMenuState.setShowAddToPlaylist(false)}
         songIds={trackMenuState.selectedTrack ? [trackMenuState.selectedTrack.id] : []}
         songTitle={trackMenuState.selectedTrack?.title}
       />
-      
+
       <ConfirmModal
         visible={trackMenuState.showConfirm}
         title={trackMenuState.confirmMessage.title}
         message={trackMenuState.confirmMessage.message}
         onClose={() => trackMenuState.setShowConfirm(false)}
+      />
+
+      <ArtistSelectionModal
+        visible={trackMenuState.showArtistSelection}
+        onClose={() => trackMenuState.setShowArtistSelection(false)}
+        artists={trackMenuState.artistsToSelect}
+        onSelectArtist={(artistId) => {
+          navigate({ name: 'artist-detail', params: { artistId } });
+        }}
       />
     </>
   );
@@ -394,7 +405,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
   },
   tabTextActive: {
-    color: theme.colors.text.primary,
+    color: theme.colors.text.inverse,
   },
   results: {
     flex: 1,

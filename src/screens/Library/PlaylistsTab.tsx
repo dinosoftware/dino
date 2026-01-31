@@ -4,8 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, RefreshControl } from 'react-native';
-import { Plus } from 'lucide-react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, RefreshControl, Share } from 'react-native';
+import { Plus, Download } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { usePlaylists, useCoverArt } from '../../hooks/api';
 import { useNavigationStore } from '../../stores/navigationStore';
@@ -16,12 +16,17 @@ import { LoadingSpinner, EmptyState, ErrorView } from '../../components/common';
 import { theme } from '../../config';
 import { Playlist } from '../../api/opensubsonic/types';
 import { deletePlaylist } from '../../api/opensubsonic/playlists';
+import { createShare } from '../../api/opensubsonic/share';
+import { useSettingsStore } from '../../stores/settingsStore';
+import { useToastStore } from '../../stores/toastStore';
+import { useDownloadStore } from '../../stores/downloadStore';
 
 export const PlaylistsTab: React.FC = () => {
   const { data: playlists, isLoading, error, refetch, isRefetching } = usePlaylists();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
+  const { showToast } = useToastStore();
 
   if (isLoading && !isRefetching) {
     return <LoadingSpinner message="Loading playlists..." />;
@@ -125,17 +130,55 @@ const PlaylistMenuWrapper: React.FC<{
 }> = ({ visible, onClose, playlist, onDeleted }) => {
   const { data: coverArtUrl } = useCoverArt(playlist.coverArt, 200);
   const [showConfirm, setShowConfirm] = useState(false);
+  const { showToast } = useToastStore();
 
   const handleDelete = async () => {
     try {
       await deletePlaylist(playlist.id);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Playlist deleted');
       setShowConfirm(false);
       onDeleted();
     } catch (error) {
       console.error('Failed to delete playlist:', error);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to delete playlist', 'error');
       setShowConfirm(false);
+    }
+  };
+
+  const handleShare = async () => {
+    const includeShareMessage = useSettingsStore.getState().includeShareMessage;
+    
+    try {
+      // Create OpenSubsonic share
+      const description = playlist.owner ? `${playlist.name} by ${playlist.owner}` : playlist.name;
+      const share = await createShare([playlist.id], description);
+
+      // Build message based on setting
+      let message: string;
+      if (includeShareMessage) {
+        message = `Check out the playlist "${playlist.name}"`;
+        if (playlist.owner) {
+          message += ` by ${playlist.owner}`;
+        }
+        if (playlist.songCount) {
+          message += `\n${playlist.songCount} ${playlist.songCount === 1 ? 'track' : 'tracks'}`;
+        }
+        message += `\n\n${share.url}`;
+      } else {
+        message = share.url;
+      }
+
+      await Share.share({
+        message: message,
+        url: share.url,
+        title: `Share Playlist: ${playlist.name}`,
+      });
+      
+      showToast('Share link created');
+    } catch (error) {
+      console.error('Error sharing playlist:', error);
+      showToast('Failed to create share link', 'error');
     }
   };
 
@@ -146,6 +189,7 @@ const PlaylistMenuWrapper: React.FC<{
         onClose={onClose}
         playlist={playlist}
         coverArtUrl={coverArtUrl || undefined}
+        onShare={handleShare}
         onDelete={() => {
           onClose();
           setShowConfirm(true);
@@ -169,6 +213,8 @@ const PlaylistMenuWrapper: React.FC<{
 const PlaylistItem: React.FC<{ playlist: Playlist; onLongPress: () => void }> = ({ playlist, onLongPress }) => {
   const { data: coverArtUrl } = useCoverArt(playlist.coverArt, 200);
   const { navigate } = useNavigationStore();
+  const { isPlaylistDownloaded } = useDownloadStore();
+  const isDownloaded = isPlaylistDownloaded(playlist.id);
   
   return (
     <TouchableOpacity
@@ -182,14 +228,22 @@ const PlaylistItem: React.FC<{ playlist: Playlist; onLongPress: () => void }> = 
       }}
       activeOpacity={0.7}
     >
-      <Image
-        source={
-          coverArtUrl
-            ? { uri: coverArtUrl }
-            : require('../../../assets/images/icon.png')
-        }
-        style={styles.playlistCover}
-      />
+      <View style={styles.coverWrapper}>
+        <Image
+          source={
+            coverArtUrl
+              ? { uri: coverArtUrl }
+              : require('../../../assets/images/icon.png')
+          }
+          style={styles.playlistCover}
+        />
+        {/* Download Badge */}
+        {isDownloaded && (
+          <View style={styles.downloadBadge}>
+            <Download size={12} color={theme.colors.text.inverse} strokeWidth={2.5} />
+          </View>
+        )}
+      </View>
       <View style={styles.playlistInfo}>
         <Text style={styles.playlistName}>{playlist.name}</Text>
         <Text style={styles.playlistDetails}>
@@ -236,12 +290,27 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
+  coverWrapper: {
+    position: 'relative',
+    marginRight: theme.spacing.md,
+  },
   playlistCover: {
     width: 56,
     height: 56,
     borderRadius: theme.borderRadius.md,
-    marginRight: theme.spacing.md,
     backgroundColor: theme.colors.background.muted,
+  },
+  downloadBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: theme.colors.accent,
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.md,
   },
   playlistInfo: {
     flex: 1,

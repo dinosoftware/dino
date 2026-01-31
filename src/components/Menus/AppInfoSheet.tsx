@@ -8,6 +8,7 @@ import { Code, Heart, Info, X } from 'lucide-react-native';
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
+  Image,
   Linking,
   Modal,
   PanResponder,
@@ -18,6 +19,7 @@ import {
   View,
 } from 'react-native';
 import { theme } from '../../config';
+import { APP_VERSION } from '../../config/constants';
 
 interface AppInfoSheetProps {
   visible: boolean;
@@ -131,18 +133,18 @@ export const AppInfoSheet: React.FC<AppInfoSheetProps> = ({ visible, onClose }) 
             <View style={styles.content}>
               {/* App Icon/Logo */}
               <View style={styles.logoContainer}>
-                <View style={styles.logo}>
-                  <Text style={styles.logoText}>♪</Text>
-                </View>
+                <Image
+                  source={require('../../../assets/images/icon-circle.png')}
+                  style={styles.appIcon}
+                />
                 <Text style={styles.appName}>Dino Music</Text>
               </View>
-
               {/* Info Items */}
               <View style={styles.infoSection}>
                 <InfoItem
                   icon={<Info size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                   label="Version"
-                  value="1.0.0"
+                  value={APP_VERSION}
                 />
                 <InfoItem
                   icon={<Heart size={22} color={theme.colors.text.primary} strokeWidth={2} />}
@@ -220,18 +222,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: theme.spacing.xl,
   },
-  logo: {
+  appIcon: {
     width: 80,
     height: 80,
     borderRadius: 20,
-    backgroundColor: theme.colors.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
     marginBottom: theme.spacing.md,
-  },
-  logoText: {
-    fontSize: 40,
-    color: theme.colors.background.primary,
   },
   appName: {
     fontSize: theme.typography.fontSize.xxl,

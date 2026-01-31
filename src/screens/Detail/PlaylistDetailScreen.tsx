@@ -3,64 +3,54 @@
  * Shows playlist details and tracks
  */
 
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ChevronLeft, MoreVertical, Play, Shuffle } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
   Image,
+  ScrollView,
+  StyleSheet,
+  Text,
   TouchableOpacity,
+  View,
 } from 'react-native';
-import { Play, Shuffle, MoreVertical, ChevronLeft, Trash2 } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
-import { useQuery } from '@tanstack/react-query';
-import { getPlaylist, deletePlaylist } from '../../api/opensubsonic/playlists';
-import { useCoverArt } from '../../hooks/api/useAlbums';
-import { useAlbumColors } from '../../hooks/useAlbumColors';
-import { usePlayerStore } from '../../stores/playerStore';
-import { useQueueStore } from '../../stores/queueStore';
-import { useNavigationStore } from '../../stores/navigationStore';
-import { trackPlayerService } from '../../services/player/TrackPlayerService';
-import { theme } from '../../config/theme';
+import { deletePlaylist } from '../../api/opensubsonic/playlists';
+import { Track } from '../../api/opensubsonic/types';
 import { TrackRow } from '../../components/Cards/TrackRow';
-import { TrackMenu } from '../../components/Player/TrackMenu';
 import { PlaylistMenu } from '../../components/Menus';
+import { AddToPlaylistModal } from '../../components/Modals/AddToPlaylistModal';
+import { ArtistSelectionModal } from '../../components/Modals/ArtistSelectionModal';
 import { ConfirmModal } from '../../components/Modals/ConfirmModal';
 import { SongInfoModal } from '../../components/Modals/SongInfoModal';
-import { AddToPlaylistModal } from '../../components/Modals/AddToPlaylistModal';
-import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { TrackMenu } from '../../components/Player/TrackMenu';
 import { ErrorView } from '../../components/common/ErrorView';
-import { Track } from '../../api/opensubsonic/types';
+import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { theme } from '../../config/theme';
+import { useCoverArt } from '../../hooks/api/useAlbums';
+import { usePlaylist } from '../../hooks/api/usePlaylists';
+import { useAlbumColors } from '../../hooks/useAlbumColors';
 import { useTrackMenuState } from '../../hooks/useTrackMenuState';
+import { trackPlayerService } from '../../services/player/TrackPlayerService';
+import { useNavigationStore } from '../../stores/navigationStore';
+import { usePlayerStore } from '../../stores/playerStore';
+import { useQueueStore } from '../../stores/queueStore';
 
 interface PlaylistDetailScreenProps {
   playlistId: string;
 }
 
 export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScreenProps) {
-  const { data: response, isLoading, error, refetch } = useQuery({
-    queryKey: ['playlist', playlistId],
-    queryFn: () => getPlaylist(playlistId),
-  });
-
-  const playlist = response?.playlist;
+  const { data: playlist, isLoading, error, refetch } = usePlaylist(playlistId);
   const { data: coverArtUrl } = useCoverArt(playlist?.coverArt, 500);
   const playlistColors = useAlbumColors(coverArtUrl || undefined);
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
-  const { setQueue, shuffleQueue } = useQueueStore();
+  const { setQueue } = useQueueStore();
   const { goBack, navigate } = useNavigationStore();
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  
-  const trackMenuState = useTrackMenuState();
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  const trackMenuState = useTrackMenuState();
 
   const getTotalDuration = () => {
     if (!playlist?.entry) return '0:00';
@@ -73,7 +63,7 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
     if (!playlist?.entry || playlist.entry.length === 0) return;
 
     const tracks: Track[] = playlist.entry;
-    
+
     setQueue(tracks, 0);
     setCurrentTrack(tracks[0]);
     await trackPlayerService.play();
@@ -83,14 +73,14 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
     if (!playlist?.entry || playlist.entry.length === 0) return;
 
     const tracks: Track[] = playlist.entry;
-    
+
     // Shuffle the tracks array before setting queue
     const shuffled = [...tracks];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    
+
     // Set queue with shuffled tracks
     setQueue(shuffled, 0);
     setCurrentTrack(shuffled[0]);
@@ -131,24 +121,8 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
 
   return (
     <View style={styles.container}>
-      {/* Blurred background - top half only */}
-      {coverArtUrl && (
-        <View style={styles.blurredTopContainer}>
-          <Image
-            source={{ uri: coverArtUrl }}
-            style={styles.blurredTopImage}
-            blurRadius={60}
-          />
-          <LinearGradient
-            colors={['rgba(9, 9, 11, 0.4)', 'rgba(9, 9, 11, 0.8)', theme.colors.background.primary]}
-            locations={[0, 0.6, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-        </View>
-      )}
-
       {/* Back Button */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.backButton}
         onPress={() => goBack()}
         activeOpacity={0.7}
@@ -157,12 +131,24 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
       </TouchableOpacity>
 
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Blurred background - scrolls with content */}
+        {coverArtUrl && (
+          <View style={styles.blurredBackground}>
+            <Image
+              source={{ uri: coverArtUrl }}
+              style={styles.blurredImage}
+              blurRadius={60}
+            />
+            <LinearGradient
+              colors={['transparent', theme.colors.background.primary]}
+              locations={[0, 0.5]}
+              style={StyleSheet.absoluteFill}
+            />
+          </View>
+        )}
+
         {/* Playlist Header */}
-        <LinearGradient
-          colors={[playlistColors.primary + '60', playlistColors.background + '40', 'transparent']}
-          locations={[0, 0.5, 1]}
-          style={styles.header}
-        >
+        <View style={styles.header}>
           <Image
             source={
               coverArtUrl
@@ -171,23 +157,23 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
             }
             style={styles.coverArt}
           />
-          
+
           <Text style={styles.title} numberOfLines={2}>
             {playlist.name}
           </Text>
-          
+
           {playlist.comment && (
             <Text style={styles.comment} numberOfLines={2}>
               {playlist.comment}
             </Text>
           )}
-          
+
           <View style={styles.metadata}>
             <Text style={styles.metadataText}>
               {playlist.songCount || playlist.entry?.length || 0} songs • {getTotalDuration()}
             </Text>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Action Buttons */}
         <View style={styles.actions}>
@@ -209,8 +195,8 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
             <Text style={styles.shuffleButtonText}>Shuffle</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.iconButton} 
+          <TouchableOpacity
+            style={styles.iconButton}
             activeOpacity={0.8}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -260,6 +246,7 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
         onShowInfo={trackMenuState.handleShowInfo}
         onShowAddToPlaylist={trackMenuState.handleShowAddToPlaylist}
         onShowConfirm={trackMenuState.handleShowConfirm}
+        onGoToArtist={trackMenuState.handleGoToArtist}
       />
 
       {/* Song Info Modal */}
@@ -283,6 +270,16 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
         title={trackMenuState.confirmMessage.title}
         message={trackMenuState.confirmMessage.message}
         onClose={() => trackMenuState.setShowConfirm(false)}
+      />
+
+      {/* Artist Selection Modal */}
+      <ArtistSelectionModal
+        visible={trackMenuState.showArtistSelection}
+        onClose={() => trackMenuState.setShowArtistSelection(false)}
+        artists={trackMenuState.artistsToSelect}
+        onSelectArtist={(artistId) => {
+          navigate({ name: 'artist-detail', params: { artistId } });
+        }}
       />
 
       {/* Playlist Menu */}
@@ -318,15 +315,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background.primary,
   },
-  blurredTopContainer: {
+  blurredBackground: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 450,
-    overflow: 'hidden',
+    height: 800,
+    zIndex: -1,
   },
-  blurredTopImage: {
+  blurredImage: {
     width: '100%',
     height: '100%',
   },
