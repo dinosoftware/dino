@@ -14,7 +14,7 @@ export const savePlayQueue = async (
   currentIndex?: number,
   position?: number
 ): Promise<void> => {
-  await apiClient.get('savePlayQueue', {
+  await apiClient.request('savePlayQueue', {
     id: trackIds,
     ...(currentIndex !== undefined && { current: currentIndex }),
     ...(position !== undefined && { position: Math.floor(position) }),
@@ -25,5 +25,5 @@ export const savePlayQueue = async (
  * Get play queue from server
  */
 export const getPlayQueue = async (): Promise<GetPlayQueueResponse> => {
-  return await apiClient.get<GetPlayQueueResponse>('getPlayQueue');
+  return await apiClient.request<GetPlayQueueResponse>('getPlayQueue');
 };

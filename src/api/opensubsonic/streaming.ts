@@ -34,14 +34,14 @@ export const getCoverArtUrl = async (
 };
 
 /**
- * Scrobble a track (update play count and last played)
+ * Scrobble a track (update play count and last played) - uses POST when supported
  */
 export const scrobble = async (
   trackId: string,
   time?: number,
   submission: boolean = false
 ): Promise<void> => {
-  await apiClient.get('scrobble', {
+  await apiClient.request('scrobble', {
     id: trackId,
     ...(time && { time }),
     submission,

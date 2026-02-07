@@ -142,7 +142,15 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
       const download = activeDownloads.get(id);
       
       if (download) {
-        const progress = download.totalBytes > 0 ? downloadedBytes / download.totalBytes : 0;
+        // For albums/playlists, use track count progress
+        // For individual tracks, use byte progress
+        let progress = 0;
+        if (download.totalTracks && download.totalTracks > 0 && completedTracks !== undefined) {
+          progress = completedTracks / download.totalTracks;
+        } else if (download.totalBytes > 0) {
+          progress = downloadedBytes / download.totalBytes;
+        }
+        
         activeDownloads.set(id, {
           ...download,
           downloadedBytes,

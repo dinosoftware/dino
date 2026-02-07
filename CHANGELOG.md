@@ -7,7 +7,228 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.1.0] - 2026-01-31 (Updated)
+### Added
+- **Scan Library Button**: Added "Scan Library" button to User Settings Menu
+  - Starts a media library scan on the server
+  - Shows toast notification when scan starts
+  - Located in QAM between Settings and Shares
+
+### Fixed
+- **Home Screen Skeleton Loading**: Fixed inconsistent skeleton states
+  - Recently Played and New Releases now show skeleton for title during loading
+  - All sections now have consistent skeleton appearance
+  - Fixed text appearing during loading state
+- **Album Long-Press Menu**: Added long-press support to all home sections
+  - Random Albums now supports long-press menu with haptics
+  - Most Played now supports long-press menu with haptics
+  - Recently Played now has haptic feedback on long-press
+  - New Releases now has haptic feedback on long-press
+  - Consistent behavior and feedback across all album displays
+- **Shuffle and Repeat Functionality**: Fixed shuffle and repeat buttons not working
+  - Shuffle: toggleShuffle() now calls shuffleQueue() when turning shuffle on
+  - Shuffle: Calls unshuffleQueue() when turning shuffle off  
+  - Shuffle: Queue now properly shuffles/unshuffles when button is pressed
+  - Repeat Track: Fixed track not repeating when reaching the end
+  - Repeat Track: Now seeks to start and replays instead of calling play() on finished track
+  - Repeat Queue: Already working correctly
+- **Download Progress for Albums/Playlists**: Fixed progress bar not updating
+  - Progress now calculated based on completed tracks (e.g., 3/10 tracks)
+  - Previously only used byte-based progress which stayed at 0%
+  - Individual track downloads still use byte-based progress
+- **POST Request Authentication**: Fixed authentication errors with POST requests
+  - Request interceptor was adding auth params to both URL and body
+  - Now only adds auth params to URL for GET requests
+  - POST requests correctly use auth params in body only
+  - Fixes "wrong api key" and "wrong username or password" errors on certain endpoints
+- **Queue and Mini Player Display**: Fixed queue not showing up at all
+  - Queue was loaded into store but currentTrack was never set
+  - Mini player requires currentTrack to be set in playerStore to display
+  - Now sets currentTrack for both server queue and local queue on startup
+  - Mini player and queue now display correctly on app launch
+  - Playback resumes at correct position when user presses play
+- **Production Build Crash**: Fixed app crashes in production builds
+  - Removed verbose console.log statements with complex object logging
+  - These logs could cause crashes or undefined behavior in production
+  - App now works correctly in both dev and production builds
+
+## [1.2.2] - 2026-02-06
+
+### Added
+- **OpenSubsonic Extensions Detection**: Automatic server capability detection
+  - Detects formPost, apiKeyAuthentication, and songLyrics extensions
+  - Stored per-server with 24-hour cache
+  - Auto-refreshes on app startup and login
+- **API Key Authentication**: Full support for OpenSubsonic API key auth
+  - Login with API key instead of username/password
+  - Deep link support: `dino://add-server?url=...&apiKey=...`
+  - Toggle between Password and API Key in login screen
+  - Edit server modal supports switching auth types
+  - Uses tokenInfo endpoint to fetch username for API key users
+- **POST Request Support**: Automatic POST for API endpoints
+  - Uses POST for all API calls (except media streaming)
+  - Enabled when server supports formPost extension
+  - Settings toggle to disable POST requests if needed
+- **User Avatar System**: Server avatar with fallback to initials
+  - Fetches user avatar via getAvatar endpoint
+  - Falls back to white circle with dark initial if no avatar
+  - Displayed in HomeScreen, LibraryScreen, UserSettingsMenu, and Settings
+  - Auto-fetches username from tokenInfo for API key auth
+- **Quality Badge Toggle**: Tap quality badge to switch between simple/detailed
+  - Simple mode: "MAX", "HIGH", "MEDIUM", "LOW", "DOWNLOADED"
+  - Detailed mode: "1411 kbps FLAC", "320 kbps MP3", etc.
+  - Shows actual track bitrate/format when streaming at MAX quality
+  - Setting persists across app restarts
+- **Player Loading Indicator**: Shows spinner when track is buffering
+  - Replaces play/pause icon with loading spinner
+  - Visible in both MiniPlayer and FullPlayer
+  - Clear feedback when track is loading
+- **Network Settings Section**: New settings section for network options
+  - Toggle to enable/disable POST requests
+  - More network options can be added here in future
+
+### Changed
+- **Avatar Component**: Enhanced to support server avatar fetching
+  - Auto-builds avatar URL from username
+  - Shows single letter initial (matching UserAvatar style)
+  - White circle with dark text for consistency
+- **Edit Server Modal**: Complete redesign with auth type selection
+  - Toggle between Password and API Key authentication
+  - Auto-detects current auth type when opening
+  - Separate fields for each auth mode
+  - Clean, modern UI with proper spacing
+
+### Fixed
+- **Server Setup Race Condition**: Fixed "no server selected" error
+  - Combined server addition and selection into atomic state update
+  - Prevents race condition between addServer() and setCurrentServer()
+  - LoginScreen now always has valid currentServerId
+- **Deep Link API Key Parameter**: Fixed case sensitivity issue
+  - Now accepts both `apiKey` (camelCase) and `apikey` (lowercase)
+  - generateAddServerLink() uses camelCase for consistency
+- **Avatar Text Visibility**: Fixed invisible text on avatar fallback
+  - Changed from white-on-white to dark-on-white
+  - Shows single initial instead of two letters
+  - Matches UserAvatar component style
+- **Username Display with API Key**: Fixed "User" showing everywhere
+  - HomeScreen, LibraryScreen, UserSettingsMenu now check userStore first
+  - Falls back to credentials username for password auth
+  - Works correctly for both auth types
+- **Progress Bar Color Update**: Fixed delayed color changes
+  - Removed memo wrapper that prevented re-renders
+  - Quality badge now updates immediately when tapping
+  - Progress bar color changes instantly on track switch
+
+### Technical
+- Added `getOpenSubsonicExtensions` API endpoint (unauthenticated)
+- Added `getCurrentUser` and `tokenInfo` API endpoints for user info
+- Enhanced `apiClient.request()` to support formPost extension
+- Updated all API endpoints to use POST when available
+- Added `ServerCapabilities` interface with extension detection
+- Added `qualityBadgeDetailed` and `usePostRequests` settings
+- Created `Avatar` component with server avatar support
+- Enhanced streaming info to include both simple and detailed text
+- Updated `TrackPlayerService` to show actual track quality for MAX
+
+## [1.2.1] - 2026-02-05
+
+### Added
+- **Skeleton Loading Screens**: Improved home screen loading experience
+  - Created animated skeleton loader component
+  - Added skeletons for Hero Banner, Random Albums, and Most Played sections
+  - Smooth pulsing animation while content loads
+  - Better visual feedback during initial load
+
+### Fixed
+- **Queue Playback Reset Bug** (CRITICAL): Fixed playback resetting to track start when removing/moving tracks
+  - Added delay to queue sync operations to ensure state is fully updated
+  - Skip sync when moving currently playing track (not needed)
+  - Prevents playback from jumping to beginning of track during queue modifications
+  - Fixed by improving sync timing in `removeFromQueue` and `reorderQueue`
+- **Queue Scroll Reset Bug** (CRITICAL): Fixed scroll position resetting when selecting a track
+  - Added `getItemLayout` with fixed item height (80px) for scroll calculation
+  - Added `maintainVisibleContentPosition` to preserve scroll on updates
+  - Disabled `removeClippedSubviews` to maintain scroll position
+  - Increased render batch sizes for smoother scrolling
+  - Removed `currentIndex` from renderItem dependencies to prevent full re-render
+  - Scroll position now preserved when tapping tracks in queue
+- **App Startup Hang**: Fixed app stuck on loading screen when server unreachable
+  - Queue sync from server now loads in background (non-blocking)
+  - Starred items now load in background after app shows
+  - App starts immediately with local queue, then syncs from server
+  - Loading screen only waits for local storage loads
+  - No more waiting for network requests during startup
+  - App starts in under 1 second even if server is down
+- **Stream Switching on SIM Change**: Fixed stream URL changing when switching between SIM cards
+  - Network monitoring now only triggers on WiFi ↔ Mobile switches
+  - Ignores Mobile → Mobile changes (SIM switching)
+  - Prevents unnecessary stream quality changes when staying on mobile data
+- **GIF Background Rendering**: Improved GIF album cover blurring
+  - React Native's `blurRadius` now properly blurs GIF first frame
+  - Removed unnecessary GIF detection logic
+  - Simplified component for better performance
+- **useInsertionEffect Warning**: Fixed React warning in BlurredBackground component
+  - Added `React.memo` to prevent unnecessary re-renders
+  - Added proper display name for debugging
+- **Full Player Swipe Gesture**: Fixed swipe down closing full player instead of menu first
+  - Added dynamic check for open menus/modals using ref
+  - Swipe down now closes TrackMenu/Lyrics/Queue first before closing player
+  - Prevents accidental player dismissal when interacting with menus
+- **Notification Click Handling**: Fixed notification clicks not opening full player
+  - Deep link service now detects notification URLs and opens full player
+  - Removed error toast when clicking playback notification
+  - Tapping notification now correctly shows the now playing screen
+
+### Known Issues
+- **Background Playback on Android**: Playback may stop when app is minimized on some Android devices
+  - This is due to aggressive battery optimization by Android OS
+  - **Workaround**: Set battery optimization to "Unrestricted" for Dino in Android settings
+  - Go to: Settings > Apps > Dino > Battery > Unrestricted
+  - Some manufacturers (Samsung, Xiaomi, etc.) have additional battery settings that may need adjustment
+
+## [1.2.0] - 2026-01-31
+
+### Added
+- **Server Queue Loading**: Queue now loads from new server when switching between servers
+  - Automatically fetches saved queue from new server after switch
+  - Restores playback position if available
+  - Only clears local queue, preserves server queues
+- **Server Setup Help Links**: Added clickable links to server documentation in setup screen
+  - Links to Dinosonic (https://github.com/sonicdino/dinosonic)
+  - Links to Navidrome (https://www.navidrome.org)
+  - Links to OpenSubsonic (https://opensubsonic.netlify.app)
+  - Helps users discover and set up compatible music servers
+- **Queue Auto-Scroll**: Queue screen now automatically scrolls to currently playing track when opened
+  - Current track positioned near top for better visibility
+  - Smooth animated scroll on queue open
+- **Edit Server Details**: Settings now allows editing server name, URL, and credentials
+  - Edit button next to each server in Settings
+  - Can update server name, URL, username, and password
+  - Credentials are optional when updating server info
+
+### Changed
+- **Clear Queue Parameter**: `clearQueue()` now accepts optional parameter
+  - `clearQueue(true)` - Clears both local and server queue (default, from Clear Queue button)
+  - `clearQueue(false)` - Only clears local queue (used when switching servers)
+- **Server Selection Screen Layout**: Completely redesigned for better space efficiency
+  - Reduced padding and spacing throughout
+  - Smaller icons and text for more compact layout
+  - Can now see 6-8 servers at once instead of 2
+  - Properly scrollable list for long server lists
+
+### Fixed
+- **Queue Not Clearing When Switching Servers** (CRITICAL): Fixed queue persisting across server switches
+  - Queue now automatically clears when switching to a different server
+  - Playback stops when switching servers to prevent confusion
+  - Prevents old server's tracks from remaining in queue
+  - Loads queue from new server after clearing
+  - Implemented in `AppNavigator` with server change detection
+- **Server Selection Screen Scrolling**: Fixed inability to scroll through server list
+  - Completely redesigned layout with compact spacing
+  - Can now view all servers when more than 2 are added
+  - Proper scrolling behavior for long server lists
+- **Debug Logging**: Removed excessive call stack logging from `setCurrentServer`
+
+## [1.1.0] - 2026-01-31
 
 ### Added
 - **Album Sorting**: New horizontal scrolling sort buttons above album grid

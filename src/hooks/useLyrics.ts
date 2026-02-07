@@ -23,7 +23,7 @@ export const useLyrics = () => {
         // Delay slightly to avoid overwhelming the server
         setTimeout(() => {
           lyricsManager.fetchLyrics(track.id, false, false); // Cache only, don't set in store
-          console.log('[Lyrics] Pre-cached lyrics for next track:', track.title);
+          // console.log('[Lyrics] Pre-cached lyrics for next track:', track.title);
         }, (index + 1) * 500); // 500ms delay between each request
       });
     }

@@ -8,9 +8,9 @@ import {
   Code,
   Info,
   LogOut,
+  RefreshCw,
   Settings,
   Share2,
-  User,
   X
 } from 'lucide-react-native';
 import React, { useEffect, useRef } from 'react';
@@ -28,6 +28,10 @@ import {
 import { theme } from '../../config';
 import { useAuthStore } from '../../stores/authStore';
 import { useNavigationStore } from '../../stores/navigationStore';
+import { useUserStore } from '../../stores/userStore';
+import { useToastStore } from '../../stores/toastStore';
+import { startScan } from '../../api/opensubsonic/system';
+import { Avatar } from '../common';
 
 interface UserSettingsMenuProps {
   visible: boolean;
@@ -61,7 +65,12 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
   const translateY = useRef(new Animated.Value(0)).current;
   const getCurrentServerAuth = useAuthStore((state) => state.getCurrentServerAuth);
   const auth = getCurrentServerAuth();
+  const user = useUserStore((state) => state.user);
   const { navigate } = useNavigationStore();
+  const { showToast } = useToastStore();
+  
+  // Get username - prefer userStore (works for API key), fallback to auth credentials
+  const username = user?.username || auth?.username || 'User';
 
   // Haptic feedback when menu opens
   useEffect(() => {
@@ -122,6 +131,17 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
     onClose();
   };
 
+  const handleScanLibrary = async () => {
+    try {
+      await startScan();
+      showToast('Library scan started');
+      onClose();
+    } catch (error) {
+      console.error('Failed to start scan:', error);
+      showToast('Failed to start scan', 'error');
+    }
+  };
+
   const handleLogout = () => {
     onClose();
     onLogout();
@@ -148,12 +168,10 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
 
             {/* Header */}
             <View style={styles.header}>
-              <View style={styles.userIcon}>
-                <User size={32} color={theme.colors.text.primary} strokeWidth={2} />
-              </View>
+              <Avatar username={username} size={56} />
               <View style={styles.userInfo}>
                 <Text style={styles.username} numberOfLines={1}>
-                  {auth?.username || 'User'}
+                  {username}
                 </Text>
                 <Text style={styles.serverUrl} numberOfLines={1}>
                   {auth?.serverUrl || 'No server'}
@@ -170,6 +188,11 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
                 icon={<Settings size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                 label="Settings"
                 onPress={handleSettings}
+              />
+              <MenuItem
+                icon={<RefreshCw size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Scan Library"
+                onPress={handleScanLibrary}
               />
               <MenuItem
                 icon={<Share2 size={22} color={theme.colors.text.primary} strokeWidth={2} />}
@@ -242,6 +265,7 @@ const styles = StyleSheet.create({
   },
   userInfo: {
     flex: 1,
+    marginLeft: theme.spacing.md,
     marginRight: theme.spacing.md,
   },
   username: {

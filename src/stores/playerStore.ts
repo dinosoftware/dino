@@ -31,7 +31,8 @@ interface LyricsLoadingState {
 interface StreamingInfo {
   quality: string; // e.g., "320", "0" (original)
   format: string; // e.g., "mp3", "flac", "original"
-  displayText: string; // e.g., "MAX" or "320 kbps MP3"
+  displayText: string; // e.g., "MAX" or "320 kbps MP3" (detailed)
+  displayTextSimple: string; // e.g., "MAX", "HIGH", "LOW", "DOWNLOADED"
   networkType: 'wifi' | 'mobile' | 'unknown';
 }
 
@@ -126,7 +127,18 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   },
 
   toggleShuffle: () => {
+    const wasShuffled = usePlayerStore.getState().shuffleEnabled;
     set((state) => ({ shuffleEnabled: !state.shuffleEnabled }));
+    
+    // Actually shuffle or unshuffle the queue
+    const { shuffleQueue, unshuffleQueue } = require('./queueStore').useQueueStore.getState();
+    if (!wasShuffled) {
+      // Turning shuffle ON - shuffle the queue
+      shuffleQueue();
+    } else {
+      // Turning shuffle OFF - restore original order
+      unshuffleQueue();
+    }
   },
 
   setRepeatMode: (mode) => {

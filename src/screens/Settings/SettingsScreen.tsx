@@ -4,7 +4,7 @@
  */
 
 import * as Haptics from 'expo-haptics';
-import { ArrowLeft, Check, ChevronRight, Plus, Server as ServerIcon, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, Check, ChevronRight, Edit3, Plus, Server as ServerIcon, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   Modal,
@@ -12,20 +12,25 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
+import { apiClient } from '../../api/client';
+import { Avatar } from '../../components/common';
 import { ConfirmModal } from '../../components/Modals/ConfirmModal';
 import { theme } from '../../config';
 import { APP_VERSION } from '../../config/constants';
 import { useAuthStore, useServerStore, useSettingsStore } from '../../stores';
 import { useNavigationStore } from '../../stores/navigationStore';
+import { useToastStore } from '../../stores/toastStore';
+import { useUserStore } from '../../stores/userStore';
 
 interface SettingsScreenProps {
   onLogout: () => void;
 }
 
-type ModalType = 'quality-wifi' | 'quality-mobile' | 'format-wifi' | 'format-mobile' | 'lyrics-font' | 'servers' | 'max-downloads' | 'radio-queue' | 'storage-limit' | 'cache-size' | null;
+type ModalType = 'quality-wifi' | 'quality-mobile' | 'format-wifi' | 'format-mobile' | 'lyrics-font' | 'servers' | 'max-downloads' | 'instant-mix' | 'storage-limit' | 'cache-size' | 'edit-credentials' | null;
 
 interface ConfirmDialog {
   visible: boolean;
@@ -38,6 +43,7 @@ interface ConfirmDialog {
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
   const { goBack } = useNavigationStore();
+  const { showToast } = useToastStore();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>({
     visible: false,
@@ -45,17 +51,38 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     message: '',
   });
 
+  // Edit server state
+  const [editingServerId, setEditingServerId] = useState<string | null>(null);
+  const [editServerName, setEditServerName] = useState('');
+  const [editServerUrl, setEditServerUrl] = useState('');
+  const [editUsername, setEditUsername] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editApiKey, setEditApiKey] = useState('');
+  const [editAuthMode, setEditAuthMode] = useState<'password' | 'apikey'>('password');
+
   const {
     servers,
     currentServerId,
     setCurrentServer,
-    removeServer
+    removeServer,
+    updateServer
   } = useServerStore();
 
   const currentServer = servers.find((s) => s.id === currentServerId);
   const getCurrentServerAuth = useAuthStore((state) => state.getCurrentServerAuth);
   const auth = getCurrentServerAuth();
-  const username = auth?.username || 'Unknown';
+  const { user } = useUserStore();
+
+  // Get username from user store (for API key auth) or fall back to auth store
+  const username = user?.username || auth?.username || 'Unknown';
+
+  // Build avatar URL
+  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (user) {
+      apiClient.buildAvatarUrl(user.username).then(setAvatarUrl);
+    }
+  }, [user]);
 
   const {
     streamingQualityWiFi,
@@ -70,9 +97,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     includeShareMessage,
     wifiOnlyDownloads,
     maxConcurrentDownloads,
-    radioQueueSize,
+    instantMixSize,
     storageLimit,
     streamCacheSize,
+    usePostRequests,
     updateSettings,
   } = useSettingsStore();
 
@@ -108,12 +136,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     { value: 5, label: '5', description: 'Five concurrent downloads' },
   ];
 
-  const radioQueueOptions = [
-    { value: 10, label: '10', description: '10 tracks in radio queue' },
-    { value: 15, label: '15', description: '15 tracks in radio queue' },
-    { value: 20, label: '20', description: '20 tracks in radio queue' },
-    { value: 30, label: '30', description: '30 tracks in radio queue' },
-    { value: 50, label: '50', description: '50 tracks in radio queue' },
+  const instantMixOptions = [
+    { value: 10, label: '10', description: '10 tracks in instant mix' },
+    { value: 15, label: '15', description: '15 tracks in instant mix' },
+    { value: 20, label: '20', description: '20 tracks in instant mix' },
+    { value: 30, label: '30', description: '30 tracks in instant mix' },
+    { value: 50, label: '50', description: '50 tracks in instant mix' },
   ];
 
   const storageLimitOptions = [
@@ -165,8 +193,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
       case 'max-downloads':
         updateSettings({ maxConcurrentDownloads: value });
         break;
-      case 'radio-queue':
-        updateSettings({ radioQueueSize: value });
+      case 'instant-mix':
+        updateSettings({ instantMixSize: value });
         break;
       case 'storage-limit':
         updateSettings({ storageLimit: value });
@@ -256,6 +284,77 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     });
   };
 
+  const handleEditCredentials = (serverId: string) => {
+    const server = servers.find((s) => s.id === serverId);
+    const auth = useAuthStore.getState().credentials[serverId];
+    setEditingServerId(serverId);
+    setEditServerName(server?.name || '');
+    setEditServerUrl(server?.url || '');
+
+    // Detect current auth mode
+    if (auth?.apiKey) {
+      setEditAuthMode('apikey');
+      setEditApiKey(''); // Don't show existing API key
+      setEditUsername('');
+      setEditPassword('');
+    } else {
+      setEditAuthMode('password');
+      setEditUsername(auth?.username || '');
+      setEditPassword('');
+      setEditApiKey('');
+    }
+
+    setActiveModal('edit-credentials');
+  };
+
+  const handleSaveCredentials = async () => {
+    if (!editingServerId) {
+      return;
+    }
+
+    // Validate fields
+    if (!editServerName.trim()) {
+      showToast('Please enter a server name', 'error');
+      return;
+    }
+
+    if (!editServerUrl.trim()) {
+      showToast('Please enter a server URL', 'error');
+      return;
+    }
+
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      // Update server name and URL
+      updateServer(editingServerId, editServerName.trim(), editServerUrl.trim());
+
+      // Update credentials based on auth mode
+      if (editAuthMode === 'apikey' && editApiKey.trim()) {
+        // API Key authentication
+        await useAuthStore.getState().loginWithApiKey(editingServerId, editApiKey.trim());
+        showToast('Server and API key updated successfully');
+      } else if (editAuthMode === 'password' && editUsername.trim() && editPassword.trim()) {
+        // Password authentication
+        await useAuthStore.getState().login(editingServerId, editUsername.trim(), editPassword.trim());
+        showToast('Server and credentials updated successfully');
+      } else {
+        showToast('Server updated successfully');
+      }
+
+      setActiveModal(null);
+      setEditingServerId(null);
+      setEditServerName('');
+      setEditServerUrl('');
+      setEditUsername('');
+      setEditPassword('');
+      setEditApiKey('');
+      setEditAuthMode('password');
+    } catch (error) {
+      showToast('Failed to update server. Please check your settings.', 'error');
+    }
+  };
+
   const renderOptionModal = (
     title: string,
     options: { value: string | number; label: string; description: string }[],
@@ -269,7 +368,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
       statusBarTranslucent
       onRequestClose={() => setActiveModal(null)}
     >
-      <View style={styles.modalOverlay}>
+      <View style={styles.modalOverlayEnd}>
         <TouchableOpacity
           style={styles.modalBackdrop}
           activeOpacity={1}
@@ -336,7 +435,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           <Text style={styles.sectionTitle}>ACCOUNT</Text>
           <View style={styles.sectionCard}>
             <View style={styles.settingItem}>
-              <View style={styles.settingLeft}>
+              <Avatar username={username} avatarUrl={avatarUrl || undefined} size={48} />
+              <View style={[styles.settingLeft, { marginLeft: theme.spacing.md }]}>
                 <Text style={styles.settingLabel}>Username</Text>
                 <Text style={styles.settingValue}>{username}</Text>
               </View>
@@ -414,6 +514,30 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
               <ChevronRight size={20} color={theme.colors.text.tertiary} />
             </TouchableOpacity>
 
+          </View>
+        </View>
+
+        {/* Network Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>NETWORK</Text>
+          <View style={styles.sectionCard}>
+            <View style={styles.settingItem}>
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Use POST Requests</Text>
+                <Text style={styles.settingDescription}>
+                  Use POST for API requests if server supports it
+                </Text>
+              </View>
+              <Switch
+                value={usePostRequests}
+                onValueChange={(value) => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  updateSettings({ usePostRequests: value });
+                }}
+                trackColor={{ false: theme.colors.border, true: theme.colors.accent }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
           </View>
         </View>
 
@@ -577,13 +701,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           <View style={styles.sectionCard}>
             <TouchableOpacity
               style={styles.settingItem}
-              onPress={() => setActiveModal('radio-queue')}
+              onPress={() => setActiveModal('instant-mix')}
               activeOpacity={0.7}
             >
               <View style={styles.settingLeft}>
-                <Text style={styles.settingLabel}>Radio Queue Size</Text>
-                <Text style={styles.settingDescription}>Number of tracks to keep in radio queue</Text>
-                <Text style={styles.settingValue}>{radioQueueSize} tracks</Text>
+                <Text style={styles.settingLabel}>Instant Mix Size</Text>
+                <Text style={styles.settingDescription}>Number of similar tracks in instant mix</Text>
+                <Text style={styles.settingValue}>{instantMixSize} tracks</Text>
               </View>
               <ChevronRight size={20} color={theme.colors.text.tertiary} />
             </TouchableOpacity>
@@ -664,7 +788,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
       {renderOptionModal('Streaming Format (Mobile)', formatOptions, streamingFormatMobile, 'format-mobile')}
       {renderOptionModal('Lyrics Font Size', fontSizeOptions, lyricsFontSize, 'lyrics-font')}
       {renderOptionModal('Max Concurrent Downloads', maxDownloadsOptions, maxConcurrentDownloads, 'max-downloads')}
-      {renderOptionModal('Radio Queue Size', radioQueueOptions, radioQueueSize, 'radio-queue')}
+      {renderOptionModal('Instant Mix Size', instantMixOptions, instantMixSize, 'instant-mix')}
       {renderOptionModal('Download Storage Limit', storageLimitOptions, storageLimit, 'storage-limit')}
       {renderOptionModal('Stream Cache Size', cacheSizeOptions, streamCacheSize, 'cache-size')}
 
@@ -687,7 +811,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
         statusBarTranslucent
         onRequestClose={() => setActiveModal(null)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={styles.modalOverlayEnd}>
           <TouchableOpacity
             style={styles.modalBackdrop}
             activeOpacity={1}
@@ -737,17 +861,149 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                         <Check size={20} color={theme.colors.accent} strokeWidth={3} />
                       )}
                     </TouchableOpacity>
-                    {servers.length > 1 && (
+                    <View style={styles.serverActions}>
                       <TouchableOpacity
-                        style={styles.deleteButton}
-                        onPress={() => handleRemoveServer(server.id, server.name)}
+                        style={styles.serverActionButton}
+                        onPress={() => handleEditCredentials(server.id)}
                       >
-                        <Trash2 size={18} color={theme.colors.error} strokeWidth={2} />
+                        <Edit3 size={18} color={theme.colors.text.secondary} strokeWidth={2} />
                       </TouchableOpacity>
-                    )}
+                      {servers.length > 1 && (
+                        <TouchableOpacity
+                          style={styles.serverActionButton}
+                          onPress={() => handleRemoveServer(server.id, server.name)}
+                        >
+                          <Trash2 size={18} color={theme.colors.error} strokeWidth={2} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                 );
               })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Credentials Modal */}
+      <Modal
+        visible={activeModal === 'edit-credentials'}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setActiveModal(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setActiveModal(null)}
+          />
+          <View style={styles.editCredentialsContainer}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Server</Text>
+            </View>
+
+            {/* Form */}
+            <ScrollView style={{ paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.md }}>
+              <Text style={styles.inputLabel}>Server Name</Text>
+              <TextInput
+                style={styles.input}
+                value={editServerName}
+                onChangeText={setEditServerName}
+                placeholder="My Music Server"
+                placeholderTextColor={theme.colors.text.tertiary}
+                autoCapitalize="words"
+                autoCorrect={false}
+              />
+
+              <Text style={[styles.inputLabel, { marginTop: theme.spacing.md }]}>Server URL</Text>
+              <TextInput
+                style={styles.input}
+                value={editServerUrl}
+                onChangeText={setEditServerUrl}
+                placeholder="https://music.example.com"
+                placeholderTextColor={theme.colors.text.tertiary}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+
+              {/* Auth Mode Toggle */}
+              <Text style={[styles.inputLabel, { marginTop: theme.spacing.lg }]}>Authentication</Text>
+              <View style={styles.authModeToggle}>
+                <TouchableOpacity
+                  style={[styles.authToggleButton, editAuthMode === 'password' && styles.authToggleButtonActive]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setEditAuthMode('password');
+                  }}
+                >
+                  <Text style={[styles.authToggleText, editAuthMode === 'password' && styles.authToggleTextActive]}>
+                    Password
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.authToggleButton, editAuthMode === 'apikey' && styles.authToggleButtonActive]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setEditAuthMode('apikey');
+                  }}
+                >
+                  <Text style={[styles.authToggleText, editAuthMode === 'apikey' && styles.authToggleTextActive]}>
+                    API Key
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {editAuthMode === 'password' ? (
+                <>
+                  <Text style={[styles.inputLabel, { marginTop: theme.spacing.md }]}>Username</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editUsername}
+                    onChangeText={setEditUsername}
+                    placeholder="Username (optional)"
+                    placeholderTextColor={theme.colors.text.tertiary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Text style={[styles.inputLabel, { marginTop: theme.spacing.md }]}>Password</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editPassword}
+                    onChangeText={setEditPassword}
+                    placeholder="New password (optional)"
+                    placeholderTextColor={theme.colors.text.tertiary}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.inputLabel, { marginTop: theme.spacing.md }]}>API Key</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editApiKey}
+                    onChangeText={setEditApiKey}
+                    placeholder="Enter API key (optional)"
+                    placeholderTextColor={theme.colors.text.tertiary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </>
+              )}
+
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleSaveCredentials}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.saveButtonText}>Save Changes</Text>
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
@@ -854,6 +1110,10 @@ const styles = StyleSheet.create({
 
   // Modal Styles (QAM-style)
   modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  modalOverlayEnd: {
     flex: 1,
     justifyContent: 'flex-end',
   },
@@ -975,5 +1235,78 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: theme.spacing.sm,
+  },
+  serverActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  serverActionButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: theme.spacing.xs,
+  },
+  inputLabel: {
+    fontSize: theme.typography.fontSize.sm,
+    fontWeight: theme.typography.fontWeight.medium,
+    color: theme.colors.text.secondary,
+    marginBottom: theme.spacing.xs,
+  },
+  input: {
+    backgroundColor: theme.colors.background.elevated,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    fontSize: theme.typography.fontSize.md,
+    color: theme.colors.text.primary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  saveButton: {
+    backgroundColor: theme.colors.accent,
+    borderRadius: theme.borderRadius.md,
+    paddingVertical: theme.spacing.md,
+    alignItems: 'center',
+    marginTop: theme.spacing.xl,
+    marginBottom: theme.spacing.lg,
+  },
+  saveButtonText: {
+    fontSize: theme.typography.fontSize.md,
+    fontWeight: theme.typography.fontWeight.semibold,
+    color: theme.colors.text.inverse,
+  },
+  authModeToggle: {
+    flexDirection: 'row',
+    marginTop: theme.spacing.sm,
+    backgroundColor: theme.colors.background.elevated,
+    borderRadius: theme.borderRadius.md,
+    padding: 4,
+  },
+  authToggleButton: {
+    flex: 1,
+    paddingVertical: theme.spacing.sm,
+    alignItems: 'center',
+    borderRadius: theme.borderRadius.sm,
+  },
+  authToggleButtonActive: {
+    backgroundColor: theme.colors.accent,
+  },
+  authToggleText: {
+    fontSize: theme.typography.fontSize.md,
+    fontWeight: theme.typography.fontWeight.medium,
+    color: theme.colors.text.secondary,
+  },
+  authToggleTextActive: {
+    color: theme.colors.accentForeground,
+    fontWeight: theme.typography.fontWeight.semibold,
+  },
+  editCredentialsContainer: {
+    backgroundColor: theme.colors.background.card,
+    borderRadius: theme.borderRadius.xl,
+    marginHorizontal: theme.spacing.lg,
+    maxWidth: 400,
+    width: '90%',
+    alignSelf: 'center',
   },
 });

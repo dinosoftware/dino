@@ -3,22 +3,23 @@
  * Guide users through adding their first OpenSubsonic server
  */
 
+import { ChevronLeft } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
+  View,
 } from 'react-native';
-import { ChevronLeft } from 'lucide-react-native';
 import { testConnection } from '../../api/opensubsonic/auth';
-import { useServerStore } from '../../stores';
 import { theme } from '../../config';
+import { useServerStore } from '../../stores';
 
 interface ServerSetupScreenProps {
   onComplete: () => void;
@@ -82,25 +83,25 @@ export const ServerSetupScreen: React.FC<ServerSetupScreenProps> = ({ onComplete
           console.log('HTTPS failed, trying HTTP...');
           const httpUrl = formattedUrl.replace('https://', 'http://');
           const httpReachable = await testConnection(httpUrl, '', '');
-          
+
           console.log('HTTP test result:', httpReachable);
-          
+
           if (httpReachable) {
             // Add server and proceed to login
             console.log('HTTP connection successful, adding server');
-            addServer(serverName.trim(), httpUrl);
+            addServer(serverName.trim(), httpUrl, true); // autoSwitch = true
             onComplete();
             return;
           }
         }
-        
+
         setError('Could not connect to server. Please check the URL and try again.');
         return;
       }
 
       // Add server and proceed to login
       console.log('Connection successful, adding server and proceeding to login');
-      addServer(serverName.trim(), formattedUrl);
+      addServer(serverName.trim(), formattedUrl, true); // autoSwitch = true
       onComplete();
     } catch (err) {
       console.error('Server connection test failed:', err);
@@ -190,10 +191,28 @@ export const ServerSetupScreen: React.FC<ServerSetupScreenProps> = ({ onComplete
           {/* Help Text */}
           <View style={styles.helpContainer}>
             <Text style={styles.helpText}>
-              Don't have a server? Learn about{' '}
-              <Text style={styles.helpLink}>Navidrome</Text>,{' '}
-              <Text style={styles.helpLink}>Airsonic</Text>, and other
-              OpenSubsonic servers.
+              Don&apos;t have a server? Learn about{' '}
+              <Text
+                style={styles.helpLink}
+                onPress={() => Linking.openURL('https://github.com/sonicdino/dinosonic')}
+              >
+                Dinosonic
+              </Text>
+              {', '}
+              <Text
+                style={styles.helpLink}
+                onPress={() => Linking.openURL('https://www.navidrome.org')}
+              >
+                Navidrome
+              </Text>
+              {', and other '}
+              <Text
+                style={styles.helpLink}
+                onPress={() => Linking.openURL('https://opensubsonic.netlify.app')}
+              >
+                OpenSubsonic
+              </Text>
+              {' compatible servers.'}
             </Text>
           </View>
         </View>

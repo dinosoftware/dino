@@ -10,8 +10,10 @@ import { SubsonicResponse } from './opensubsonic/types';
 
 // Type for server credentials
 export interface ServerCredentials {
-  username: string;
-  password: string;
+  username?: string;
+  token?: string;  // md5(password + salt)
+  salt?: string;   // random salt
+  apiKey?: string; // API key for apiKeyAuthentication extension
   serverUrl: string;
 }
 
@@ -34,8 +36,14 @@ class APIClient {
    * Set credentials for API requests
    */
   setCredentials(credentials: ServerCredentials) {
+    console.log('[API Client] setCredentials called with:', {
+      hasApiKey: !!credentials.apiKey,
+      hasUsername: !!credentials.username,
+      serverUrl: credentials.serverUrl,
+    });
     this.credentials = credentials;
     this.axiosInstance.defaults.baseURL = `${credentials.serverUrl}/rest`;
+    console.log('[API Client] baseURL set to:', this.axiosInstance.defaults.baseURL);
   }
 
   /**
@@ -54,29 +62,37 @@ class APIClient {
   }
 
   /**
-   * Generate authentication parameters (salt + token)
+   * Generate authentication parameters (use stored token + salt or API key)
    */
-  private async generateAuthParams() {
+  private generateAuthParams(): Record<string, string> {
     if (!this.credentials) {
       throw new Error('No credentials set');
     }
 
-    // Generate random salt
-    const salt = Math.random().toString(36).substring(2, 15);
-
-    // Generate token (MD5 hash of password + salt)
-    const token = await Crypto.digestStringAsync(
-      Crypto.CryptoDigestAlgorithm.MD5,
-      this.credentials.password + salt
-    );
-
-    return {
-      u: this.credentials.username,
-      s: salt,
-      t: token,
+    const baseParams = {
       v: API_VERSION,
       c: CLIENT_NAME,
       f: API_FORMAT,
+    };
+
+    // Use API key if available
+    if (this.credentials.apiKey) {
+      return {
+        ...baseParams,
+        apiKey: this.credentials.apiKey,
+      };
+    }
+
+    // Otherwise use token-based auth
+    if (!this.credentials.username || !this.credentials.token || !this.credentials.salt) {
+      throw new Error('Invalid credentials: missing username, token, or salt');
+    }
+
+    return {
+      ...baseParams,
+      u: this.credentials.username,
+      s: this.credentials.salt,
+      t: this.credentials.token,
     };
   }
 
@@ -84,11 +100,12 @@ class APIClient {
    * Setup request/response interceptors
    */
   private setupInterceptors() {
-    // Request interceptor - add auth params
+    // Request interceptor - add auth params (for GET requests only)
+    // POST requests handle auth params in the request body
     this.axiosInstance.interceptors.request.use(
-      async (config) => {
-        if (this.credentials) {
-          const authParams = await this.generateAuthParams();
+      (config) => {
+        if (this.credentials && config.method?.toLowerCase() === 'get') {
+          const authParams = this.generateAuthParams();
           config.params = {
             ...config.params,
             ...authParams,
@@ -155,13 +172,73 @@ class APIClient {
   }
 
   /**
+   * Request (auto-selects GET or POST based on server capabilities)
+   * Defaults to POST when server supports it (unless forceGet is true)
+   * 
+   * @param endpoint - API endpoint name (without .view)
+   * @param params - Request parameters
+   * @param options.forceGet - Force GET even if server supports POST (for media URLs)
+   * @param options.config - Additional axios config
+   */
+  async request<T = any>(
+    endpoint: string,
+    params?: Record<string, any>,
+    options?: { forceGet?: boolean; config?: AxiosRequestConfig }
+  ): Promise<T> {
+    const serverSupportsPost = this.supportsFormPost();
+    const clientForcesGet = options?.forceGet === true;
+    
+    // Check user setting for POST requests
+    const { usePostRequests } = await import('../stores/settingsStore').then(m => m.useSettingsStore.getState());
+    const userWantsPost = usePostRequests !== false; // Default to true if not set
+    
+    const usePost = serverSupportsPost && !clientForcesGet && userWantsPost;
+    
+    console.log('[API Client] 🔍 Request decision for:', endpoint, {
+      serverSupportsFormPost: serverSupportsPost,
+      userWantsPost,
+      forceGet: clientForcesGet,
+      willUsePost: usePost,
+    });
+    
+    if (usePost) {
+      console.log('[API Client] 📤 Using POST for:', endpoint);
+      return this.post<T>(endpoint, params, options?.config);
+    } else {
+      console.log('[API Client] 📥 Using GET for:', endpoint, 
+        !serverSupportsPost ? '(server does not support POST)' : 
+        !userWantsPost ? '(user disabled POST)' : '(forceGet requested)');
+      return this.get<T>(endpoint, params, options?.config);
+    }
+  }
+
+  /**
+   * Check if server supports formPost extension
+   */
+  private supportsFormPost(): boolean {
+    // This will be set by the stores when capabilities are loaded
+    // For now, return false - will be implemented via a setter method
+    return (this as any)._supportsFormPost || false;
+  }
+
+  /**
+   * Set server capabilities (called by serverStore after fetching extensions)
+   */
+  setServerCapabilities(capabilities: { supportsFormPost: boolean }) {
+    (this as any)._supportsFormPost = capabilities.supportsFormPost;
+    console.log('[API Client] Server capabilities updated:', capabilities);
+  }
+
+  /**
    * GET request
+   * Note: Most endpoints should use request() which auto-selects POST when available
    */
   async get<T = any>(
     endpoint: string,
     params?: Record<string, any>,
     config?: AxiosRequestConfig
   ): Promise<T> {
+    console.log('[API Client] 📥 GET request to:', endpoint, 'hasCredentials:', this.hasCredentials());
     const response = await this.axiosInstance.get<SubsonicResponse<T>>(
       `${endpoint}.view`,
       {
@@ -190,17 +267,43 @@ class APIClient {
   }
 
   /**
-   * POST request
+   * POST request (application/x-www-form-urlencoded)
    */
   async post<T = any>(
     endpoint: string,
-    data?: any,
+    params?: Record<string, any>,
     config?: AxiosRequestConfig
   ): Promise<T> {
+    console.log('[API Client] POST request to:', endpoint, 'hasCredentials:', this.hasCredentials());
+    
+    // Merge auth params with request params
+    const authParams = this.generateAuthParams();
+    const allParams = { ...params, ...authParams };
+    
+    // Convert to URLSearchParams for application/x-www-form-urlencoded
+    const formData = new URLSearchParams();
+    Object.keys(allParams).forEach(key => {
+      const value = allParams[key];
+      if (Array.isArray(value)) {
+        // For arrays, repeat the parameter name for each value
+        value.forEach(v => {
+          formData.append(key, String(v));
+        });
+      } else if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    });
+    
     const response = await this.axiosInstance.post<SubsonicResponse<T>>(
       `${endpoint}.view`,
-      data,
-      config
+      formData.toString(),
+      {
+        ...config,
+        headers: {
+          ...config?.headers,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }
     );
     return response.data['subsonic-response'] as T;
   }
@@ -271,28 +374,73 @@ class APIClient {
   }
 
   /**
-   * Ping server to check if it's reachable and validate credentials
+   * Build avatar URL with auth params
    */
-  async ping(serverUrl: string, username?: string, password?: string): Promise<boolean> {
+  async buildAvatarUrl(username?: string): Promise<string | null> {
+    if (!this.credentials) {
+      return null;
+    }
+
     try {
-      // Always send auth params - use dummy values if not provided
-      const user = username || 'guest';
-      const pass = password || 'guest';
+      const authParams = await this.generateAuthParams();
+      const params = new URLSearchParams({
+        ...(username && { username }),
+        ...authParams,
+      });
 
-      const salt = Math.random().toString(36).substring(2, 15);
-      const token = await Crypto.digestStringAsync(
-        Crypto.CryptoDigestAlgorithm.MD5,
-        pass + salt
-      );
+      return `${this.credentials.serverUrl}/rest/getAvatar.view?${params.toString()}`;
+    } catch (error) {
+      console.log('[API Client] Failed to build avatar URL:', error);
+      return null;
+    }
+  }
 
-      const params: any = {
-        v: API_VERSION,
-        c: CLIENT_NAME,
-        f: API_FORMAT,
-        u: user,
-        s: salt,
-        t: token,
-      };
+  /**
+   * Ping server to check if it's reachable and validate credentials
+   * Supports password, token, and API key authentication
+   */
+  async ping(serverUrl: string, username?: string, tokenOrPassword?: string, salt?: string, apiKey?: string): Promise<boolean> {
+    try {
+      let params: Record<string, string>;
+
+      if (apiKey) {
+        // API key authentication
+        params = {
+          v: API_VERSION,
+          c: CLIENT_NAME,
+          f: API_FORMAT,
+          apiKey: apiKey,
+        };
+      } else {
+        // Token or password authentication
+        const user = username || 'guest';
+        
+        let authToken: string;
+        let authSalt: string;
+        
+        if (salt) {
+          // Token auth - use provided token and salt
+          authToken = tokenOrPassword || 'guest';
+          authSalt = salt;
+        } else {
+          // Password auth - generate token from password
+          const pass = tokenOrPassword || 'guest';
+          authSalt = Math.random().toString(36).substring(2, 15);
+          authToken = await Crypto.digestStringAsync(
+            Crypto.CryptoDigestAlgorithm.MD5,
+            pass + authSalt
+          );
+        }
+
+        params = {
+          v: API_VERSION,
+          c: CLIENT_NAME,
+          f: API_FORMAT,
+          u: user,
+          s: authSalt,
+          t: authToken,
+        };
+      }
 
       const response = await axios.get(`${serverUrl}/rest/ping.view`, {
         params,
@@ -307,14 +455,25 @@ class APIClient {
         return false;
       }
 
-      // IMPORTANT: If we get a valid Subsonic response (even if auth failed),
-      // the server is reachable and is a valid OpenSubsonic server!
-      // A 'failed' status just means wrong/missing credentials, which is EXPECTED
-      // when testing server reachability with dummy credentials.
-      console.log('[API] Ping result:', data['subsonic-response'].status);
+      const status = data['subsonic-response'].status;
+      console.log('[API] Ping result:', status);
 
-      // Server is reachable if we get any valid Subsonic response
-      return true;
+      // If credentials were provided, check auth status
+      if (apiKey || (username && tokenOrPassword)) {
+        // Authentication was attempted - must be 'ok' to succeed
+        if (status === 'ok') {
+          console.log('[API] Ping successful with valid credentials');
+          return true;
+        } else {
+          console.log('[API] Ping failed: Invalid credentials');
+          return false;
+        }
+      } else {
+        // No credentials provided - just checking server reachability
+        // Any valid Subsonic response means server is reachable
+        console.log('[API] Ping successful: Server is reachable');
+        return true;
+      }
     } catch (error) {
       // Network error - server is not reachable
       console.error('[API] Ping error:', error);

@@ -28,8 +28,8 @@ interface Settings {
   gaplessPlayback: boolean;
   normalizeVolume: boolean;
   
-  // Radio
-  radioQueueSize: number;
+  // Instant Mix
+  instantMixSize: number;
   
   // Storage
   storageLimit: number; // in MB
@@ -53,6 +53,12 @@ interface Settings {
   
   // Sharing
   includeShareMessage: boolean; // "Check out X" in share messages
+  
+  // UI
+  qualityBadgeDetailed: boolean; // Show detailed quality (e.g., "320 kbps MP3") vs simple (e.g., "HIGH")
+  
+  // Network
+  usePostRequests: boolean; // Use POST for API requests (if server supports formPost extension)
 }
 
 interface SettingsStore extends Settings {

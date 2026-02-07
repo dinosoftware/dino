@@ -12,6 +12,9 @@ import { useServerStore, useAuthStore, useSettingsStore, useQueueStore } from '.
 import { useFavoritesStore } from '../stores/favoritesStore';
 import { useDownloadStore } from '../stores/downloadStore';
 import { trackPlayerService } from '../services/player/TrackPlayerService';
+import { queueSyncManager } from '../services/player/QueueSyncManager';
+import { getOpenSubsonicExtensions, supportsFormPost, supportsApiKeyAuth, supportsSongLyrics } from '../api/opensubsonic/extensions';
+import { apiClient } from '../api/client';
 import { theme } from '../config';
 
 export const AppNavigator: React.FC = () => {
@@ -32,6 +35,9 @@ export const AppNavigator: React.FC = () => {
   const authIsAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const currentServerId = useServerStore((state) => state.currentServerId);
   
+  // Track previous server ID to detect changes
+  const [previousServerId, setPreviousServerId] = useState<string | null>(null);
+  
   // Update local state and invalidate cache when auth/server changes
   useEffect(() => {
     if (!isLoading) {
@@ -41,13 +47,36 @@ export const AppNavigator: React.FC = () => {
       
       setIsAuthenticated(nowAuthenticated);
       
-      // If server changed while authenticated, invalidate all queries
-      if (nowAuthenticated && wasAuthenticated) {
-        console.log('[AppNavigator] Server changed - invalidating queries');
+      // If server changed while authenticated, clear queue and invalidate all queries
+      if (nowAuthenticated && wasAuthenticated && previousServerId !== null && previousServerId !== currentServerId) {
+        console.log('[AppNavigator] Server changed - clearing local queue and loading new server queue');
+        
+        // Clear local queue WITHOUT clearing server queue (we're switching servers)
+        useQueueStore.getState().clearQueue(false).then(() => {
+          // Load queue from new server after clearing
+          console.log('[AppNavigator] Loading queue from new server...');
+          queueSyncManager.loadFromServer().then((loaded) => {
+            if (loaded) {
+              console.log('[AppNavigator] Loaded queue from new server');
+              // Queue is now available, user can press play when ready
+            } else {
+              console.log('[AppNavigator] No queue on new server');
+            }
+          }).catch((error) => {
+            console.error('[AppNavigator] Failed to load queue from new server:', error);
+          });
+        });
+        
+        // Invalidate all cached data
         queryClient.invalidateQueries();
       }
+      
+      // Update previous server ID
+      if (currentServerId !== previousServerId) {
+        setPreviousServerId(currentServerId);
+      }
     }
-  }, [authIsAuthenticated, currentServerId, isLoading]);
+  }, [authIsAuthenticated, currentServerId, isLoading, isAuthenticated, previousServerId]);
 
   useEffect(() => {
     // Load data from storage on app launch
@@ -95,21 +124,83 @@ export const AppNavigator: React.FC = () => {
         const isAuth = hasSetup && hasAuth && hasServer;
         setIsAuthenticated(isAuth);
         
-        // Load starred items if authenticated
+        // Mark loading as complete - show app immediately
+        setIsLoading(false);
+        
+        // Set API client capabilities AFTER loading completes
+        if (isAuth && serverState.currentServerId) {
+          const currentServer = serverState.getCurrentServer();
+          if (currentServer?.capabilities) {
+            console.log('[AppNavigator] ⚙️  Setting API client capabilities on startup:', currentServer.capabilities);
+            apiClient.setServerCapabilities({
+              supportsFormPost: currentServer.capabilities.supportsFormPost,
+            });
+          } else {
+            console.log('[AppNavigator] ⚠️  No capabilities found for current server!');
+          }
+        }
+        
+        // Load starred items and check server capabilities in background if authenticated (non-blocking)
         if (isAuth) {
-          console.log('[AppNavigator] Loading starred items...');
-          try {
-            await useFavoritesStore.getState().loadStarred();
+          console.log('[AppNavigator] Loading starred items in background...');
+          // Don't await - let it load in background
+          Promise.race([
+            useFavoritesStore.getState().loadStarred(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+          ]).then(() => {
             console.log('[AppNavigator] Starred items loaded');
-          } catch (error) {
-            console.error('[AppNavigator] Failed to load starred items:', error);
+          }).catch((error) => {
+            console.log('[AppNavigator] Skipping starred items (server may be unreachable):', error);
+          });
+
+          // Check and fetch server capabilities if missing, stale (>24h), or empty
+          const currentServer = serverState.getCurrentServer();
+          const ONE_DAY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+          const isStale = currentServer?.capabilities && 
+                         (Date.now() - currentServer.capabilities.lastChecked) > ONE_DAY;
+          const isEmpty = currentServer?.capabilities && 
+                         (!currentServer.capabilities.extensions || currentServer.capabilities.extensions.length === 0);
+          const needsRefresh = !currentServer?.capabilities || isStale || isEmpty;
+
+          if (currentServer && needsRefresh) {
+            if (!currentServer.capabilities) {
+              console.log('[AppNavigator] 🔍 Server capabilities missing, fetching in background...');
+            } else if (isEmpty) {
+              console.log('[AppNavigator] 🔍 Server capabilities empty (bug?), forcing refresh...');
+            } else {
+              console.log('[AppNavigator] 🔍 Server capabilities stale, refreshing in background...');
+            }
+            
+            (async () => {
+              try {
+                console.log('[AppNavigator] 🔍 Calling getOpenSubsonicExtensions()...');
+                const extensions = await getOpenSubsonicExtensions();
+                console.log('[AppNavigator] ✅ Received extensions:', extensions);
+                console.log('[AppNavigator] 🔍 Extensions count:', extensions?.length || 0);
+                
+                const capabilities = {
+                  extensions,
+                  supportsFormPost: supportsFormPost(extensions),
+                  supportsApiKeyAuth: supportsApiKeyAuth(extensions),
+                  supportsSongLyrics: supportsSongLyrics(extensions),
+                  lastChecked: Date.now(),
+                };
+                
+                console.log('[AppNavigator] 🔍 Updating server capabilities:', capabilities);
+                useServerStore.getState().updateServerCapabilities(currentServer.id, capabilities);
+                console.log('[AppNavigator] ✅ Server capabilities updated successfully');
+              } catch (error) {
+                console.error('[AppNavigator] ❌ Failed to fetch server capabilities:', error);
+              }
+            })();
+          } else if (currentServer?.capabilities) {
+            console.log('[AppNavigator] ✅ Server capabilities already cached and fresh:', currentServer.capabilities);
           }
         }
       } catch (error) {
         console.error('Failed to initialize app:', error);
         setIsAuthenticated(false);
-      } finally {
-        setIsLoading(false);
+        setIsLoading(false); // Always stop loading even on error
       }
     };
 

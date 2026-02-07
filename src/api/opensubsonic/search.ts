@@ -8,6 +8,7 @@ import { SearchResponse3 } from './types';
 
 /**
  * Search for tracks, albums, and artists (ID3 tags)
+ * Uses POST when supported (better for long queries)
  */
 export const search3 = async (
   query: string,
@@ -18,7 +19,7 @@ export const search3 = async (
   albumOffset = 0,
   songOffset = 0
 ): Promise<SearchResponse3> => {
-  return await apiClient.get<SearchResponse3>('search3', {
+  return await apiClient.request<SearchResponse3>('search3', {
     query,
     artistCount,
     albumCount,

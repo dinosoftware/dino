@@ -74,9 +74,14 @@ class TrackPlayerService {
     console.log('[TrackPlayer] Initializing...');
 
     try {
+      // Get stream cache size from settings (convert MB to KB)
+      const { streamCacheSize } = useSettingsStore.getState();
+      const maxCacheSizeKB = streamCacheSize * 1024;
+      
       await TrackPlayer.setupPlayer({
         waitForBuffer: true,
         autoHandleInterruptions: true,
+        maxCacheSize: maxCacheSizeKB, // Android only - in KB
       });
 
       await TrackPlayer.updateOptions({
@@ -128,31 +133,39 @@ class TrackPlayerService {
       await useQueueStore.getState().loadFromStorage();
       console.log('[TrackPlayer] Local queue loaded');
 
-      // Try to load queue from server (will check for conflicts)
-      try {
-        const usedServerQueue = await queueSyncManager.loadFromServer();
-        if (usedServerQueue) {
-          console.log('[TrackPlayer] Loaded queue from server');
-          // If we loaded server queue and it has tracks, restore current track
-          const { queue, currentIndex } = useQueueStore.getState();
-          if (queue.length > 0 && currentIndex >= 0 && currentIndex < queue.length) {
-            const currentTrack = queue[currentIndex];
-            usePlayerStore.getState().setCurrentTrack(currentTrack);
-            console.log('[TrackPlayer] Restored current track from server queue');
-          }
-        } else {
-          console.log('[TrackPlayer] Using local queue');
-        }
-      } catch (error) {
-        console.error('[TrackPlayer] Failed to load server queue, using local:', error);
-      }
+      // Mark as initialized early - don't wait for server
+      this.isInitialized = true;
+      console.log('[TrackPlayer] Initialized successfully (local queue)');
 
       // Start queue sync and scrobbling managers
       queueSyncManager.start();
       scrobblingManager.start();
 
-      this.isInitialized = true;
-      console.log('[TrackPlayer] Initialized successfully');
+      // Load queue from server in background (non-blocking)
+      // This allows app to start immediately even if server is unreachable
+      queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
+        if (usedServerQueue) {
+          console.log('[TrackPlayer] Loaded queue from server (background)');
+          const { queue, currentIndex } = useQueueStore.getState();
+          if (queue.length > 0 && currentIndex >= 0 && currentIndex < queue.length) {
+            // Set current track so mini player shows up
+            const currentTrack = queue[currentIndex];
+            usePlayerStore.getState().setCurrentTrack(currentTrack);
+            console.log('[TrackPlayer] Server queue ready:', queue.length, 'tracks, current track set');
+          }
+        } else {
+          console.log('[TrackPlayer] Using local queue');
+          // If there's a local queue, make sure current track is set
+          const { queue, currentIndex } = useQueueStore.getState();
+          if (queue.length > 0 && currentIndex >= 0 && currentIndex < queue.length) {
+            const currentTrack = queue[currentIndex];
+            usePlayerStore.getState().setCurrentTrack(currentTrack);
+            console.log('[TrackPlayer] Local queue ready:', queue.length, 'tracks, current track set');
+          }
+        }
+      }).catch((error) => {
+        console.log('[TrackPlayer] Failed to load server queue (background), using local:', error);
+      });
     } catch (error) {
       console.error('[TrackPlayer] Initialization failed:', error);
       throw error;
@@ -196,7 +209,15 @@ class TrackPlayerService {
 
     TrackPlayer.addEventListener(Event.PlaybackTrackChanged, async (event) => {
       // Get previous track info for scrobbling
-      const { currentTrack: previousTrack, progress: previousProgress } = usePlayerStore.getState();
+      const { currentTrack: previousTrack, progress: previousProgress, repeatMode } = usePlayerStore.getState();
+
+      // Check if we should repeat the current track
+      if (repeatMode === 'track' && previousTrack && event.nextTrack !== undefined) {
+        console.log('[TrackPlayer] Repeat track mode - going back to:', previousTrack.title);
+        // Go back to the previous track (which is the one we want to repeat)
+        await TrackPlayer.skipToPrevious();
+        return;
+      }
 
       if (event.nextTrack !== undefined) {
         const track = await TrackPlayer.getTrack(event.nextTrack);
@@ -222,15 +243,24 @@ class TrackPlayerService {
                 quality: '0',
                 format: 'Downloaded',
                 displayText: 'Downloaded',
+                displayTextSimple: 'DOWNLOADED',
                 networkType: 'unknown',
               });
             } else {
               // Update with current network settings
               this.getActiveStreamingSettings().then(streamingSettings => {
+                // For MAX quality, show actual track bitrate/format in detailed view
+                let detailedText = streamingSettings.displayText;
+                if (streamingSettings.quality === '0' && trackData.bitRate && trackData.suffix) {
+                  const format = trackData.suffix.toUpperCase();
+                  detailedText = `${trackData.bitRate} kbps ${format}`;
+                }
+                
                 usePlayerStore.getState().setStreamingInfo({
                   quality: streamingSettings.quality,
                   format: streamingSettings.formatName,
-                  displayText: streamingSettings.displayText,
+                  displayText: detailedText,
+                  displayTextSimple: streamingSettings.displayTextSimple,
                   networkType: streamingSettings.networkType,
                 });
               }).catch(err => console.error('[TrackPlayer] Failed to update streaming info:', err));
@@ -263,14 +293,16 @@ class TrackPlayerService {
       const { repeatMode, currentTrack, progress } = usePlayerStore.getState();
       const { queue, currentIndex, skipToNext } = useQueueStore.getState();
 
+      console.log('[TrackPlayer] Repeat mode:', repeatMode, 'Current index:', currentIndex, 'Queue length:', queue.length);
+
       // Scrobble the current track that just finished
       if (currentTrack) {
         await scrobblingManager.onTrackEnded(currentTrack, progress.position, progress.duration);
       }
 
       if (repeatMode === 'track') {
-        // Repeat current track
-        console.log('[TrackPlayer] Repeating current track');
+        // Repeat current track - just replay it
+        console.log('[TrackPlayer] Repeating current track:', currentTrack?.title);
         await this.play();
       } else if (repeatMode === 'queue' || currentIndex < queue.length - 1) {
         // Skip to next track if:
@@ -335,13 +367,26 @@ class TrackPlayerService {
         maxBitRateForApi = undefined; // Don't send bitrate param to use original
       }
 
-      // Generate display text
+      // Generate display text (detailed and simple)
       let displayText: string;
+      let displayTextSimple: string;
+      
       if (quality === '0' || streamingFormat === 'original') {
         displayText = 'MAX';
+        displayTextSimple = 'MAX';
       } else {
         const formatUpper = (formatForApi || streamingFormat).toUpperCase();
         displayText = `${quality} kbps ${formatUpper}`;
+        
+        // Simple text based on quality range
+        const qualityNum = parseInt(quality);
+        if (qualityNum >= 256) {
+          displayTextSimple = 'HIGH';
+        } else if (qualityNum >= 128) {
+          displayTextSimple = 'MEDIUM';
+        } else {
+          displayTextSimple = 'LOW';
+        }
       }
 
       const networkType = isWiFi ? 'wifi' : networkState.type === Network.NetworkStateType.CELLULAR ? 'mobile' : 'unknown';
@@ -350,6 +395,7 @@ class TrackPlayerService {
         maxBitRate: maxBitRateForApi,
         format: formatForApi,
         displayText,
+        displayTextSimple,
         quality,
         formatName: streamingFormat,
         networkType: networkType as 'wifi' | 'mobile' | 'unknown',
@@ -359,10 +405,15 @@ class TrackPlayerService {
       // Fallback to mobile quality and format
       const fallbackMaxBitRate = streamingQualityMobile === '0' ? undefined : streamingQualityMobile;
       const fallbackFormat = streamingFormatMobile === 'original' ? undefined : streamingFormatMobile;
+      const fallbackQualityNum = parseInt(streamingQualityMobile);
+      const fallbackSimple = streamingQualityMobile === '0' ? 'MAX' : 
+                             fallbackQualityNum >= 256 ? 'HIGH' :
+                             fallbackQualityNum >= 128 ? 'MEDIUM' : 'LOW';
       return {
         maxBitRate: fallbackMaxBitRate,
         format: fallbackFormat,
         displayText: streamingQualityMobile === '0' ? 'MAX' : `${streamingQualityMobile} kbps ${streamingFormatMobile.toUpperCase()}`,
+        displayTextSimple: fallbackSimple,
         quality: streamingQualityMobile,
         formatName: streamingFormatMobile,
         networkType: 'unknown' as const,
@@ -525,13 +576,22 @@ class TrackPlayerService {
           quality: '0',
           format: 'Downloaded',
           displayText: 'Downloaded',
+          displayTextSimple: 'DOWNLOADED',
           networkType: 'unknown',
         });
       } else {
+        // For MAX quality, show actual track bitrate/format in detailed view
+        let detailedText = streamingSettings.displayText;
+        if (streamingSettings.quality === '0' && currentTrack.bitRate && currentTrack.suffix) {
+          const format = currentTrack.suffix.toUpperCase();
+          detailedText = `${currentTrack.bitRate} kbps ${format}`;
+        }
+        
         usePlayerStore.getState().setStreamingInfo({
           quality: streamingSettings.quality,
           format: streamingSettings.formatName,
-          displayText: streamingSettings.displayText,
+          displayText: detailedText,
+          displayTextSimple: streamingSettings.displayTextSimple,
           networkType: streamingSettings.networkType,
         });
       }
@@ -543,10 +603,14 @@ class TrackPlayerService {
       await TrackPlayer.add(currentTrackObj);
 
       // Preload next tracks for gapless playback (async, non-blocking)
+      // Skip preloading if repeat track is enabled - we don't want to auto-advance
       const { queue, currentIndex } = useQueueStore.getState();
-      this.preloadNextTracksInitial(currentIndex, queue, streamingSettings).catch(err => {
-        console.error('[TrackPlayer] Failed to preload initial tracks:', err);
-      });
+      const { repeatMode: currentRepeatMode } = usePlayerStore.getState();
+      if (currentRepeatMode !== 'track') {
+        this.preloadNextTracksInitial(currentIndex, queue, streamingSettings).catch(err => {
+          console.error('[TrackPlayer] Failed to preload initial tracks:', err);
+        });
+      }
 
       // Check if we need to restore a position (from server queue)
       const { restoredPosition } = usePlayerStore.getState();
@@ -842,9 +906,20 @@ class TrackPlayerService {
         }
 
         if (newNetworkType !== this.lastNetworkType && this.lastNetworkType !== 'unknown') {
-          console.log(`[TrackPlayer] Network event detected: ${this.lastNetworkType} → ${newNetworkType}`);
-          this.lastNetworkType = newNetworkType;
-          this.handleNetworkChange(newNetworkType);
+          // Only handle meaningful changes (wifi <-> mobile)
+          // Don't trigger on mobile -> mobile (SIM switch) or unknown states
+          const isMeaningfulChange = 
+            (this.lastNetworkType === 'wifi' && newNetworkType === 'mobile') ||
+            (this.lastNetworkType === 'mobile' && newNetworkType === 'wifi');
+          
+          if (isMeaningfulChange) {
+            console.log(`[TrackPlayer] Network event detected: ${this.lastNetworkType} → ${newNetworkType}`);
+            this.lastNetworkType = newNetworkType;
+            this.handleNetworkChange(newNetworkType);
+          } else {
+            console.log(`[TrackPlayer] Ignoring network event: ${this.lastNetworkType} → ${newNetworkType} (not WiFi/Mobile switch)`);
+            this.lastNetworkType = newNetworkType;
+          }
         } else if (this.lastNetworkType === 'unknown') {
           this.lastNetworkType = newNetworkType;
         }
@@ -871,11 +946,22 @@ class TrackPlayerService {
         currentNetworkType = 'unknown';
       }
 
-      // Check if network type changed
+      // Check if network type changed (wifi <-> mobile, not mobile <-> mobile)
       if (currentNetworkType !== this.lastNetworkType && this.lastNetworkType !== 'unknown') {
-        console.log(`[TrackPlayer] Network poll detected change: ${this.lastNetworkType} → ${currentNetworkType}`);
-        this.lastNetworkType = currentNetworkType;
-        await this.handleNetworkChange(currentNetworkType);
+        // Only handle meaningful changes (wifi <-> mobile)
+        // Don't trigger on mobile -> mobile (SIM switch) or unknown states
+        const isMeaningfulChange = 
+          (this.lastNetworkType === 'wifi' && currentNetworkType === 'mobile') ||
+          (this.lastNetworkType === 'mobile' && currentNetworkType === 'wifi');
+        
+        if (isMeaningfulChange) {
+          console.log(`[TrackPlayer] Network poll detected change: ${this.lastNetworkType} → ${currentNetworkType}`);
+          this.lastNetworkType = currentNetworkType;
+          await this.handleNetworkChange(currentNetworkType);
+        } else {
+          console.log(`[TrackPlayer] Ignoring network change: ${this.lastNetworkType} → ${currentNetworkType} (not WiFi/Mobile switch)`);
+          this.lastNetworkType = currentNetworkType;
+        }
       } else if (this.lastNetworkType === 'unknown') {
         this.lastNetworkType = currentNetworkType;
       }
@@ -933,15 +1019,25 @@ class TrackPlayerService {
           quality: '0',
           format: 'Downloaded',
           displayText: 'Downloaded',
+          displayTextSimple: 'DOWNLOADED',
           networkType: 'unknown',
         });
       } else {
         // Still update the badge to show current network type
         const streamingSettings = await this.getActiveStreamingSettings();
+        
+        // For MAX quality, show actual track bitrate/format in detailed view
+        let detailedText = streamingSettings.displayText;
+        if (streamingSettings.quality === '0' && currentTrack.bitRate && currentTrack.suffix) {
+          const format = currentTrack.suffix.toUpperCase();
+          detailedText = `${currentTrack.bitRate} kbps ${format}`;
+        }
+        
         usePlayerStore.getState().setStreamingInfo({
           quality: streamingSettings.quality,
           format: streamingSettings.formatName,
-          displayText: streamingSettings.displayText,
+          displayText: detailedText,
+          displayTextSimple: streamingSettings.displayTextSimple,
           networkType: streamingSettings.networkType,
         });
       }
@@ -975,10 +1071,18 @@ class TrackPlayerService {
       });
 
       // Update badge immediately
+      // For MAX quality, show actual track bitrate/format in detailed view
+      let detailedText = streamingSettings.displayText;
+      if (streamingSettings.quality === '0' && currentTrack.bitRate && currentTrack.suffix) {
+        const format = currentTrack.suffix.toUpperCase();
+        detailedText = `${currentTrack.bitRate} kbps ${format}`;
+      }
+      
       usePlayerStore.getState().setStreamingInfo({
         quality: streamingSettings.quality,
         format: streamingSettings.formatName,
-        displayText: streamingSettings.displayText,
+        displayText: detailedText,
+        displayTextSimple: streamingSettings.displayTextSimple,
         networkType: streamingSettings.networkType,
       });
 

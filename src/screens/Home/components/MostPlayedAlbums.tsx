@@ -12,8 +12,11 @@ import { getAlbumList2 } from '../../../api/opensubsonic/albums';
 import { useCoverArt } from '../../../hooks/api/useAlbums';
 import { useNavigationStore } from '../../../stores/navigationStore';
 import { useServerStore } from '../../../stores/serverStore';
+import { useAlbumMenuState } from '../../../hooks/useAlbumMenuState';
+import { AlbumMenuWrapper } from '../../../components/Menus';
 import { theme } from '../../../config';
 import { Album } from '../../../api/opensubsonic/types';
+import { HorizontalAlbumListSkeleton } from '../../../components/common';
 
 export const MostPlayedAlbums: React.FC = () => {
   const { currentServerId } = useServerStore();
@@ -26,7 +29,11 @@ export const MostPlayedAlbums: React.FC = () => {
 
   const albums = response?.albumList2?.album || [];
 
-  if (isLoading || albums.length === 0) {
+  if (isLoading) {
+    return <HorizontalAlbumListSkeleton />;
+  }
+
+  if (albums.length === 0) {
     return null;
   }
 
@@ -63,29 +70,50 @@ interface AlbumCardProps {
 const AlbumCard: React.FC<AlbumCardProps> = ({ album }) => {
   const { data: coverArtUrl } = useCoverArt(album.coverArt, 300);
   const { navigate } = useNavigationStore();
+  const albumMenuState = useAlbumMenuState();
 
   const handlePress = () => {
     navigate({ name: 'album-detail', params: { albumId: album.id } });
   };
 
+  const handleLongPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    albumMenuState.openAlbumMenu(album);
+  };
+
   return (
-    <TouchableOpacity style={styles.card} onPress={handlePress}>
-      <Image
-        source={
-          coverArtUrl
-            ? { uri: coverArtUrl }
-            : require('../../../../assets/images/icon.png')
-        }
-        style={styles.artwork}
-        resizeMode="cover"
+    <>
+      <TouchableOpacity 
+        style={styles.card} 
+        onPress={handlePress}
+        onLongPress={handleLongPress}
+      >
+        <Image
+          source={
+            coverArtUrl
+              ? { uri: coverArtUrl }
+              : require('../../../../assets/images/icon.png')
+          }
+          style={styles.artwork}
+          resizeMode="cover"
+        />
+        <Text style={styles.albumName} numberOfLines={1}>
+          {album.name}
+        </Text>
+        <Text style={styles.artistName} numberOfLines={1}>
+          {album.artist}
+        </Text>
+      </TouchableOpacity>
+      <AlbumMenuWrapper
+        visible={albumMenuState.showAlbumMenu}
+        onClose={albumMenuState.closeAlbumMenu}
+        album={albumMenuState.selectedAlbum}
+        showAlbumInfo={albumMenuState.showAlbumInfo}
+        setShowAlbumInfo={albumMenuState.setShowAlbumInfo}
+        showAddToPlaylist={albumMenuState.showAddToPlaylist}
+        setShowAddToPlaylist={albumMenuState.setShowAddToPlaylist}
       />
-      <Text style={styles.albumName} numberOfLines={1}>
-        {album.name}
-      </Text>
-      <Text style={styles.artistName} numberOfLines={1}>
-        {album.artist}
-      </Text>
-    </TouchableOpacity>
+    </>
   );
 };
 

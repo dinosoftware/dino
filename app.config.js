@@ -2,8 +2,8 @@ module.exports = {
   expo: {
     name: "Dino",
     slug: "dino",
-    scheme: "dinosonic",
-    version: "1.1.0",
+    scheme: "dino",
+    version: "1.2.2",
     orientation: "portrait",
     icon: "./assets/images/icon-square.png", // Square icon as main app icon
     userInterfaceStyle: "dark", // Force dark mode for Tidal-inspired design
@@ -54,8 +54,12 @@ module.exports = {
           action: "VIEW",
           data: [
             {
-              scheme: "dinosonic",
+              scheme: "dino",
               host: "share"
+            },
+            {
+              scheme: "dino",
+              host: "add-server"
             }
           ],
           category: ["BROWSABLE", "DEFAULT"]

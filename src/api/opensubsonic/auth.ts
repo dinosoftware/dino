@@ -10,7 +10,7 @@ import { PingResponse } from './types';
  * Ping server to check connection and authentication
  */
 export const ping = async (): Promise<PingResponse> => {
-  return await apiClient.get<PingResponse>('ping');
+  return await apiClient.request<PingResponse>('ping');
 };
 
 /**

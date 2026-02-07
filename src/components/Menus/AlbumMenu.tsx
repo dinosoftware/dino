@@ -25,6 +25,7 @@ import {
   Shuffle,
   Info,
   ListPlus,
+  User,
   X 
 } from 'lucide-react-native';
 import { theme } from '../../config';
@@ -34,6 +35,7 @@ import { useFavoritesStore } from '../../stores/favoritesStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useDownloadStore } from '../../stores/downloadStore';
 import { useToastStore } from '../../stores/toastStore';
+import { useNavigationStore } from '../../stores/navigationStore';
 import { downloadService } from '../../services/DownloadService';
 
 interface AlbumMenuProps {
@@ -70,6 +72,7 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({ visible, onClose, album, c
   const { isAlbumStarred, toggleAlbumStar } = useFavoritesStore();
   const { isAlbumDownloaded } = useDownloadStore();
   const { showToast } = useToastStore();
+  const { navigate } = useNavigationStore();
 
   // Haptic feedback when menu opens
   useEffect(() => {
@@ -218,6 +221,15 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({ visible, onClose, album, c
     setTimeout(() => onAddToPlaylist?.(), 100);
   };
 
+  const handleGoToArtist = () => {
+    if (album?.artistId) {
+      onClose();
+      setTimeout(() => {
+        navigate({ name: 'artist-detail', params: { artistId: album.artistId! } });
+      }, 100);
+    }
+  };
+
   return (
     <Modal
       visible={visible}
@@ -267,6 +279,13 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({ visible, onClose, album, c
               label="Shuffle"
               onPress={handleShuffle}
             />
+            {album.artistId && (
+              <MenuItem
+                icon={<User size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Go to Artist"
+                onPress={handleGoToArtist}
+              />
+            )}
             <MenuItem
               icon={
                 <Heart 

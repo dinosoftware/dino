@@ -22,7 +22,7 @@ class LyricsManager {
     try {
       // Check cache first
       if (!forceRefresh && this.lyricsCache.has(trackId)) {
-        console.log('[Lyrics] Using cached lyrics for:', trackId);
+        // console.log('[Lyrics] Using cached lyrics for:', trackId);
         const cachedLyrics = this.lyricsCache.get(trackId);
         if (setInStore) {
           this.setLyricsInStore(cachedLyrics);
@@ -33,7 +33,7 @@ class LyricsManager {
       // Check if track has downloaded lyrics
       const downloadedTrack = useDownloadStore.getState().getDownloadedTrack(trackId);
       if (downloadedTrack?.lyricsUri) {
-        console.log('[Lyrics] Loading from downloaded file:', downloadedTrack.lyricsUri);
+        // console.log('[Lyrics] Loading from downloaded file:', downloadedTrack.lyricsUri);
         try {
           const lyricsContent = await FileSystem.readAsStringAsync(downloadedTrack.lyricsUri);
           const lyrics = JSON.parse(lyricsContent);
@@ -58,10 +58,10 @@ class LyricsManager {
       }
       
       // Fetch from server (skip caching for now due to MMKV serialization issues)
-      console.log('[Lyrics] Fetching from server:', trackId);
+      // console.log('[Lyrics] Fetching from server:', trackId);
       const response = await getLyricsBySongId(trackId);
       
-      console.log('[Lyrics] Response:', JSON.stringify(response, null, 2));
+      // console.log('[Lyrics] Response:', JSON.stringify(response, null, 2));
       
       // Handle OpenSubsonic lyricsList format
       // Cast to any because different servers return different formats
@@ -71,23 +71,23 @@ class LyricsManager {
       if (responseAny?.lyricsList?.structuredLyrics?.[0]) {
         // OpenSubsonic format: response.lyricsList.structuredLyrics[0]
         lyrics = responseAny.lyricsList.structuredLyrics[0];
-        console.log('[Lyrics] Found structuredLyrics format');
+        // console.log('[Lyrics] Found structuredLyrics format');
       } else if (response?.lyrics) {
         // Standard format: response.lyrics
         lyrics = response.lyrics;
-        console.log('[Lyrics] Found standard lyrics format');
+        // console.log('[Lyrics] Found standard lyrics format');
       } else {
         lyrics = responseAny;
-        console.log('[Lyrics] Using response as lyrics');
+        // console.log('[Lyrics] Using response as lyrics');
       }
       
-      console.log('[Lyrics] Parsed lyrics:', {
-        hasLine: !!lyrics?.line,
-        lineCount: lyrics?.line?.length || 0,
-        hasValue: !!lyrics?.value,
-        valueLength: lyrics?.value?.length || 0,
-        synced: lyrics?.synced,
-      });
+      // console.log('[Lyrics] Parsed lyrics:', {
+      //   hasLine: !!lyrics?.line,
+      //   lineCount: lyrics?.line?.length || 0,
+      //   hasValue: !!lyrics?.value,
+      //   valueLength: lyrics?.value?.length || 0,
+      //   synced: lyrics?.synced,
+      // });
 
       // Cache in memory
       this.lyricsCache.set(trackId, lyrics);
@@ -102,7 +102,7 @@ class LyricsManager {
       return lyrics;
     } catch (error) {
       // Silently fail - most tracks won't have lyrics anyway
-      console.log('[Lyrics] Failed to fetch:', error);
+      // console.log('[Lyrics] Failed to fetch:', error);
 
       // Only update store if requested
       if (setInStore) {
@@ -122,7 +122,7 @@ class LyricsManager {
     const { setCurrentLyrics } = usePlayerStore.getState();
 
     if (!lyrics) {
-      console.log('[Lyrics] No lyrics object');
+      // console.log('[Lyrics] No lyrics object');
       setCurrentLyrics(null);
       return;
     }
@@ -132,14 +132,14 @@ class LyricsManager {
     const plainText = lyrics.value || lyrics.text || lyrics.unsyncedLyrics;
     const isSynced = lyrics.synced !== false; // If synced field exists and is false, not synced
 
-    console.log('[Lyrics] Checking lyrics structure:', {
-      hasLines: !!lines,
-      linesLength: Array.isArray(lines) ? lines.length : 0,
-      hasPlainText: !!plainText,
-      plainTextLength: typeof plainText === 'string' ? plainText.length : 0,
-      isSynced: isSynced,
-      lyricsKeys: Object.keys(lyrics),
-    });
+    // console.log('[Lyrics] Checking lyrics structure:', {
+    //   hasLines: !!lines,
+    //   linesLength: Array.isArray(lines) ? lines.length : 0,
+    //   hasPlainText: !!plainText,
+    //   plainTextLength: typeof plainText === 'string' ? plainText.length : 0,
+    //   isSynced: isSynced,
+    //   lyricsKeys: Object.keys(lyrics),
+    // });
 
     // Check if lyrics are synchronized (have timestamps)
     if (lines && Array.isArray(lines) && lines.length > 0) {
@@ -148,7 +148,7 @@ class LyricsManager {
       
       if (hasTimestamps && isSynced) {
         // Synced lyrics with timestamps
-        console.log('[Lyrics] Setting synced lyrics with', lines.length, 'lines');
+        // console.log('[Lyrics] Setting synced lyrics with', lines.length, 'lines');
         setCurrentLyrics({
           type: 'synced',
           lines: lines,
@@ -158,7 +158,7 @@ class LyricsManager {
         });
       } else {
         // Lines without timestamps - convert to plain text
-        console.log('[Lyrics] Converting unsynced lines to plain text');
+        // console.log('[Lyrics] Converting unsynced lines to plain text');
         const text = lines.map((line: any) => line.value || line).join('\n');
         setCurrentLyrics({
           type: 'unsynced',
@@ -170,7 +170,7 @@ class LyricsManager {
       }
     } else if (plainText && typeof plainText === 'string') {
       // Unsynchronized plain text lyrics
-      console.log('[Lyrics] Setting unsynced lyrics,', plainText.length, 'characters');
+      // console.log('[Lyrics] Setting unsynced lyrics,', plainText.length, 'characters');
       setCurrentLyrics({
         type: 'unsynced',
         lines: null,
@@ -180,7 +180,7 @@ class LyricsManager {
       });
     } else {
       // No lyrics available
-      console.log('[Lyrics] No valid lyrics found in response');
+      // console.log('[Lyrics] No valid lyrics found in response');
       setCurrentLyrics(null);
     }
   }
@@ -195,7 +195,7 @@ class LyricsManager {
       this.updateCurrentLine();
     }, LYRICS_SYNC_CONFIG.UPDATE_INTERVAL);
 
-    console.log('[Lyrics] Started sync');
+    // console.log('[Lyrics] Started sync');
   }
 
   /**
@@ -205,7 +205,7 @@ class LyricsManager {
     if (this.syncIntervalId) {
       clearInterval(this.syncIntervalId);
       this.syncIntervalId = null;
-      console.log('[Lyrics] Stopped sync');
+      // console.log('[Lyrics] Stopped sync');
     }
   }
 
@@ -254,7 +254,7 @@ class LyricsManager {
   async seekToLine(line: LyricLine) {
     const positionSeconds = line.start / 1000;
     
-    console.log('[Lyrics] Seeking to line:', line.value, 'at', positionSeconds, 'seconds');
+    // console.log('[Lyrics] Seeking to line:', line.value, 'at', positionSeconds, 'seconds');
     
     try {
       await TrackPlayer.seekTo(positionSeconds);

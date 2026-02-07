@@ -45,7 +45,7 @@ export const createShare = async (
     params.expires = expires;
   }
 
-  const response = await apiClient.get<CreateShareResponse>('createShare', params);
+  const response = await apiClient.request<CreateShareResponse>('createShare', params);
   
   if (!response.shares?.share || response.shares.share.length === 0) {
     throw new Error('Failed to create share');
@@ -58,7 +58,7 @@ export const createShare = async (
  * Get all shares created by the current user
  */
 export const getShares = async (): Promise<Share[]> => {
-  const response = await apiClient.get<CreateShareResponse>('getShares');
+  const response = await apiClient.request<CreateShareResponse>('getShares');
   return response.shares?.share || [];
 };
 
@@ -66,7 +66,7 @@ export const getShares = async (): Promise<Share[]> => {
  * Delete an existing share
  */
 export const deleteShare = async (shareId: string): Promise<void> => {
-  await apiClient.get('deleteShare', { id: shareId });
+  await apiClient.request('deleteShare', { id: shareId });
 };
 
 /**
@@ -89,5 +89,5 @@ export const updateShare = async (
     params.expires = expires;
   }
 
-  await apiClient.get('updateShare', params);
+  await apiClient.request('updateShare', params);
 };

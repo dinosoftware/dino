@@ -3,7 +3,7 @@
  * Dynamic blur background for screens
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../../config';
@@ -13,7 +13,7 @@ interface BlurredBackgroundProps {
   children?: React.ReactNode;
 }
 
-export const BlurredBackground: React.FC<BlurredBackgroundProps> = ({
+export const BlurredBackground: React.FC<BlurredBackgroundProps> = React.memo(({
   imageUri,
   children,
 }) => {
@@ -34,7 +34,7 @@ export const BlurredBackground: React.FC<BlurredBackgroundProps> = ({
       {/* Solid background to prevent white flash */}
       <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.background.primary }]} />
       
-      {/* Static blurred background image */}
+      {/* Static blurred background image - always works even for GIFs (uses first frame) */}
       <Image
         source={{ uri: imageUri }}
         style={[StyleSheet.absoluteFill, { transform: [{ scale: 1.2 }] }]}
@@ -55,7 +55,9 @@ export const BlurredBackground: React.FC<BlurredBackgroundProps> = ({
       {children}
     </View>
   );
-};
+});
+
+BlurredBackground.displayName = 'BlurredBackground';
 
 const styles = StyleSheet.create({
   container: {

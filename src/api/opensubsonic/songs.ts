@@ -23,5 +23,5 @@ export const getRandomSongs = async (
   if (toYear) params.toYear = toYear;
   if (musicFolderId) params.musicFolderId = musicFolderId;
   
-  return await apiClient.get<GetRandomSongsResponse>('getRandomSongs', params);
+  return await apiClient.request<GetRandomSongsResponse>('getRandomSongs', params);
 };

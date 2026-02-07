@@ -72,7 +72,7 @@ interface QueueStore {
   addToQueue: (tracks: Track | Track[], position?: 'next' | 'end') => void;
   removeFromQueue: (index: number) => void;
   reorderQueue: (fromIndex: number, toIndex: number) => void;
-  clearQueue: () => void;
+  clearQueue: (clearServerQueue?: boolean) => Promise<void>;
   shuffleQueue: () => void;
   unshuffleQueue: () => void;
   skipToTrack: (index: number) => void;
@@ -147,6 +147,14 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     });
     
     get().saveToStorage();
+    
+    // Sync TrackPlayer's preloaded tracks to include the new tracks
+    if (position === 'next') {
+      // When adding "Play Next", immediately update TrackPlayer's queue
+      console.log('[QueueStore] Added tracks to play next, syncing TrackPlayer');
+      setTimeout(() => syncQueue(), 50);
+    }
+    
     triggerSync(true);
   },
 
@@ -183,18 +191,21 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     if (removingCurrentTrack && get().queue.length > 0) {
       const newCurrentTrack = get().queue[get().currentIndex];
       if (newCurrentTrack) {
-        console.log('[QueueStore] Removed current track, syncing queue to play next');
-        syncQueue();
+        console.log('[QueueStore] Removed current track, will sync queue to play next');
+        // Delay sync slightly to ensure state is updated
+        setTimeout(() => syncQueue(), 100);
       }
     } else if (!removingCurrentTrack) {
-      // Sync TrackPlayer queue for normal removals
-      syncQueue();
+      // Sync TrackPlayer queue for normal removals (updates preloaded tracks only)
+      setTimeout(() => syncQueue(), 100);
     }
     
     triggerSync(true);
   },
 
   reorderQueue: (fromIndex, toIndex) => {
+    const wasCurrentTrackMoved = fromIndex === get().currentIndex;
+    
     set((state) => {
       const newQueue = [...state.queue];
       const [movedTrack] = newQueue.splice(fromIndex, 1);
@@ -218,14 +229,17 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     
     get().saveToStorage();
     
-    // DON'T sync TrackPlayer queue when reordering - it will naturally pick up
-    // the new order when the next track plays. Syncing now would interrupt playback.
-    // Only sync the server queue.
+    // Only sync TrackPlayer if we didn't move the currently playing track
+    // Moving current track doesn't need sync - it's still playing
+    if (!wasCurrentTrackMoved) {
+      syncQueue();
+    }
     
+    // Sync to server
     triggerSync(true);
   },
 
-  clearQueue: async () => {
+  clearQueue: async (clearServerQueue = true) => {
     // Stop playback and reset TrackPlayer
     await TrackPlayer.reset();
     
@@ -245,15 +259,16 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     // Close full player if open
     useNavigationStore.getState().closeFullPlayer();
     
-    // Clear server queue
-    try {
-      await savePlayQueue([], undefined, undefined);
-      console.log('[QueueStore] Server queue cleared');
-    } catch (error) {
-      console.error('[QueueStore] Failed to clear server queue:', error);
+    // Clear server queue only if requested (e.g., from Clear Queue button)
+    if (clearServerQueue) {
+      try {
+        await savePlayQueue([], undefined, undefined);
+        console.log('[QueueStore] Server queue cleared');
+      } catch (error) {
+        console.error('[QueueStore] Failed to clear server queue:', error);
+      }
+      triggerSync(true);
     }
-    
-    triggerSync(true);
   },
 
   shuffleQueue: () => {

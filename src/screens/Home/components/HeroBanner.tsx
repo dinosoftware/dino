@@ -23,6 +23,7 @@ import { getRandomSongs } from '../../../api/opensubsonic/songs';
 import { getSimilarSongs2 } from '../../../api/opensubsonic/radio';
 import { useCoverArt } from '../../../hooks/api/useAlbums';
 import { useNavigationStore } from '../../../stores/navigationStore';
+import { HeroBannerSkeleton } from '../../../components/common';
 import { useQueueStore } from '../../../stores/queueStore';
 import { usePlayerStore } from '../../../stores/playerStore';
 import { useServerStore } from '../../../stores/serverStore';
@@ -106,7 +107,11 @@ export const HeroBanner: React.FC = () => {
     }
   };
 
-  if (isLoading || tracks.length === 0) {
+  if (isLoading) {
+    return <HeroBannerSkeleton />;
+  }
+
+  if (tracks.length === 0) {
     return null;
   }
 

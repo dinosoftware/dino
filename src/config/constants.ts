@@ -86,8 +86,8 @@ export const DEFAULT_SETTINGS = {
   gaplessPlayback: true,
   normalizeVolume: false,
 
-  // Radio
-  radioQueueSize: 20,
+  // Instant Mix
+  instantMixSize: 20,
 
   // Storage
   storageLimit: 5120, // 5GB in MB
@@ -111,6 +111,12 @@ export const DEFAULT_SETTINGS = {
   
   // Sharing
   includeShareMessage: true, // Include "Check out X" in share messages
+  
+  // UI
+  qualityBadgeDetailed: false, // Show simple quality badges by default (e.g., "MAX", "HIGH")
+  
+  // Network
+  usePostRequests: true, // Use POST for API requests by default (if server supports it)
 };
 
 // Lyrics Font Sizes (all text stays bold, only opacity changes)

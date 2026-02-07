@@ -4,10 +4,11 @@
  * HEAVILY OPTIMIZED - Re-renders only when needed
  */
 
-import React, { useState, useCallback, useMemo, memo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { theme } from '../../config';
+import { useSettingsStore } from '../../stores/settingsStore';
 
 interface ProgressBarProps {
   position: number; // in seconds
@@ -15,7 +16,8 @@ interface ProgressBarProps {
   buffered: number; // in seconds
   onSeek: (position: number) => void;
   color?: string; // Optional color override
-  qualityText?: string; // Optional quality indicator
+  qualityText?: string; // Detailed quality text (e.g., "320 kbps MP3")
+  qualityTextSimple?: string; // Simple quality text (e.g., "HIGH")
 }
 
 const formatTime = (seconds: number): string => {
@@ -24,16 +26,27 @@ const formatTime = (seconds: number): string => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-export const ProgressBar = memo<ProgressBarProps>(({
+export const ProgressBar: React.FC<ProgressBarProps> = ({
   position,
   duration,
   buffered,
   onSeek,
   color,
   qualityText,
+  qualityTextSimple,
 }) => {
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPosition, setSeekPosition] = useState(0);
+  
+  const qualityBadgeDetailed = useSettingsStore((state) => state.qualityBadgeDetailed);
+  const updateSettings = useSettingsStore((state) => state.updateSettings);
+  
+  const toggleQualityMode = useCallback(() => {
+    updateSettings({ qualityBadgeDetailed: !qualityBadgeDetailed });
+  }, [qualityBadgeDetailed, updateSettings]);
+  
+  // Show detailed or simple based on setting
+  const displayText = qualityBadgeDetailed ? qualityText : (qualityTextSimple || qualityText);
 
   const currentPosition = isSeeking ? seekPosition : position;
   const bufferedProgress = useMemo(() => 
@@ -104,26 +117,21 @@ export const ProgressBar = memo<ProgressBarProps>(({
       <View style={styles.timeContainer}>
         <Text style={styles.timeText}>{currentTimeText}</Text>
         <View style={styles.centerBadgeContainer}>
-          {qualityText && (
-            <View style={[styles.qualityBadge, { borderColor: color || theme.colors.accent }]}>
-              <Text style={[styles.qualityText, { color: color || theme.colors.accent }]}>
-                {qualityText}
-              </Text>
-            </View>
+          {displayText && (
+            <TouchableOpacity onPress={toggleQualityMode} activeOpacity={0.7}>
+              <View style={[styles.qualityBadge, { borderColor: color || theme.colors.accent }]}>
+                <Text style={[styles.qualityText, { color: color || theme.colors.accent }]}>
+                  {displayText}
+                </Text>
+              </View>
+            </TouchableOpacity>
           )}
         </View>
         <Text style={styles.timeText}>{durationText}</Text>
       </View>
     </View>
   );
-}, (prevProps, nextProps) => {
-  // Only re-render if values changed significantly (reduce re-renders)
-  const positionChanged = Math.abs(prevProps.position - nextProps.position) > 0.5;
-  const durationChanged = prevProps.duration !== nextProps.duration;
-  const bufferedChanged = Math.abs(prevProps.buffered - nextProps.buffered) > 1;
-  
-  return !positionChanged && !durationChanged && !bufferedChanged;
-});
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -149,7 +157,7 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    pointerEvents: 'none', // Allow touches to pass through
+    pointerEvents: 'box-none', // Allow touches on children but not on container itself
   },
   qualityBadge: {
     borderWidth: 1.5,

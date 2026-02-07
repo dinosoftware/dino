@@ -10,7 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { useAlbums, useCoverArt } from '../../../hooks/api';
 import { AlbumCard } from '../../../components/Cards';
 import { AlbumMenuWrapper } from '../../../components/Menus';
-import { EmptyState, ErrorView } from '../../../components/common';
+import { EmptyState, ErrorView, Skeleton } from '../../../components/common';
 import { AlbumCardSkeleton } from '../../../components/Skeletons';
 import { useNavigationStore } from '../../../stores/navigationStore';
 import { useAlbumMenuState } from '../../../hooks/useAlbumMenuState';
@@ -23,7 +23,9 @@ export const RecentlyPlayed: React.FC = () => {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.sectionTitle}>Recently Played</Text>
+        <View style={styles.header}>
+          <Skeleton width={180} height={24} />
+        </View>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -94,6 +96,11 @@ const AlbumCardWithArt: React.FC<{ album: Album }> = ({ album }) => {
   const { navigate } = useNavigationStore();
   const albumMenuState = useAlbumMenuState();
 
+  const handleLongPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    albumMenuState.openAlbumMenu(album);
+  };
+
   return (
     <>
       <View style={styles.cardWrapper}>
@@ -104,7 +111,7 @@ const AlbumCardWithArt: React.FC<{ album: Album }> = ({ album }) => {
           onPress={() => {
             navigate({ name: 'album-detail', params: { albumId: album.id } });
           }}
-          onLongPress={() => albumMenuState.openAlbumMenu(album)}
+          onLongPress={handleLongPress}
         />
       </View>
       <AlbumMenuWrapper

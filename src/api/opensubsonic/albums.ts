@@ -14,7 +14,7 @@ import {
  * Get album by ID with tracks
  */
 export const getAlbum = async (albumId: string): Promise<GetAlbumResponse> => {
-  return await apiClient.get<GetAlbumResponse>('getAlbum', {
+  return await apiClient.request<GetAlbumResponse>('getAlbum', {
     id: albumId,
   });
 };
@@ -27,7 +27,7 @@ export const getAlbumList2 = async (
   size = 20,
   offset = 0
 ): Promise<GetAlbumList2Response> => {
-  return await apiClient.get<GetAlbumList2Response>('getAlbumList2', {
+  return await apiClient.request<GetAlbumList2Response>('getAlbumList2', {
     type,
     size,
     offset,
@@ -42,7 +42,7 @@ export const getAlbumList = async (
   size = 20,
   offset = 0
 ): Promise<GetAlbumListResponse> => {
-  return await apiClient.get<GetAlbumListResponse>('getAlbumList', {
+  return await apiClient.request<GetAlbumListResponse>('getAlbumList', {
     type,
     size,
     offset,

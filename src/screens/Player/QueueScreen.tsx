@@ -3,7 +3,7 @@
  * Optimized with FlashList, memoization, and drag-to-reorder
  */
 
-import React, { useRef, useState, useCallback, memo } from 'react';
+import React, { useRef, useState, useCallback, memo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -87,6 +87,13 @@ const QueueItem = memo<QueueItemProps>(({ track, index, isPlaying, onRemove, onL
       </TouchableOpacity>
     </View>
   ), [handleRemove]);
+  
+  const handleSwipeableWillOpen = useCallback(() => {
+    // Auto-delete when swipe reaches threshold (>50%)
+    handleRemove();
+    // Close the swipeable after deletion
+    swipeableRef.current?.close();
+  }, [handleRemove]);
 
   return (
     <Swipeable
@@ -95,6 +102,7 @@ const QueueItem = memo<QueueItemProps>(({ track, index, isPlaying, onRemove, onL
       overshootRight={false}
       friction={2}
       rightThreshold={40}
+      onSwipeableWillOpen={handleSwipeableWillOpen}
     >
       <View style={[styles.queueItem, isPlaying && styles.queueItemActive, isActive && styles.queueItemDragging]}>
         {/* Drag Handle - touchable to trigger drag */}
@@ -131,7 +139,7 @@ const QueueItem = memo<QueueItemProps>(({ track, index, isPlaying, onRemove, onL
               {track.title}
             </Text>
             <Text style={styles.trackArtist} numberOfLines={1}>
-              {track.artist || 'Unknown Artist'}
+              {track.displayArtist || track.artist || 'Unknown Artist'}
             </Text>
           </View>
 
@@ -162,8 +170,30 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
   const trackMenuState = useTrackMenuState();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showSaveToPlaylist, setShowSaveToPlaylist] = useState(false);
+  const flatListRef = useRef<any>(null);
+  const scrollOffsetRef = useRef(0);
+  const hasScrolledToCurrentRef = useRef(false);
 
   console.log('[QueueScreen] Current index:', currentIndex, 'Queue length:', queue.length);
+
+  // Auto-scroll to current track when opening queue (only once)
+  useEffect(() => {
+    if (!hasScrolledToCurrentRef.current && currentIndex >= 0 && queue.length > 0 && flatListRef.current) {
+      // Delay to ensure list is rendered
+      setTimeout(() => {
+        try {
+          flatListRef.current?.scrollToIndex?.({
+            index: currentIndex,
+            animated: true,
+            viewPosition: 0.3, // Show current track near top
+          });
+          hasScrolledToCurrentRef.current = true;
+        } catch (error) {
+          console.log('[QueueScreen] Could not scroll to current track:', error);
+        }
+      }, 300);
+    }
+  }, []); // Only run on mount
 
   const handleRemove = useCallback((index: number) => {
     removeFromQueue(index);
@@ -174,6 +204,7 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
   }, [trackMenuState]);
 
   const handlePress = useCallback(async (index: number) => {
+    // Don't scroll when selecting a track - user is already at the right position
     await trackPlayerService.playTrack(index);
   }, []);
 
@@ -186,8 +217,9 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
 
   const renderItem = useCallback(({ item, drag, isActive, getIndex }: RenderItemParams<Track>) => {
     const index = getIndex();
+    // Don't use currentIndex directly here - causes re-render and scroll reset
+    // Instead, QueueItem will get isPlaying from extraData update
     const isPlaying = index === currentIndex;
-    console.log('[QueueItem]', index, 'isPlaying:', isPlaying, 'currentIndex:', currentIndex);
     return (
       <QueueItem
         track={item}
@@ -200,9 +232,17 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
         isActive={isActive}
       />
     );
-  }, [currentIndex, handleRemove, handleLongPress, handlePress]);
+  }, [handleRemove, handleLongPress, handlePress]);
 
   const keyExtractor = useCallback((item: Track, index: number) => `${item.id}-${index}`, []);
+
+  // Fixed item height for scroll position calculation
+  const ITEM_HEIGHT = 72 + 8; // 72px item + 8px margin
+  const getItemLayout = useCallback((data: any, index: number) => ({
+    length: ITEM_HEIGHT,
+    offset: ITEM_HEIGHT * index,
+    index,
+  }), []);
 
   const translateY = useRef(new Animated.Value(0)).current;
 
@@ -302,21 +342,37 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
 
           {/* Queue List - NO GESTURE AT ALL */}
           <DraggableFlatList
+            ref={flatListRef}
             data={queue}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
             onDragEnd={handleDragEnd}
+            extraData={currentIndex}
+            getItemLayout={getItemLayout}
             containerStyle={{ flex: 1 }}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             activationDistance={10}
             autoscrollThreshold={50}
             autoscrollSpeed={100}
-            removeClippedSubviews={true}
-            maxToRenderPerBatch={10}
-            updateCellsBatchingPeriod={50}
-            initialNumToRender={20}
-            windowSize={21}
+            removeClippedSubviews={false}
+            maxToRenderPerBatch={15}
+            updateCellsBatchingPeriod={100}
+            initialNumToRender={25}
+            windowSize={31}
+            maintainVisibleContentPosition={{
+              minIndexForVisible: 0,
+            }}
+            onScrollToIndexFailed={(info) => {
+              // Fallback if scrollToIndex fails
+              setTimeout(() => {
+                flatListRef.current?.scrollToIndex?.({
+                  index: info.index,
+                  animated: false,
+                  viewPosition: 0.3,
+                });
+              }, 100);
+            }}
           />
         </Animated.View>
 

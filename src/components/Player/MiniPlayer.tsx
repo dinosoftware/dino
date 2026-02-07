@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
 import { Play, Pause, SkipForward } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { usePlayer } from '../../hooks/usePlayer';
@@ -17,10 +17,11 @@ interface MiniPlayerProps {
 }
 
 export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
-  const { currentTrack, isPlaying, togglePlayPause, skipToNext, progress } = usePlayer();
+  const { currentTrack, isPlaying, playbackState, togglePlayPause, skipToNext, progress } = usePlayer();
   const { data: coverArtUrl } = useCoverArt(currentTrack?.coverArt, 200);
   const albumColors = useAlbumColors(coverArtUrl || undefined);
   
+  const isBuffering = playbackState === 'buffering';
   const progressPercentage = progress.duration > 0 ? (progress.position / progress.duration) * 100 : 0;
 
   if (!currentTrack) {
@@ -88,7 +89,9 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
           onPress={handlePlayPause}
           style={[styles.controlButton, styles.playButton, { backgroundColor: albumColors.primary }]}
         >
-          {isPlaying ? (
+          {isBuffering ? (
+            <ActivityIndicator size="small" color={albumColors.textColor} />
+          ) : isPlaying ? (
             <Pause size={18} color={albumColors.textColor} fill={albumColors.textColor} />
           ) : (
             <Play size={18} color={albumColors.textColor} fill={albumColors.textColor} strokeWidth={2} />

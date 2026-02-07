@@ -12,8 +12,8 @@ import { RandomAlbums } from './components/RandomAlbums';
 import { MostPlayedAlbums } from './components/MostPlayedAlbums';
 import { RecommendedAlbums } from './components/RecommendedAlbums';
 import { UserSettingsMenu, AppInfoSheet } from '../../components/Menus';
-import { UserAvatar } from '../../components/UserAvatar';
-import { useAuthStore, useServerStore } from '../../stores';
+import { Avatar } from '../../components/common';
+import { useAuthStore, useServerStore, useUserStore } from '../../stores';
 import { theme } from '../../config';
 
 const queryClient = new QueryClient();
@@ -29,13 +29,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout }) => {
   // Get credentials and current server separately to avoid re-renders
   const credentials = useAuthStore((state) => state.credentials);
   const currentServerId = useServerStore((state) => state.currentServerId);
+  const user = useUserStore((state) => state.user);
   
-  // Calculate username with useMemo
+  // Calculate username with useMemo - prefer userStore (works for API key), fallback to credentials
   const username = useMemo(() => {
     if (!currentServerId) return 'User';
+    // Try userStore first (works for both password and API key auth)
+    if (user?.username) return user.username;
+    // Fallback to credentials (password auth)
     const creds = credentials[currentServerId];
     return creds?.username || 'User';
-  }, [credentials, currentServerId]);
+  }, [credentials, currentServerId, user]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -48,7 +52,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout }) => {
               style={styles.profileButton}
               onPress={() => setShowUserMenu(true)}
             >
-              <UserAvatar username={username} size={40} />
+              <Avatar username={username} size={40} />
             </TouchableOpacity>
           </View>
 

@@ -80,6 +80,48 @@ export class DownloadService {
   }
 
   /**
+   * Get total download storage usage in MB
+   */
+  private async getStorageUsage(): Promise<number> {
+    try {
+      const downloadDir = this.getDownloadDirectory();
+      const metadataDir = this.getMetadataDirectory();
+      
+      let totalSize = 0;
+      
+      // Calculate size of download directory
+      const downloadDirInfo = await FileSystem.getInfoAsync(downloadDir);
+      if (downloadDirInfo.exists && downloadDirInfo.isDirectory) {
+        const files = await FileSystem.readDirectoryAsync(downloadDir);
+        for (const file of files) {
+          const fileInfo = await FileSystem.getInfoAsync(`${downloadDir}${file}`);
+          if (fileInfo.exists && !fileInfo.isDirectory) {
+            totalSize += fileInfo.size || 0;
+          }
+        }
+      }
+      
+      // Calculate size of metadata directory
+      const metadataDirInfo = await FileSystem.getInfoAsync(metadataDir);
+      if (metadataDirInfo.exists && metadataDirInfo.isDirectory) {
+        const files = await FileSystem.readDirectoryAsync(metadataDir);
+        for (const file of files) {
+          const fileInfo = await FileSystem.getInfoAsync(`${metadataDir}${file}`);
+          if (fileInfo.exists && !fileInfo.isDirectory) {
+            totalSize += fileInfo.size || 0;
+          }
+        }
+      }
+      
+      // Convert bytes to MB
+      return totalSize / (1024 * 1024);
+    } catch (error) {
+      console.error('[DownloadService] Failed to calculate storage usage:', error);
+      return 0;
+    }
+  }
+
+  /**
    * Check if WiFi-only downloads setting is enabled and we're not on WiFi
    */
   private async shouldBlockDownload(): Promise<boolean> {
@@ -91,6 +133,21 @@ export class DownloadService {
     
     const networkState = await Network.getNetworkStateAsync();
     return networkState.type !== Network.NetworkStateType.WIFI;
+  }
+  
+  /**
+   * Check if storage limit has been reached
+   */
+  private async checkStorageLimit(): Promise<boolean> {
+    const { storageLimit } = useSettingsStore.getState();
+    const currentUsage = await this.getStorageUsage();
+    
+    if (currentUsage >= storageLimit) {
+      console.warn(`[DownloadService] Storage limit reached: ${currentUsage.toFixed(2)} MB / ${storageLimit} MB`);
+      return true;
+    }
+    
+    return false;
   }
 
   /**
@@ -147,6 +204,11 @@ export class DownloadService {
     if (await this.shouldBlockDownload()) {
       throw new Error('WiFi-only downloads is enabled. Connect to WiFi to download.');
     }
+    
+    // Check storage limit
+    if (await this.checkStorageLimit()) {
+      throw new Error('Storage limit reached. Delete some downloads or increase limit in settings.');
+    }
 
     // Add to queue
     this.downloadQueue.push({ type: 'track', item: track });
@@ -166,6 +228,11 @@ export class DownloadService {
     // Check WiFi-only setting
     if (await this.shouldBlockDownload()) {
       throw new Error('WiFi-only downloads is enabled. Connect to WiFi to download.');
+    }
+    
+    // Check storage limit
+    if (await this.checkStorageLimit()) {
+      throw new Error('Storage limit reached. Delete some downloads or increase limit in settings.');
     }
 
     // Fetch full album details to get all tracks
@@ -190,6 +257,11 @@ export class DownloadService {
     // Check WiFi-only setting
     if (await this.shouldBlockDownload()) {
       throw new Error('WiFi-only downloads is enabled. Connect to WiFi to download.');
+    }
+    
+    // Check storage limit
+    if (await this.checkStorageLimit()) {
+      throw new Error('Storage limit reached. Delete some downloads or increase limit in settings.');
     }
 
     // Fetch full playlist details to get all tracks

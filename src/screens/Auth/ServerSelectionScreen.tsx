@@ -95,7 +95,7 @@ export const ServerSelectionScreen: React.FC<ServerSelectionScreenProps> = ({
             >
               <View style={styles.serverIconContainer}>
                 <ServerIcon
-                  size={24}
+                  size={20}
                   color={
                     item.id === currentServerId
                       ? theme.colors.accent
@@ -109,7 +109,7 @@ export const ServerSelectionScreen: React.FC<ServerSelectionScreenProps> = ({
                 <Text style={styles.serverUrl}>{item.url}</Text>
               </View>
               <ChevronRight
-                size={20}
+                size={18}
                 color={theme.colors.text.tertiary}
                 strokeWidth={2}
               />
@@ -118,20 +118,20 @@ export const ServerSelectionScreen: React.FC<ServerSelectionScreenProps> = ({
               style={styles.deleteButton}
               onPress={() => handleDeleteServer(item.id)}
             >
-              <Trash2 size={20} color={theme.colors.error} strokeWidth={2} />
+              <Trash2 size={18} color={theme.colors.error} strokeWidth={2} />
             </TouchableOpacity>
           </View>
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListFooterComponent={() => (
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.addButton} onPress={onAddNewServer}>
+              <Plus size={20} color={theme.colors.accent} strokeWidth={2.5} />
+              <Text style={styles.addButtonText}>Add New Server</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       />
-
-      {/* Add New Server Button */}
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.addButton} onPress={onAddNewServer}>
-          <Plus size={24} color={theme.colors.accent} strokeWidth={2.5} />
-          <Text style={styles.addButtonText}>Add New Server</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* Delete Confirmation Modal */}
       <ConfirmModal
@@ -157,9 +157,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background.primary,
   },
   header: {
-    paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.xxxl,
-    paddingBottom: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
+    paddingBottom: theme.spacing.sm,
   },
   title: {
     fontSize: theme.typography.fontSize.huge,
@@ -173,8 +173,8 @@ const styles = StyleSheet.create({
     lineHeight: theme.typography.fontSize.lg * theme.typography.lineHeight.relaxed,
   },
   listContent: {
-    paddingHorizontal: theme.spacing.xl,
-    paddingBottom: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.sm,
   },
   serverCard: {
     flexDirection: 'row',
@@ -189,56 +189,57 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
   },
   serverIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.borderRadius.md,
+    width: 36,
+    height: 36,
+    borderRadius: theme.borderRadius.sm,
     backgroundColor: theme.colors.background.muted,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: theme.spacing.md,
+    marginRight: theme.spacing.sm,
   },
   serverInfo: {
     flex: 1,
     marginRight: theme.spacing.md,
   },
   serverName: {
-    fontSize: theme.typography.fontSize.lg,
+    fontSize: theme.typography.fontSize.md,
     fontWeight: theme.typography.fontWeight.semibold,
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
+    marginBottom: 2,
   },
   serverUrl: {
     fontSize: theme.typography.fontSize.sm,
     color: theme.colors.text.secondary,
   },
   deleteButton: {
-    width: 56,
-    height: '100%',
+    width: 44,
+    alignSelf: 'stretch',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: theme.colors.background.muted,
   },
   separator: {
-    height: theme.spacing.md,
+    height: theme.spacing.xs,
   },
   footer: {
-    padding: theme.spacing.xl,
-    paddingBottom: theme.spacing.xxl,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.lg,
   },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.lg,
+    borderRadius: theme.borderRadius.md,
     borderWidth: 2,
     borderColor: theme.colors.accent,
     borderStyle: 'dashed',
-    padding: theme.spacing.lg,
-    minHeight: 64,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
   },
   addButtonText: {
     fontSize: theme.typography.fontSize.lg,

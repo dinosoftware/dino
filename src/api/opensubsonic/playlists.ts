@@ -13,33 +13,33 @@ import {
  * Get all playlists
  */
 export const getPlaylists = async (): Promise<GetPlaylistsResponse> => {
-  return await apiClient.get<GetPlaylistsResponse>('getPlaylists');
+  return await apiClient.request<GetPlaylistsResponse>('getPlaylists');
 };
 
 /**
  * Get playlist by ID with tracks
  */
 export const getPlaylist = async (playlistId: string): Promise<GetPlaylistResponse> => {
-  return await apiClient.get<GetPlaylistResponse>('getPlaylist', {
+  return await apiClient.request<GetPlaylistResponse>('getPlaylist', {
     id: playlistId,
   });
 };
 
 /**
- * Create new playlist
+ * Create new playlist (uses POST when supported)
  */
 export const createPlaylist = async (
   name: string,
   songIds?: string[]
 ): Promise<GetPlaylistResponse> => {
-  return await apiClient.get<GetPlaylistResponse>('createPlaylist', {
+  return await apiClient.request<GetPlaylistResponse>('createPlaylist', {
     name,
     ...(songIds && { songId: songIds }),
   });
 };
 
 /**
- * Update playlist (add/remove tracks)
+ * Update playlist (add/remove tracks) - uses POST when supported
  */
 export const updatePlaylist = async (
   playlistId: string,
@@ -67,14 +67,14 @@ export const updatePlaylist = async (
     params.songIndexToRemove = songIndexesToRemove;
   }
   
-  await apiClient.get('updatePlaylist', params);
+  await apiClient.request('updatePlaylist', params);
 };
 
 /**
- * Delete playlist
+ * Delete playlist (uses POST when supported)
  */
 export const deletePlaylist = async (playlistId: string): Promise<void> => {
-  await apiClient.get('deletePlaylist', {
+  await apiClient.request('deletePlaylist', {
     id: playlistId,
   });
 };
