@@ -197,10 +197,11 @@ export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
       {/* Full Player Modal - Renders on top of everything */}
       <Modal
         visible={showFullPlayer}
-        animationType="slide"
-        presentationStyle="fullScreen"
+        animationType="none"
+        presentationStyle="overFullScreen"
         statusBarTranslucent
         onRequestClose={() => setShowFullPlayer(false)}
+        transparent={true}
       >
         <FullPlayer onClose={() => setShowFullPlayer(false)} />
       </Modal>

@@ -5,7 +5,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { ArrowRightLeft, Cast, ChevronDown, Heart, ListMusic, MicVocal, MoreVertical, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react-native';
-import React, { memo, useCallback, useRef, useState } from 'react';
+import React, { memo, useCallback, useRef, useState, useEffect } from 'react';
 import {
   Animated,
   Dimensions,
@@ -36,7 +36,7 @@ import { BlurredBackground } from '../common';
 import { ProgressBar } from './ProgressBar';
 import { TrackMenu } from './TrackMenu';
 
-const { width } = Dimensions.get('window');
+const { width, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface FullPlayerProps {
   onClose: () => void;
@@ -157,7 +157,27 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
   const [showLyrics, setShowLyrics] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const translateY = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+
+  // Slide up animation on mount
+  useEffect(() => {
+    Animated.spring(translateY, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 30,
+    }).start();
+  }, []);
+
+  const handleClose = useCallback(() => {
+    Animated.timing(translateY, {
+      toValue: SCREEN_HEIGHT,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      onClose();
+    });
+  }, [translateY, onClose]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -177,14 +197,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
       },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dy > 100) {
-          Animated.timing(translateY, {
-            toValue: 1000,
-            duration: 250,
-            useNativeDriver: true,
-          }).start(() => {
-            translateY.setValue(0);
-            onClose();
-          });
+          handleClose();
         } else {
           Animated.spring(translateY, {
             toValue: 0,
@@ -251,12 +264,13 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
 
   return (
     <>
-    <View style={{ flex: 1, overflow: 'hidden' }}>
-      <BlurredBackground imageUri={coverArtUrl || undefined}>
-      <Animated.View
-        style={[styles.container, { transform: [{ translateY }] }]}
-        {...panResponder.panHandlers}
-      >
+    <Animated.View style={[StyleSheet.absoluteFillObject, { transform: [{ translateY }] }]}>
+      <View style={{ flex: 1, overflow: 'hidden' }}>
+        <BlurredBackground imageUri={coverArtUrl || undefined}>
+          <View
+            style={styles.container}
+            {...panResponder.panHandlers}
+          >
         {/* Swipe Indicator */}
         <View style={styles.swipeIndicator}>
           <View style={styles.swipeHandle} />
@@ -264,7 +278,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
 
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
             <ChevronDown size={28} color={theme.colors.text.primary} strokeWidth={2.5} />
           </TouchableOpacity>
           <View style={styles.placeholder} />
@@ -432,9 +446,10 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
           message={trackMenuState.confirmMessage.message}
           onClose={() => trackMenuState.setShowConfirm(false)}
         />
-      </Animated.View>
-    </BlurredBackground>
-    </View>
+      </View>
+      </BlurredBackground>
+      </View>
+    </Animated.View>
 
     {/* Lyrics and Queue overlays */}
     {showLyrics && <LyricsScreen onClose={() => setShowLyrics(false)} />}
