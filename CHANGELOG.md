@@ -29,8 +29,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Shuffle: Calls unshuffleQueue() when turning shuffle off  
   - Shuffle: Queue now properly shuffles/unshuffles when button is pressed
   - Repeat Track: Fixed track not repeating when reaching the end
-  - Repeat Track: Now seeks to start and replays instead of calling play() on finished track
+  - Repeat Track: Disables gapless preloading when repeat track is on
+  - Repeat Track: Properly replays track via PlaybackQueueEnded event
   - Repeat Queue: Already working correctly
+- **Queue Sync Playback Reset**: Fixed playback resetting when modifying queue
+  - When queue is modified, now finds where current track actually is
+  - Updates queue index to match instead of assuming mismatch = wrong track
+  - Only restarts playback if current track was actually removed
+  - Prevents false resets when coming back from another app
+  - Fixes "jumps to random position" when adding/removing tracks
 - **Download Progress for Albums/Playlists**: Fixed progress bar not updating
   - Progress now calculated based on completed tracks (e.g., 3/10 tracks)
   - Previously only used byte-based progress which stayed at 0%

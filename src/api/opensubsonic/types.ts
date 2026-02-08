@@ -101,6 +101,20 @@ export interface Lyrics {
   line?: LyricLine[]; // Synchronized lyrics
 }
 
+// OpenSubsonic extended lyrics format
+export interface StructuredLyrics {
+  displayArtist?: string;
+  displayTitle?: string;
+  lang?: string;
+  synced: boolean;
+  line?: LyricLine[];
+  value?: string; // Unsynced lyrics text
+}
+
+export interface LyricsList {
+  structuredLyrics?: StructuredLyrics[];
+}
+
 // Play Queue Types
 export interface PlayQueue {
   current?: number;
@@ -225,7 +239,8 @@ export interface GetPlaylistResponse {
 }
 
 export interface GetLyricsResponse {
-  lyrics: Lyrics;
+  lyrics?: Lyrics; // Old format (Subsonic)
+  lyricsList?: LyricsList; // New format (OpenSubsonic)
 }
 
 export interface GetPlayQueueResponse {

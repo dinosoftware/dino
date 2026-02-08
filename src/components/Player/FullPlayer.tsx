@@ -249,16 +249,10 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
 
   const isFavorite = isTrackStarred(currentTrack.id);
 
-  if (showLyrics) {
-    return <LyricsScreen onClose={() => setShowLyrics(false)} />;
-  }
-
-  if (showQueue) {
-    return <QueueScreen onClose={() => setShowQueue(false)} />;
-  }
-
   return (
-    <BlurredBackground imageUri={coverArtUrl || undefined}>
+    <>
+    <View style={{ flex: 1, overflow: 'hidden' }}>
+      <BlurredBackground imageUri={coverArtUrl || undefined}>
       <Animated.View
         style={[styles.container, { transform: [{ translateY }] }]}
         {...panResponder.panHandlers}
@@ -313,6 +307,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
           onSeek={seekTo}
           color={albumColors.primary}
           qualityText={streamingInfo?.displayText}
+          qualityTextSimple={streamingInfo?.displayTextSimple}
         />
 
         {/* Main Controls */}
@@ -439,6 +434,12 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
         />
       </Animated.View>
     </BlurredBackground>
+    </View>
+
+    {/* Lyrics and Queue overlays */}
+    {showLyrics && <LyricsScreen onClose={() => setShowLyrics(false)} />}
+    {showQueue && <QueueScreen onClose={() => setShowQueue(false)} />}
+    </>
   );
 };
 

@@ -64,6 +64,28 @@ class TrackPlayerService {
   intervalId: ReturnType<typeof setInterval> | null = null;
   networkCheckInterval: ReturnType<typeof setInterval> | null = null;
   lastNetworkType: 'wifi' | 'mobile' | 'unknown' = 'unknown';
+  isSyncingQueue = false; // Lock to prevent concurrent queue syncs
+
+  /**
+   * Format audio codec name with proper capitalization
+   * FLAC, Opus, AAC, etc. - not all uppercase
+   */
+  private formatCodecName(format: string): string {
+    const formatLower = format.toLowerCase();
+    switch (formatLower) {
+      case 'flac': return 'FLAC';
+      case 'opus': return 'Opus';
+      case 'aac': return 'AAC';
+      case 'mp3': return 'MP3';
+      case 'ogg': return 'OGG';
+      case 'wav': return 'WAV';
+      case 'm4a': return 'M4A';
+      case 'alac': return 'ALAC';
+      case 'ape': return 'APE';
+      case 'wma': return 'WMA';
+      default: return format.toUpperCase(); // Fallback to uppercase
+    }
+  }
 
   /**
    * Initialize the player service
@@ -239,10 +261,18 @@ class TrackPlayerService {
             // Update streaming info based on whether track is downloaded
             const downloadedTrack = useDownloadStore.getState().getDownloadedTrack(trackData.id);
             if (downloadedTrack) {
+              // Show actual bitrate and format for downloaded tracks in detailed view
+              const track = downloadedTrack.track;
+              let detailedText = 'Downloaded';
+              if (track.bitRate && track.suffix) {
+                const format = this.formatCodecName(track.suffix);
+                detailedText = `${track.bitRate} kbps ${format}`;
+              }
+              
               usePlayerStore.getState().setStreamingInfo({
                 quality: '0',
-                format: 'Downloaded',
-                displayText: 'Downloaded',
+                format: track.suffix || 'Downloaded',
+                displayText: detailedText,
                 displayTextSimple: 'DOWNLOADED',
                 networkType: 'unknown',
               });
@@ -252,7 +282,7 @@ class TrackPlayerService {
                 // For MAX quality, show actual track bitrate/format in detailed view
                 let detailedText = streamingSettings.displayText;
                 if (streamingSettings.quality === '0' && trackData.bitRate && trackData.suffix) {
-                  const format = trackData.suffix.toUpperCase();
+                  const format = this.formatCodecName(trackData.suffix);
                   detailedText = `${trackData.bitRate} kbps ${format}`;
                 }
                 
@@ -375,8 +405,8 @@ class TrackPlayerService {
         displayText = 'MAX';
         displayTextSimple = 'MAX';
       } else {
-        const formatUpper = (formatForApi || streamingFormat).toUpperCase();
-        displayText = `${quality} kbps ${formatUpper}`;
+        const format = this.formatCodecName(formatForApi || streamingFormat);
+        displayText = `${quality} kbps ${format}`;
         
         // Simple text based on quality range
         const qualityNum = parseInt(quality);
@@ -412,7 +442,7 @@ class TrackPlayerService {
       return {
         maxBitRate: fallbackMaxBitRate,
         format: fallbackFormat,
-        displayText: streamingQualityMobile === '0' ? 'MAX' : `${streamingQualityMobile} kbps ${streamingFormatMobile.toUpperCase()}`,
+        displayText: streamingQualityMobile === '0' ? 'MAX' : `${streamingQualityMobile} kbps ${this.formatCodecName(streamingFormatMobile)}`,
         displayTextSimple: fallbackSimple,
         quality: streamingQualityMobile,
         formatName: streamingFormatMobile,
@@ -583,7 +613,7 @@ class TrackPlayerService {
         // For MAX quality, show actual track bitrate/format in detailed view
         let detailedText = streamingSettings.displayText;
         if (streamingSettings.quality === '0' && currentTrack.bitRate && currentTrack.suffix) {
-          const format = currentTrack.suffix.toUpperCase();
+          const format = this.formatCodecName(currentTrack.suffix);
           detailedText = `${currentTrack.bitRate} kbps ${format}`;
         }
         
@@ -795,6 +825,14 @@ class TrackPlayerService {
    * This is critical when queue is modified (remove/reorder) to keep everything in sync
    */
   async syncQueueWithTrackPlayer() {
+    // Prevent concurrent syncs - they can cause race conditions
+    if (this.isSyncingQueue) {
+      console.log('[TrackPlayer] Queue sync already in progress, skipping');
+      return;
+    }
+    
+    this.isSyncingQueue = true;
+    
     try {
       const { queue, currentIndex } = useQueueStore.getState();
       const { currentTrack } = usePlayerStore.getState();
@@ -804,16 +842,28 @@ class TrackPlayerService {
         return;
       }
 
-      // Verify current track is still in queue at currentIndex
+      // Verify current track is still in queue - if not at currentIndex, find it
       const trackAtCurrentIndex = queue[currentIndex];
       if (!trackAtCurrentIndex || trackAtCurrentIndex.id !== currentTrack.id) {
         console.warn('[TrackPlayer] Current track mismatch after queue modification');
-        // Update to the track at currentIndex
-        const newCurrentTrack = queue[currentIndex];
-        if (newCurrentTrack) {
-          usePlayerStore.getState().setCurrentTrack(newCurrentTrack);
-          await this.play(); // Play the new current track
-          return;
+        
+        // Search for the current track in the queue
+        const actualIndex = queue.findIndex(t => t.id === currentTrack.id);
+        
+        if (actualIndex !== -1) {
+          // Found it! Just update the index, don't restart playback
+          console.log('[TrackPlayer] Found current track at index:', actualIndex);
+          useQueueStore.setState({ currentIndex: actualIndex });
+          // Continue with sync below - don't return here
+        } else {
+          // Current track was removed from queue entirely
+          console.warn('[TrackPlayer] Current track no longer in queue, playing track at current index');
+          const newCurrentTrack = queue[currentIndex];
+          if (newCurrentTrack) {
+            usePlayerStore.getState().setCurrentTrack(newCurrentTrack);
+            await this.play();
+            return;
+          }
         }
       }
 
@@ -849,6 +899,8 @@ class TrackPlayerService {
       console.log('[TrackPlayer] Queue sync completed - preloaded tracks updated');
     } catch (error) {
       console.error('[TrackPlayer] Failed to sync queue:', error);
+    } finally {
+      this.isSyncingQueue = false;
     }
   }
 
@@ -1029,7 +1081,7 @@ class TrackPlayerService {
         // For MAX quality, show actual track bitrate/format in detailed view
         let detailedText = streamingSettings.displayText;
         if (streamingSettings.quality === '0' && currentTrack.bitRate && currentTrack.suffix) {
-          const format = currentTrack.suffix.toUpperCase();
+          const format = this.formatCodecName(currentTrack.suffix);
           detailedText = `${currentTrack.bitRate} kbps ${format}`;
         }
         
@@ -1071,12 +1123,12 @@ class TrackPlayerService {
       });
 
       // Update badge immediately
-      // For MAX quality, show actual track bitrate/format in detailed view
-      let detailedText = streamingSettings.displayText;
-      if (streamingSettings.quality === '0' && currentTrack.bitRate && currentTrack.suffix) {
-        const format = currentTrack.suffix.toUpperCase();
-        detailedText = `${currentTrack.bitRate} kbps ${format}`;
-      }
+        // For MAX quality, show actual track bitrate/format in detailed view
+        let detailedText = streamingSettings.displayText;
+        if (streamingSettings.quality === '0' && currentTrack.bitRate && currentTrack.suffix) {
+          const format = this.formatCodecName(currentTrack.suffix);
+          detailedText = `${currentTrack.bitRate} kbps ${format}`;
+        }
       
       usePlayerStore.getState().setStreamingInfo({
         quality: streamingSettings.quality,

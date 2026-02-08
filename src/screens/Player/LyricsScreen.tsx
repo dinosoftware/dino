@@ -21,7 +21,7 @@ import { Lock, Unlock } from 'lucide-react-native';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 import { useLyrics } from '../../hooks/useLyrics';
 import { usePlayer } from '../../hooks/usePlayer';
-import { BlurredBackground, EmptyState } from '../../components/common';
+import { EmptyState, BlurredBackground } from '../../components/common';
 import { theme, LYRICS_FONT_SIZES } from '../../config';
 import { useSettingsStore, usePlayerStore } from '../../stores';
 import { useCoverArt } from '../../hooks/api';
@@ -82,10 +82,20 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
   const { lyricsLoading } = usePlayerStore();
   const scrollViewRef = useRef<ScrollView>(null);
   const { data: coverArtUrl } = useCoverArt(currentTrack?.coverArt, 500);
-  const translateY = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const lineHeightsRef = useRef<Map<number, number>>(new Map());
 
   const fontSizes = LYRICS_FONT_SIZES[lyricsFontSize];
+
+  // Slide up animation on mount
+  useEffect(() => {
+    Animated.spring(translateY, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 30,
+    }).start();
+  }, []);
 
   const handleClose = () => {
     Animated.timing(translateY, {
@@ -93,7 +103,7 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
       duration: 200,
       useNativeDriver: true,
     }).start(() => {
-      translateY.setValue(0);
+      translateY.setValue(SCREEN_HEIGHT);
       onClose();
     });
   };
@@ -112,11 +122,11 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dy > 150) {
           Animated.timing(translateY, {
-            toValue: 1000,
+            toValue: SCREEN_HEIGHT,
             duration: 200,
             useNativeDriver: true,
           }).start(() => {
-            translateY.setValue(0);
+            translateY.setValue(SCREEN_HEIGHT);
             onClose();
           });
         } else {
@@ -149,11 +159,13 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
   // Show loading state
   if (lyricsLoading.isLoading) {
     return (
-      <BlurredBackground imageUri={coverArtUrl || undefined}>
-        <Animated.View 
-          style={[styles.container, { transform: [{ translateY }] }]}
-          {...panResponder.panHandlers}
-        >
+      <Animated.View style={[styles.overlay, { transform: [{ translateY }] }]}>
+        <View style={{ flex: 1, overflow: 'hidden' }}>
+          <BlurredBackground imageUri={coverArtUrl || undefined}>
+          <View 
+            style={styles.container}
+            {...panResponder.panHandlers}
+          >
           {/* Swipe Indicator */}
           <View style={styles.swipeIndicator}>
             <View style={styles.swipeHandle} />
@@ -174,17 +186,20 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
             title="Loading lyrics..."
             message="Please wait"
           />
-        </Animated.View>
-      </BlurredBackground>
+        </View>
+        </BlurredBackground>
+        </View>
+      </Animated.View>
     );
   }
 
   // Show empty state
   if (!lyrics) {
     return (
-      <BlurredBackground imageUri={coverArtUrl || undefined}>
-        <Animated.View 
-          style={[styles.container, { transform: [{ translateY }] }]}
+      <Animated.View style={[styles.overlay, { transform: [{ translateY }] }]}>
+        <BlurredBackground imageUri={coverArtUrl || undefined}>
+          <View 
+          style={styles.container}
           {...panResponder.panHandlers}
         >
           {/* Swipe Indicator */}
@@ -207,17 +222,19 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
             title="No lyrics found"
             message="Lyrics are not available for this song"
           />
-        </Animated.View>
-      </BlurredBackground>
+        </View>
+        </BlurredBackground>
+      </Animated.View>
     );
   }
 
   // Render unsynchronized lyrics
   if (lyrics.type === 'unsynced' && lyrics.plainText) {
     return (
-      <BlurredBackground imageUri={coverArtUrl || undefined}>
-        <Animated.View 
-          style={[styles.container, { transform: [{ translateY }] }]}
+      <Animated.View style={[styles.overlay, { transform: [{ translateY }] }]}>
+        <BlurredBackground imageUri={coverArtUrl || undefined}>
+          <View 
+          style={styles.container}
           {...panResponder.panHandlers}
         >
           {/* Swipe Indicator */}
@@ -259,17 +276,19 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
               </Text>
             </View>
           </ScrollView>
-        </Animated.View>
-      </BlurredBackground>
+        </View>
+        </BlurredBackground>
+      </Animated.View>
     );
   }
 
   // Render synchronized lyrics
   if (lyrics.type === 'synced' && lyrics.lines) {
     return (
-      <BlurredBackground imageUri={coverArtUrl || undefined}>
-        <Animated.View 
-          style={[styles.container, { transform: [{ translateY }] }]}
+      <Animated.View style={[styles.overlay, { transform: [{ translateY }] }]}>
+        <BlurredBackground imageUri={coverArtUrl || undefined}>
+          <View 
+          style={styles.container}
           {...panResponder.panHandlers}
         >
           {/* Swipe Indicator */}
@@ -333,8 +352,9 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
               />
             ))}
           </ScrollView>
-        </Animated.View>
-      </BlurredBackground>
+        </View>
+        </BlurredBackground>
+      </Animated.View>
     );
   }
 
@@ -350,6 +370,14 @@ const formatTime = (ms: number): string => {
 };
 
 const styles = StyleSheet.create({
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
   container: {
     flex: 1,
   },

@@ -20,6 +20,7 @@ import { X, Trash2, GripVertical, Eraser, ListPlus } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useQueueStore, usePlayerStore } from '../../stores';
 import { useCoverArt } from '../../hooks/api/useAlbums';
+
 import { BlurredBackground } from '../../components/common';
 import { TrackMenu } from '../../components/Player/TrackMenu';
 import { SongInfoModal } from '../../components/Modals/SongInfoModal';
@@ -178,8 +179,9 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
 
   // Auto-scroll to current track when opening queue (only once)
   useEffect(() => {
+    // Delay scroll to happen after slide-up animation
     if (!hasScrolledToCurrentRef.current && currentIndex >= 0 && queue.length > 0 && flatListRef.current) {
-      // Delay to ensure list is rendered
+      // Delay to ensure slide-up animation completes and list is rendered
       setTimeout(() => {
         try {
           flatListRef.current?.scrollToIndex?.({
@@ -191,7 +193,7 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
         } catch (error) {
           console.log('[QueueScreen] Could not scroll to current track:', error);
         }
-      }, 300);
+      }, 400); // Increased from 300ms to let slide-up finish
     }
   }, []); // Only run on mount
 
@@ -244,7 +246,17 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
     index,
   }), []);
 
-  const translateY = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(1000)).current;
+
+  // Slide up animation on mount
+  useEffect(() => {
+    Animated.spring(translateY, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 30,
+    }).start();
+  }, []);
 
   const handleClose = useCallback(() => {
     Animated.timing(translateY, {
@@ -252,7 +264,7 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
       duration: 200,
       useNativeDriver: true,
     }).start(() => {
-      translateY.setValue(0);
+      translateY.setValue(1000);
       onClose();
     });
   }, [translateY, onClose]);
@@ -275,7 +287,7 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
             duration: 200,
             useNativeDriver: true,
           }).start(() => {
-            translateY.setValue(0);
+            translateY.setValue(1000);
             onClose();
           });
         } else {
@@ -289,11 +301,13 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
   ).current;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <BlurredBackground imageUri={coverArtUrl || undefined}>
-        <Animated.View 
-          style={[styles.container, { transform: [{ translateY }] }]}
-        >
+    <Animated.View style={[styles.overlay, { transform: [{ translateY }] }]}>
+      <View style={{ flex: 1, overflow: 'hidden' }}>
+        <BlurredBackground imageUri={coverArtUrl || undefined}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <View 
+            style={styles.container}
+          >
           {/* Swipe Handle - ONLY AREA WITH GESTURE */}
           <View 
             style={styles.swipeIndicator}
@@ -374,7 +388,7 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
               }, 100);
             }}
           />
-        </Animated.View>
+        </View>
 
         {/* Track Menu */}
         <TrackMenu
@@ -433,12 +447,22 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
           songIds={queue.map(track => track.id)}
           songTitle="Queue"
         />
+        </GestureHandlerRootView>
       </BlurredBackground>
-    </GestureHandlerRootView>
+      </View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
   container: {
     flex: 1,
   },

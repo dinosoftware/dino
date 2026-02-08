@@ -115,7 +115,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 
       {/* Time Labels - BELOW the progress bar, inline */}
       <View style={styles.timeContainer}>
-        <Text style={styles.timeText}>{currentTimeText}</Text>
+        <Text style={[styles.timeText, styles.timeTextLeft]}>{currentTimeText}</Text>
         <View style={styles.centerBadgeContainer}>
           {displayText && (
             <TouchableOpacity onPress={toggleQualityMode} activeOpacity={0.7}>
@@ -127,7 +127,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
             </TouchableOpacity>
           )}
         </View>
-        <Text style={styles.timeText}>{durationText}</Text>
+        <Text style={[styles.timeText, styles.timeTextRight]}>{durationText}</Text>
       </View>
     </View>
   );
@@ -150,6 +150,12 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
     fontFamily: theme.typography.fontFamily.medium,
     minWidth: 40, // Fixed width to prevent shifting
+  },
+  timeTextLeft: {
+    textAlign: 'left',
+  },
+  timeTextRight: {
+    textAlign: 'right',
   },
   centerBadgeContainer: {
     position: 'absolute',

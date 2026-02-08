@@ -30,6 +30,11 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({
   const { isAlbumDownloaded } = useDownloadStore();
   const isDownloaded = isAlbumDownloaded(album.id);
 
+  const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onPress();
+  };
+
   const handleLongPress = () => {
     if (onLongPress) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -38,7 +43,7 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({
   };
 
   const handlePressIn = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Don't trigger haptic here - it fires on scroll swipes too
     Animated.spring(scaleAnim, {
       toValue: 0.98, // Subtle scale
       useNativeDriver: true,
@@ -59,7 +64,7 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({
   return (
     <TouchableOpacity
       style={[styles.container, width ? { width } : null]}
-      onPress={onPress}
+      onPress={handlePress}
       onLongPress={handleLongPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}

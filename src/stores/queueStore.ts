@@ -148,20 +148,20 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     
     get().saveToStorage();
     
-    // Sync TrackPlayer's preloaded tracks to include the new tracks
-    if (position === 'next') {
-      // When adding "Play Next", immediately update TrackPlayer's queue
-      console.log('[QueueStore] Added tracks to play next, syncing TrackPlayer');
-      setTimeout(() => syncQueue(), 50);
-    }
+    // Don't sync TrackPlayer when adding tracks - it clears/rebuilds the queue
+    // which can interrupt playback. The preloaded tracks will update naturally
+    // on the next track change.
+    // if (position === 'next') {
+    //   console.log('[QueueStore] Added tracks to play next, syncing TrackPlayer');
+    //   setTimeout(() => syncQueue(), 50);
+    // }
     
     triggerSync(true);
   },
 
   removeFromQueue: (index) => {
-    const state = get();
-    const removingCurrentTrack = index === state.currentIndex;
-    const trackAtIndex = state.queue[index];
+    const oldCurrentIndex = get().currentIndex;
+    const removingCurrentTrack = index === oldCurrentIndex;
     
     set((state) => {
       const newQueue = state.queue.filter((_, i) => i !== index);
@@ -187,6 +187,9 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     
     get().saveToStorage();
     
+    const newCurrentIndex = get().currentIndex;
+    const currentIndexChanged = oldCurrentIndex !== newCurrentIndex;
+    
     // If removing the current track and there are more tracks, we need to play the next one
     if (removingCurrentTrack && get().queue.length > 0) {
       const newCurrentTrack = get().queue[get().currentIndex];
@@ -195,8 +198,8 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         // Delay sync slightly to ensure state is updated
         setTimeout(() => syncQueue(), 100);
       }
-    } else if (!removingCurrentTrack) {
-      // Sync TrackPlayer queue for normal removals (updates preloaded tracks only)
+    } else if (!removingCurrentTrack && !currentIndexChanged) {
+      // Only sync if we didn't change currentIndex - avoid mismatch restart
       setTimeout(() => syncQueue(), 100);
     }
     
@@ -204,7 +207,8 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
   },
 
   reorderQueue: (fromIndex, toIndex) => {
-    const wasCurrentTrackMoved = fromIndex === get().currentIndex;
+    const oldCurrentIndex = get().currentIndex;
+    const wasCurrentTrackMoved = fromIndex === oldCurrentIndex;
     
     set((state) => {
       const newQueue = [...state.queue];
@@ -229,9 +233,12 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     
     get().saveToStorage();
     
-    // Only sync TrackPlayer if we didn't move the currently playing track
-    // Moving current track doesn't need sync - it's still playing
-    if (!wasCurrentTrackMoved) {
+    const newCurrentIndex = get().currentIndex;
+    const currentIndexChanged = oldCurrentIndex !== newCurrentIndex;
+    
+    // DON'T sync TrackPlayer if currentIndex changed - will cause mismatch restart
+    // Also don't sync if current track was moved - it's still playing
+    if (!wasCurrentTrackMoved && !currentIndexChanged) {
       syncQueue();
     }
     

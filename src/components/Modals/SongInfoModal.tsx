@@ -41,6 +41,7 @@ export const SongInfoModal: React.FC<SongInfoModalProps> = ({ visible, onClose, 
     return `${mb.toFixed(2)} MB`;
   };
 
+  // Debug: Log the track object to see what fields are available
   const infoRows = [
     { label: 'Title', value: track.title },
     { label: 'Artist', value: track.artist || 'Unknown' },

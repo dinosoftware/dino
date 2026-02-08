@@ -173,19 +173,34 @@ export class DownloadService {
    */
   private async downloadLyrics(trackId: string): Promise<string | undefined> {
     try {
+      console.log('[DownloadService] Downloading lyrics for track:', trackId);
       const response = await getLyricsBySongId(trackId);
-      const lyrics = response.lyrics;
       
-      if (!lyrics) {
+      // Handle both old Subsonic format (lyrics) and new OpenSubsonic format (lyricsList)
+      let lyricsData = null;
+      
+      if (response.lyricsList?.structuredLyrics && response.lyricsList.structuredLyrics.length > 0) {
+        // OpenSubsonic format - use first structured lyrics entry
+        console.log('[DownloadService] Using OpenSubsonic structured lyrics format');
+        lyricsData = response.lyricsList.structuredLyrics[0];
+      } else if (response.lyrics) {
+        // Old Subsonic format
+        console.log('[DownloadService] Using old Subsonic lyrics format');
+        lyricsData = response.lyrics;
+      }
+      
+      if (!lyricsData) {
+        console.log('[DownloadService] No lyrics available for track:', trackId);
         return undefined;
       }
       
       const localPath = this.getLyricsFilePath(trackId);
-      await FileSystem.writeAsStringAsync(localPath, JSON.stringify(lyrics));
+      await FileSystem.writeAsStringAsync(localPath, JSON.stringify(lyricsData));
       
+      console.log('[DownloadService] Saved lyrics to:', localPath);
       return localPath;
     } catch (error) {
-      console.error('Failed to download lyrics:', error);
+      console.error('[DownloadService] Failed to download lyrics for', trackId, ':', error);
       return undefined;
     }
   }
@@ -470,8 +485,11 @@ export class DownloadService {
         // Fetch and store full metadata for offline use
         const fullMetadata = await getAlbum(album.id);
 
+        // Use the full album data from metadata (includes genre and other fields)
+        const fullAlbum = fullMetadata.album;
+
         // Mark album as downloaded with metadata
-        useDownloadStore.getState().markAlbumDownloaded(album, downloadedTracks, fullMetadata, coverArtUri);
+        useDownloadStore.getState().markAlbumDownloaded(fullAlbum, downloadedTracks, fullMetadata, coverArtUri);
         useDownloadStore.getState().completeDownload(downloadId);
 
         console.log(`Downloaded album ${album.id}: ${downloadedTracks.length}/${tracks.length} tracks`);
