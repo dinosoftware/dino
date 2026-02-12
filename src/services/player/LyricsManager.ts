@@ -191,8 +191,8 @@ class LyricsManager {
   startSync() {
     if (this.syncIntervalId) return;
 
-    this.syncIntervalId = setInterval(async () => {
-      await this.updateCurrentLine();
+    this.syncIntervalId = setInterval(() => {
+      this.updateCurrentLine();
     }, LYRICS_SYNC_CONFIG.UPDATE_INTERVAL);
 
     // console.log('[Lyrics] Started sync');
@@ -211,19 +211,18 @@ class LyricsManager {
 
   /**
    * Update the current line based on playback position.
-   * Reads position directly from TrackPlayer to avoid stale store values.
+   * Reads position from store (updated every 1s by PlaybackProgressUpdated).
    */
-  private async updateCurrentLine() {
-    const { currentLyrics } = usePlayerStore.getState();
+  private updateCurrentLine() {
+    const { currentLyrics, progress } = usePlayerStore.getState();
 
     if (!currentLyrics || currentLyrics.type !== 'synced' || !currentLyrics.lines) {
       return;
     }
 
-    // Read directly from TrackPlayer - much more accurate than the store value
-    // which is only updated every ~1s by PlaybackProgressUpdated
-    const positionSec = await TrackPlayer.getPosition();
-    const positionMs = positionSec * 1000;
+    // Read from store - updated every 1s by PlaybackProgressUpdated event.
+    // Avoids a native bridge call every 100ms (10/sec) which saturates the JS thread.
+    const positionMs = progress.position * 1000;
     const lines = currentLyrics.lines;
 
     // Find the current line

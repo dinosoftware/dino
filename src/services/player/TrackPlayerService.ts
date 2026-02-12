@@ -61,7 +61,6 @@ TrackPlayer.registerPlaybackService(() => PlaybackService);
 
 class TrackPlayerService {
   isInitialized = false;
-  intervalId: ReturnType<typeof setInterval> | null = null;
   networkCheckInterval: ReturnType<typeof setInterval> | null = null;
   lastNetworkType: 'wifi' | 'mobile' | 'unknown' = 'unknown';
   isSyncingQueue = false;
@@ -152,7 +151,7 @@ class TrackPlayerService {
       
       // Register callback to sync queue with TrackPlayer when queue is modified
       setSyncQueueCallback(() => this.syncQueueWithTrackPlayer());
-      setClearPreloadedTracksCallback(() => { this.clearPreloadedTracks(); });
+      setClearPreloadedTracksCallback(() => { this.clearPreloadedTracks().catch(() => {}); });
 
       // Load settings from storage first
       await useSettingsStore.getState().loadFromStorage();
@@ -249,6 +248,14 @@ class TrackPlayerService {
     });
 
     TrackPlayer.addEventListener(Event.PlaybackTrackChanged, async (event) => {
+      // When TrackPlayer.add() buffers the next track, ExoPlayer fires a media transition
+      // which RNTP surfaces as PlaybackTrackChanged with track=null, nextTrack=1.
+      // This is NOT a real playback change - ignore it to prevent invalidatePrecache()
+      // from resetting precacheTriggerred and causing an infinite add() loop.
+      if (event.track === null && event.nextTrack !== null && event.nextTrack > 0) {
+        return;
+      }
+
       // Get previous track info for scrobbling
       const { currentTrack: previousTrack, progress: previousProgress, repeatMode } = usePlayerStore.getState();
 
@@ -792,32 +799,12 @@ class TrackPlayerService {
   }
 
   startProgressTracking() {
-    if (this.intervalId) return;
-    this.intervalId = setInterval(async () => {
-      try {
-        const position = await TrackPlayer.getPosition();
-        const duration = await TrackPlayer.getDuration();
-        const bufferedPosition = await TrackPlayer.getBufferedPosition();
-        const { setProgress, setBufferedProgress } = usePlayerStore.getState();
-        setProgress(position, duration);
-        setBufferedProgress(bufferedPosition);
-
-        // Trigger precache at 50% - guaranteed to fire even if PlaybackProgressUpdated doesn't
-        if (!this.precacheTriggerred && duration > 0 && position / duration >= 0.5) {
-          this.precacheTriggerred = true;
-          this.precacheNextTrack().catch(() => {});
-        }
-      } catch (error) {
-        // Silent fail - don't spam console during normal operation
-      }
-    }, 1000); // 1 second updates for better performance
+    // Progress is delivered via PlaybackProgressUpdated event (progressUpdateEventInterval: 1).
+    // No polling needed - eliminates 3 native bridge calls/sec.
   }
 
   stopProgressTracking() {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
+    // No-op - event-based tracking stops automatically when playback stops.
   }
 
   async playTrack(index: number) {
