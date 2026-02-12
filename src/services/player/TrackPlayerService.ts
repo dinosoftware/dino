@@ -13,7 +13,7 @@ import TrackPlayer, {
 import { getCoverArtUrl, getStreamUrl } from '../../api/opensubsonic/streaming';
 import { usePlayerStore, useQueueStore, useSettingsStore } from '../../stores';
 import { useDownloadStore } from '../../stores/downloadStore';
-import { setClearRestoredPositionCallback, setSyncQueueCallback } from '../../stores/queueStore';
+import { setClearRestoredPositionCallback, setSyncQueueCallback, setClearPreloadedTracksCallback } from '../../stores/queueStore';
 import { queueSyncManager } from './QueueSyncManager';
 import { scrobblingManager } from './ScrobblingManager';
 
@@ -64,7 +64,12 @@ class TrackPlayerService {
   intervalId: ReturnType<typeof setInterval> | null = null;
   networkCheckInterval: ReturnType<typeof setInterval> | null = null;
   lastNetworkType: 'wifi' | 'mobile' | 'unknown' = 'unknown';
-  isSyncingQueue = false; // Lock to prevent concurrent queue syncs
+  isSyncingQueue = false;
+
+  // Precache: pre-resolve the next track object so PlaybackQueueEnded can start it instantly
+  precachedTrackObj: any = null;      // the fully-built RNTP track object
+  precachedTrackId: string | null = null; // which track ID is cached
+  precacheTriggerred = false;         // did we already trigger precache for the current song
 
   /**
    * Format audio codec name with proper capitalization
@@ -107,6 +112,7 @@ class TrackPlayerService {
       });
 
       await TrackPlayer.updateOptions({
+        progressUpdateEventInterval: 1, // Fire PlaybackProgressUpdated every 1 second
         android: {
           appKilledPlaybackBehavior: AppKilledPlaybackBehavior.ContinuePlayback,
           alwaysPauseOnInterruption: true,
@@ -146,6 +152,7 @@ class TrackPlayerService {
       
       // Register callback to sync queue with TrackPlayer when queue is modified
       setSyncQueueCallback(() => this.syncQueueWithTrackPlayer());
+      setClearPreloadedTracksCallback(() => { this.clearPreloadedTracks(); });
 
       // Load settings from storage first
       await useSettingsStore.getState().loadFromStorage();
@@ -227,6 +234,18 @@ class TrackPlayerService {
       const { setProgress, setBufferedProgress } = usePlayerStore.getState();
       setProgress(event.position, event.duration);
       setBufferedProgress(event.buffered);
+
+      // Trigger precache at 50% through the track - gives RNTP time to buffer audio
+      if (
+        !this.precacheTriggerred &&
+        event.duration > 0 &&
+        event.position / event.duration >= 0.5
+      ) {
+        this.precacheTriggerred = true;
+        this.precacheNextTrack().catch(err => {
+          console.error('[TrackPlayer] Precache failed:', err);
+        });
+      }
     });
 
     TrackPlayer.addEventListener(Event.PlaybackTrackChanged, async (event) => {
@@ -245,14 +264,29 @@ class TrackPlayerService {
         const track = await TrackPlayer.getTrack(event.nextTrack);
         if (track) {
           const { queue, currentIndex, skipToTrack } = useQueueStore.getState();
-          const trackData = queue.find(t => t.id === track.id);
-          if (trackData) {
-            // Find the correct index in the queue
-            const newIndex = queue.findIndex(t => t.id === track.id);
-            
-            // CRITICAL FIX: Update queue index to match the actual playing track
-            // Only sync if indices are different (prevents unnecessary store updates)
-            if (newIndex !== -1 && newIndex !== currentIndex) {
+          
+          // When gapless playback advances naturally, the next track should be at currentIndex + 1
+          // Only search by ID if we detect something unexpected (like manual seek or queue modification)
+          const expectedNextIndex = currentIndex + 1;
+          const expectedNextTrack = queue[expectedNextIndex];
+          
+          let trackData;
+          let newIndex;
+          
+          // Check if it's the expected next track
+          if (expectedNextTrack && expectedNextTrack.id === track.id) {
+            // Natural progression - just increment index
+            trackData = expectedNextTrack;
+            newIndex = expectedNextIndex;
+          } else {
+            // Track doesn't match expected - find it in queue
+            trackData = queue.find(t => t.id === track.id);
+            newIndex = queue.findIndex(t => t.id === track.id);
+          }
+          
+          if (trackData && newIndex !== -1) {
+            // Update queue index if it changed
+            if (newIndex !== currentIndex) {
               skipToTrack(newIndex);
             }
             
@@ -304,12 +338,8 @@ class TrackPlayerService {
               previousProgress.duration
             );
 
-            // Preload next tracks for gapless playback (async, don't await)
-            const updatedIndex = useQueueStore.getState().currentIndex;
-            const updatedQueue = useQueueStore.getState().queue;
-            this.preloadNextTracks(updatedIndex, updatedQueue).catch(err => {
-              console.error('[TrackPlayer] Failed to preload tracks:', err);
-            });
+            // Reset precache so it gets refreshed for the new current track
+            this.invalidatePrecache();
           }
         }
       } else {
@@ -319,11 +349,12 @@ class TrackPlayerService {
     });
 
     TrackPlayer.addEventListener(Event.PlaybackQueueEnded, async () => {
-      console.log('[TrackPlayer] Queue ended - handling track completion');
+      // RNTP queue is always exactly 1 track, so PlaybackQueueEnded means the
+      // current track truly finished. No false-positive from remove() anymore.
       const { repeatMode, currentTrack, progress } = usePlayerStore.getState();
       const { queue, currentIndex, skipToNext } = useQueueStore.getState();
 
-      console.log('[TrackPlayer] Repeat mode:', repeatMode, 'Current index:', currentIndex, 'Queue length:', queue.length);
+      console.log('[TrackPlayer] Track finished (queue ended), advancing to next');
 
       // Scrobble the current track that just finished
       if (currentTrack) {
@@ -331,35 +362,45 @@ class TrackPlayerService {
       }
 
       if (repeatMode === 'track') {
-        // Repeat current track - just replay it
+        // Repeat current track
         console.log('[TrackPlayer] Repeating current track:', currentTrack?.title);
         await this.play();
-      } else if (repeatMode === 'queue' || currentIndex < queue.length - 1) {
-        // Skip to next track if:
-        // - Repeat mode is 'queue' (loop back to start when reaching end)
-        // - OR there are more tracks in the queue
-        const hasNext = skipToNext();
+        return;
+      }
 
+      // Determine next track
+      const hasNext = currentIndex < queue.length - 1;
+
+      if (hasNext || repeatMode === 'queue') {
+        // Advance index
         if (hasNext) {
-          // Play next track in queue
-          const nextTrack = queue[useQueueStore.getState().currentIndex];
-          if (nextTrack) {
-            console.log('[TrackPlayer] Playing next track:', nextTrack.title);
-            usePlayerStore.getState().setCurrentTrack(nextTrack);
-            await this.play();
-          }
-        } else if (repeatMode === 'queue' && queue.length > 0) {
-          // Reached end of queue with repeat mode 'queue' - restart from beginning
-          console.log('[TrackPlayer] Restarting queue from beginning');
+          skipToNext();
+        } else {
+          // repeatMode === 'queue' - wrap around to start
           useQueueStore.getState().skipToTrack(0);
-          const firstTrack = queue[0];
-          if (firstTrack) {
-            usePlayerStore.getState().setCurrentTrack(firstTrack);
-            await this.play();
-          }
+        }
+
+        const { queue: updatedQueue, currentIndex: newIndex } = useQueueStore.getState();
+        const nextTrack = updatedQueue[newIndex];
+
+        if (!nextTrack) {
+          console.error('[TrackPlayer] Next track not found at index', newIndex);
+          return;
+        }
+
+        usePlayerStore.getState().setCurrentTrack(nextTrack);
+
+        // If the next track is already buffered in RNTP's queue, use native skip (gapless, no lag)
+        if (this.precachedTrackId === nextTrack.id) {
+          console.log('[TrackPlayer] PlaybackQueueEnded: native skip to buffered track:', nextTrack.title);
+          this.invalidatePrecache();
+          await TrackPlayer.skipToNext();
+        } else {
+          console.log('[TrackPlayer] PlaybackQueueEnded: no buffer, playing normally:', nextTrack.title);
+          this.invalidatePrecache();
+          await this.play();
         }
       } else {
-        // Repeat mode is 'off' and no more tracks - stop playback
         console.log('[TrackPlayer] Playback ended');
         usePlayerStore.getState().setPlaybackState('stopped');
       }
@@ -493,80 +534,56 @@ class TrackPlayerService {
   }
 
   /**
-   * Preload next tracks for gapless playback (initial load)
+   * Enqueue the next track into RNTP so it starts buffering audio data immediately.
+   * RNTP will gaplessly advance to it when the current track ends.
+   * Called at ~50% through the current track via PlaybackProgressUpdated / setInterval.
    */
-  async preloadNextTracksInitial(currentIndex: number, queue: any[], streamingSettings: any) {
+  async precacheNextTrack() {
+    const { queue, currentIndex } = useQueueStore.getState();
+    const { repeatMode } = usePlayerStore.getState();
+    const settings = useSettingsStore.getState();
+
+    if (!settings || !settings.gaplessPlayback) return;
+    if (repeatMode === 'track') return;
+
+    const nextIndex = currentIndex + 1;
+    const nextTrack = repeatMode === 'queue' && nextIndex >= queue.length
+      ? queue[0]
+      : queue[nextIndex];
+
+    if (!nextTrack) return;
+
+    // Already enqueued for this track
+    if (this.precachedTrackId === nextTrack.id) return;
+
     try {
-      // Check if gapless playback is enabled
-      const settings = useSettingsStore.getState();
-      if (!settings || !settings.gaplessPlayback) {
-        return;
-      }
+      console.log('[TrackPlayer] Enqueueing next track for gapless buffering:', nextTrack.title);
+      const streamingSettings = await this.getActiveStreamingSettings();
+      const trackObj = await this.buildTrackObject(nextTrack, streamingSettings);
 
-      const tracksToPreload = 2; // Preload next 2 tracks
+      // Remove any stale upcoming tracks first (safe - never touches currently playing track)
+      await TrackPlayer.removeUpcomingTracks();
+      // Add next track - RNTP starts buffering it immediately for gapless playback
+      await TrackPlayer.add(trackObj);
 
-      for (let i = 1; i <= tracksToPreload; i++) {
-        const nextIndex = currentIndex + i;
-        if (nextIndex < queue.length) {
-          const nextTrack = queue[nextIndex];
-          if (!nextTrack || !nextTrack.id) {
-            console.warn('[TrackPlayer] Skipping undefined track at index:', nextIndex);
-            continue;
-          }
-          try {
-            const nextTrackObj = await this.buildTrackObject(nextTrack, streamingSettings);
-            await TrackPlayer.add(nextTrackObj);
-            console.log('[TrackPlayer] Preloaded next track for gapless:', nextTrack.title);
-          } catch (error) {
-            console.error('[TrackPlayer] Failed to preload track:', error);
-          }
-        }
-      }
+      this.precachedTrackObj = trackObj;
+      this.precachedTrackId = nextTrack.id;
+      console.log('[TrackPlayer] Next track enqueued and buffering:', nextTrack.title);
     } catch (error) {
-      console.error('[TrackPlayer] preloadNextTracksInitial error:', error);
+      console.error('[TrackPlayer] Failed to enqueue next track:', error);
+      this.precachedTrackObj = null;
+      this.precachedTrackId = null;
     }
   }
 
   /**
-   * Preload next tracks for gapless playback (during playback)
+   * Invalidate precache in memory only. No RNTP queue changes.
+   * Called when queue changes so the cached next track gets refreshed.
    */
-  async preloadNextTracks(currentIndex: number, queue: any[]) {
-    try {
-      // Check if gapless playback is enabled
-      const settings = useSettingsStore.getState();
-      if (!settings || !settings.gaplessPlayback) {
-        return;
-      }
-
-      const playerQueue = await TrackPlayer.getQueue();
-      const playerQueueLength = playerQueue.length;
-
-      // If we have less than 2 tracks in the player queue, add more
-      if (playerQueueLength < 2) {
-        const streamingSettings = await this.getActiveStreamingSettings();
-        const tracksToAdd = 2 - playerQueueLength;
-
-        for (let i = 1; i <= tracksToAdd; i++) {
-          const nextIndex = currentIndex + i;
-          if (nextIndex < queue.length) {
-            const nextTrack = queue[nextIndex];
-            if (!nextTrack || !nextTrack.id) {
-              console.warn('[TrackPlayer] Skipping undefined track at index:', nextIndex);
-              continue;
-            }
-            try {
-              const nextTrackObj = await this.buildTrackObject(nextTrack, streamingSettings);
-              await TrackPlayer.add(nextTrackObj);
-              console.log('[TrackPlayer] Preloaded next track for gapless:', nextTrack.title);
-            } catch (error) {
-              console.error('[TrackPlayer] Failed to preload track:', error);
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('[TrackPlayer] preloadNextTracks error:', error);
-    }
+  invalidatePrecache() {
+    this.precachedTrackObj = null;
+    this.precachedTrackId = null;
+    this.precacheTriggerred = false;
   }
 
   /**
@@ -632,15 +649,8 @@ class TrackPlayerService {
       await TrackPlayer.reset();
       await TrackPlayer.add(currentTrackObj);
 
-      // Preload next tracks for gapless playback (async, non-blocking)
-      // Skip preloading if repeat track is enabled - we don't want to auto-advance
-      const { queue, currentIndex } = useQueueStore.getState();
-      const { repeatMode: currentRepeatMode } = usePlayerStore.getState();
-      if (currentRepeatMode !== 'track') {
-        this.preloadNextTracksInitial(currentIndex, queue, streamingSettings).catch(err => {
-          console.error('[TrackPlayer] Failed to preload initial tracks:', err);
-        });
-      }
+      // Reset precache - will be triggered fresh at 80% via PlaybackProgressUpdated
+      this.invalidatePrecache();
 
       // Check if we need to restore a position (from server queue)
       const { restoredPosition } = usePlayerStore.getState();
@@ -703,23 +713,16 @@ class TrackPlayerService {
     // Update current track in player store
     usePlayerStore.getState().setCurrentTrack(nextTrack);
 
-    // Try to use native skip if track is already loaded (for gapless)
-    try {
-      const settings = useSettingsStore.getState();
-      if (settings && settings.gaplessPlayback) {
-        const playerQueue = await TrackPlayer.getQueue();
-        
-        if (playerQueue.find((t: any) => t.id === nextTrack.id)) {
-          console.log('[TrackPlayer] Using native skip for gapless playback');
-          await TrackPlayer.skipToNext();
-          return;
-        }
-      }
-    } catch (error) {
-      console.warn('[TrackPlayer] Could not use native skip, falling back to play:', error);
+    // If the next track is already buffered in RNTP's queue, use native skip (gapless, no lag)
+    if (this.precachedTrackId === nextTrack.id) {
+      console.log('[TrackPlayer] skipToNext: native skip to buffered track:', nextTrack.title);
+      this.invalidatePrecache();
+      await TrackPlayer.skipToNext();
+      return;
     }
 
-    // Otherwise, play the track normally
+    // Not buffered yet - play normally
+    this.invalidatePrecache();
     await this.play();
   }
 
@@ -798,6 +801,12 @@ class TrackPlayerService {
         const { setProgress, setBufferedProgress } = usePlayerStore.getState();
         setProgress(position, duration);
         setBufferedProgress(bufferedPosition);
+
+        // Trigger precache at 50% - guaranteed to fire even if PlaybackProgressUpdated doesn't
+        if (!this.precacheTriggerred && duration > 0 && position / duration >= 0.5) {
+          this.precacheTriggerred = true;
+          this.precacheNextTrack().catch(() => {});
+        }
       } catch (error) {
         // Silent fail - don't spam console during normal operation
       }
@@ -821,8 +830,24 @@ class TrackPlayerService {
   }
 
   /**
-   * Sync TrackPlayer's internal queue with Zustand queue
-   * This is critical when queue is modified (remove/reorder) to keep everything in sync
+   * Called when queue is modified - remove the stale buffered track from RNTP
+   * and reset precache state. Uses removeUpcomingTracks() which is safe and
+   * never touches the currently-playing track at index 0.
+   */
+  async clearPreloadedTracks() {
+    this.invalidatePrecache();
+    try {
+      await TrackPlayer.removeUpcomingTracks();
+    } catch (e) {
+      // silent
+    }
+  }
+
+  /**
+   * Sync TrackPlayer's internal queue with Zustand queue.
+   * Since RNTP queue is always exactly 1 track, there's nothing to remove.
+   * We only need to verify the current track index is correct and invalidate
+   * the in-memory precache so the right next track gets resolved.
    */
   async syncQueueWithTrackPlayer() {
     // Prevent concurrent syncs - they can cause race conditions
@@ -854,49 +879,31 @@ class TrackPlayerService {
           // Found it! Just update the index, don't restart playback
           console.log('[TrackPlayer] Found current track at index:', actualIndex);
           useQueueStore.setState({ currentIndex: actualIndex });
-          // Continue with sync below - don't return here
         } else {
           // Current track was removed from queue entirely
-          console.warn('[TrackPlayer] Current track no longer in queue, playing track at current index');
+          console.warn('[TrackPlayer] Current track no longer in queue');
           const newCurrentTrack = queue[currentIndex];
           if (newCurrentTrack) {
+            // Update to new track but preserve playback state
+            const wasPlaying = usePlayerStore.getState().playbackState === 'playing';
+            console.log('[TrackPlayer] Switching to track at current index, was playing:', wasPlaying);
+            
             usePlayerStore.getState().setCurrentTrack(newCurrentTrack);
-            await this.play();
+            
+            // Only resume playback if we were previously playing
+            if (wasPlaying) {
+              await this.play();
+            }
             return;
           }
         }
       }
 
-      // Current track is still correct, just need to sync the preloaded tracks
-      console.log('[TrackPlayer] Current track unchanged, syncing preloaded tracks');
-      
-      // Get TrackPlayer's current queue
-      const playerQueue = await TrackPlayer.getQueue();
-      
-      // Check if gapless playback is enabled
-      const settings = useSettingsStore.getState();
-      if (!settings || !settings.gaplessPlayback) {
-        console.log('[TrackPlayer] Gapless playback disabled, no sync needed');
-        return;
-      }
-      
-      // Remove all tracks except the first one (currently playing)
-      // TrackPlayer keeps index 0 as the current track
-      for (let i = playerQueue.length - 1; i > 0; i--) {
-        await TrackPlayer.remove(i);
-      }
-      
-      console.log('[TrackPlayer] Cleared preloaded tracks');
-      
-      // Get streaming settings
-      const streamingSettings = await this.getActiveStreamingSettings();
+      // Invalidate precache so it gets refreshed for the updated queue
+      // RNTP queue stays at 1 track - nothing to remove
+      this.invalidatePrecache();
 
-      // Preload next tracks based on updated queue
-      this.preloadNextTracksInitial(currentIndex, queue, streamingSettings).catch(err => {
-        console.error('[TrackPlayer] Failed to preload tracks after queue sync:', err);
-      });
-
-      console.log('[TrackPlayer] Queue sync completed - preloaded tracks updated');
+      console.log('[TrackPlayer] Queue sync completed - precache invalidated');
     } catch (error) {
       console.error('[TrackPlayer] Failed to sync queue:', error);
     } finally {

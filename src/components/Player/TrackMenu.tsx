@@ -133,7 +133,7 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
 
     try {
       // Fetch similar songs
-      const response = await getSimilarSongs2(track.id, 50);
+      const response = await getSimilarSongs2(track.id);
       const similarSongs = response.similarSongs2?.song || [];
 
       if (similarSongs.length === 0) {

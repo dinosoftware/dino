@@ -200,7 +200,7 @@ export const NETWORK_CONFIG = {
 
 // Lyrics Sync Configuration
 export const LYRICS_SYNC_CONFIG = {
-  UPDATE_INTERVAL: 500, // Update current line every 500ms
+  UPDATE_INTERVAL: 100, // Update current line every 100ms for tight sync
   TRANSITION_DURATION: 200, // 200ms fade transition
   AUTO_SCROLL_DURATION: 300, // 300ms scroll animation
 };

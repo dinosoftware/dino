@@ -87,16 +87,22 @@ const TrackInfo = memo<{ track: Track }>(({ track }) => {
       {/* Artists - clickable */}
       {hasMultipleArtists && track.artists ? (
         <View style={styles.artistsContainer}>
-          {track.artists.map((artist, index) => (
-            <React.Fragment key={artist.id}>
-              <TouchableOpacity onPress={() => handleArtistPress(artist.id, artist.name)}>
-                <Text style={styles.artistLink}>{artist.name}</Text>
-              </TouchableOpacity>
-              {index < track.artists!.length - 1 && (
-                <Text style={styles.artistSeparator}>, </Text>
-              )}
-            </React.Fragment>
-          ))}
+          {track.artists.map((artist, index) => {
+            const isLast = index === track.artists!.length - 1;
+            const isSecondToLast = index === track.artists!.length - 2;
+            return (
+              <React.Fragment key={artist.id}>
+                <TouchableOpacity onPress={() => handleArtistPress(artist.id, artist.name)}>
+                  <Text style={styles.artistLink}>{artist.name}</Text>
+                </TouchableOpacity>
+                {!isLast && (
+                  <Text style={styles.artistSeparator}>
+                    {isSecondToLast ? ' & ' : ', '}
+                  </Text>
+                )}
+              </React.Fragment>
+            );
+          })}
         </View>
       ) : (
         <TouchableOpacity onPress={() => handleArtistPress(track.artistId, track.artist)}>

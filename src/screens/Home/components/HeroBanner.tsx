@@ -167,7 +167,7 @@ const HeroCard: React.FC<HeroCardProps> = ({ track }) => {
     try {
       // Get similar songs (instant mix)
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const response = await getSimilarSongs2(track.id, 50);
+      const response = await getSimilarSongs2(track.id);
       const similarTracks = response.similarSongs2?.song || [];
       
       if (similarTracks.length > 0) {
@@ -192,7 +192,7 @@ const HeroCard: React.FC<HeroCardProps> = ({ track }) => {
     try {
       // Get similar songs and shuffle
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const response = await getSimilarSongs2(track.id, 50);
+      const response = await getSimilarSongs2(track.id);
       const similarTracks = response.similarSongs2?.song || [];
       
       if (similarTracks.length > 0) {

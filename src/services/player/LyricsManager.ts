@@ -191,8 +191,8 @@ class LyricsManager {
   startSync() {
     if (this.syncIntervalId) return;
 
-    this.syncIntervalId = setInterval(() => {
-      this.updateCurrentLine();
+    this.syncIntervalId = setInterval(async () => {
+      await this.updateCurrentLine();
     }, LYRICS_SYNC_CONFIG.UPDATE_INTERVAL);
 
     // console.log('[Lyrics] Started sync');
@@ -210,16 +210,20 @@ class LyricsManager {
   }
 
   /**
-   * Update the current line based on playback position
+   * Update the current line based on playback position.
+   * Reads position directly from TrackPlayer to avoid stale store values.
    */
-  private updateCurrentLine() {
-    const { currentLyrics, progress } = usePlayerStore.getState();
+  private async updateCurrentLine() {
+    const { currentLyrics } = usePlayerStore.getState();
 
     if (!currentLyrics || currentLyrics.type !== 'synced' || !currentLyrics.lines) {
       return;
     }
 
-    const positionMs = progress.position * 1000; // Convert to milliseconds
+    // Read directly from TrackPlayer - much more accurate than the store value
+    // which is only updated every ~1s by PlaybackProgressUpdated
+    const positionSec = await TrackPlayer.getPosition();
+    const positionMs = positionSec * 1000;
     const lines = currentLyrics.lines;
 
     // Find the current line
@@ -229,20 +233,18 @@ class LyricsManager {
       const nextLine = lines[i + 1];
 
       if (nextLine) {
-        // Check if position is between current and next line
         if (positionMs >= currentLine.start && positionMs < nextLine.start) {
           currentIndex = i;
           break;
         }
       } else {
-        // Last line
         if (positionMs >= currentLine.start) {
           currentIndex = i;
         }
       }
     }
 
-    // Update store if line changed
+    // Update store only if line changed to avoid unnecessary re-renders
     if (currentIndex !== currentLyrics.currentLineIndex) {
       usePlayerStore.getState().setCurrentLineIndex(currentIndex);
     }

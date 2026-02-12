@@ -42,9 +42,20 @@ const clearRestoredPosition = () => {
 
 // Callback to sync queue with TrackPlayer (set by TrackPlayerService)
 let syncQueueCallback: (() => Promise<void>) | null = null;
+let clearPreloadedTracksCallback: (() => void) | null = null;
 
 export const setSyncQueueCallback = (callback: () => Promise<void>) => {
   syncQueueCallback = callback;
+};
+
+export const setClearPreloadedTracksCallback = (callback: () => void) => {
+  clearPreloadedTracksCallback = callback;
+};
+
+const clearPreloadedTracks = () => {
+  if (clearPreloadedTracksCallback) {
+    clearPreloadedTracksCallback();
+  }
 };
 
 const syncQueue = () => {
@@ -148,13 +159,10 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     
     get().saveToStorage();
     
-    // Don't sync TrackPlayer when adding tracks - it clears/rebuilds the queue
-    // which can interrupt playback. The preloaded tracks will update naturally
-    // on the next track change.
-    // if (position === 'next') {
-    //   console.log('[QueueStore] Added tracks to play next, syncing TrackPlayer');
-    //   setTimeout(() => syncQueue(), 50);
-    // }
+    // If adding to 'next', the immediate next track changed - update preloaded track
+    if (position === 'next') {
+      clearPreloadedTracks();
+    }
     
     triggerSync(true);
   },
@@ -187,20 +195,15 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     
     get().saveToStorage();
     
-    const newCurrentIndex = get().currentIndex;
-    const currentIndexChanged = oldCurrentIndex !== newCurrentIndex;
-    
-    // If removing the current track and there are more tracks, we need to play the next one
     if (removingCurrentTrack && get().queue.length > 0) {
-      const newCurrentTrack = get().queue[get().currentIndex];
-      if (newCurrentTrack) {
-        console.log('[QueueStore] Removed current track, will sync queue to play next');
-        // Delay sync slightly to ensure state is updated
-        setTimeout(() => syncQueue(), 100);
-      }
-    } else if (!removingCurrentTrack && !currentIndexChanged) {
-      // Only sync if we didn't change currentIndex - avoid mismatch restart
-      setTimeout(() => syncQueue(), 100);
+      // Removing current track - skip to next
+      console.log('[QueueStore] Removed current track, skipping to next');
+      TrackPlayer.skipToNext().catch(err => {
+        console.error('[QueueStore] Failed to skip to next after removing current:', err);
+      });
+    } else if (index === oldCurrentIndex + 1) {
+      // Removed the immediate next track - preloaded track is now stale
+      clearPreloadedTracks();
     }
     
     triggerSync(true);
@@ -208,7 +211,6 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
 
   reorderQueue: (fromIndex, toIndex) => {
     const oldCurrentIndex = get().currentIndex;
-    const wasCurrentTrackMoved = fromIndex === oldCurrentIndex;
     
     set((state) => {
       const newQueue = [...state.queue];
@@ -233,16 +235,19 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     
     get().saveToStorage();
     
-    const newCurrentIndex = get().currentIndex;
-    const currentIndexChanged = oldCurrentIndex !== newCurrentIndex;
+    // Clear preloaded tracks if the move could change what plays next.
+    // Use oldCurrentIndex because preloaded track was based on that position.
+    const oldNextPosition = oldCurrentIndex + 1;
+    const moveTouchedNextSlot =
+      fromIndex === oldCurrentIndex ||   // current track itself was moved
+      fromIndex === oldNextPosition ||   // the preloaded next track was moved away
+      toIndex === oldNextPosition;       // something new was moved into next position
     
-    // DON'T sync TrackPlayer if currentIndex changed - will cause mismatch restart
-    // Also don't sync if current track was moved - it's still playing
-    if (!wasCurrentTrackMoved && !currentIndexChanged) {
-      syncQueue();
+    if (moveTouchedNextSlot) {
+      console.log('[QueueStore] Reorder changed next track, clearing preloaded tracks');
+      clearPreloadedTracks();
     }
     
-    // Sync to server
     triggerSync(true);
   },
 
