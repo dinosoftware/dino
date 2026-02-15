@@ -56,23 +56,22 @@ const Artwork = memo<{ uri?: string }>(({ uri }) => {
 Artwork.displayName = 'Artwork';
 
 // Memoized track info component with navigation
-const TrackInfo = memo<{ track: Track }>(({ track }) => {
-  const { navigate } = useNavigationStore();
+const TrackInfo = memo<{ track: Track; onNavigate: (action: () => void) => void }>(({ track, onNavigate }) => {
+  const { navigate, currentScreen } = useNavigationStore();
 
-  const handleArtistPress = useCallback((artistId?: string, artistName?: string) => {
-    if (artistId) {
-      navigate({ name: 'artist-detail', params: { artistId } });
-    } else if (artistName) {
-      // Fallback: search for artist by name
-      console.log('Navigate to artist:', artistName);
-    }
-  }, [navigate]);
+  const handleArtistPress = useCallback((artistId?: string, _artistName?: string) => {
+    if (!artistId) return;
+    // Don't close if already on this artist page
+    if (currentScreen.name === 'artist-detail' && currentScreen.params?.artistId === artistId) return;
+    onNavigate(() => navigate({ name: 'artist-detail', params: { artistId } }));
+  }, [navigate, currentScreen, onNavigate]);
 
   const handleAlbumPress = useCallback(() => {
-    if (track.albumId) {
-      navigate({ name: 'album-detail', params: { albumId: track.albumId } });
-    }
-  }, [track.albumId, navigate]);
+    if (!track.albumId) return;
+    // Don't close if already on this album page
+    if (currentScreen.name === 'album-detail' && currentScreen.params?.albumId === track.albumId) return;
+    onNavigate(() => navigate({ name: 'album-detail', params: { albumId: track.albumId! } }));
+  }, [track.albumId, navigate, currentScreen, onNavigate]);
 
   // Determine which artist string to display
   const displayArtist = track.displayArtist || track.artist || 'Unknown Artist';
@@ -182,6 +181,18 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
       useNativeDriver: true,
     }).start(() => {
       onClose();
+    });
+  }, [translateY, onClose]);
+
+  // Animate close then run a navigation action
+  const handleNavigate = useCallback((action: () => void) => {
+    Animated.timing(translateY, {
+      toValue: SCREEN_HEIGHT,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      onClose();
+      action();
     });
   }, [translateY, onClose]);
 
@@ -297,7 +308,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
 
         {/* Track Info with Actions */}
         <View style={styles.infoRow}>
-          <TrackInfo track={currentTrack} />
+          <TrackInfo track={currentTrack} onNavigate={handleNavigate} />
           <View style={styles.topActions}>
             <TouchableOpacity
               style={styles.topActionButton}

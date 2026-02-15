@@ -3,7 +3,7 @@
  * Displays detailed information about a track
  */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,9 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
+  Animated,
+  PanResponder,
+  Pressable,
 } from 'react-native';
 import { X } from 'lucide-react-native';
 import { Track } from '../../api/opensubsonic/types';
@@ -26,6 +29,62 @@ interface SongInfoModalProps {
 
 export const SongInfoModal: React.FC<SongInfoModalProps> = ({ visible, onClose, track }) => {
   const { data: coverArtUrl } = useCoverArt(track?.coverArt, 300);
+  const translateY = useRef(new Animated.Value(600)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.spring(translateY, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 30,
+        }),
+        Animated.timing(overlayOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const handleClose = () => {
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: 600,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(overlayOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      translateY.setValue(600);
+      overlayOpacity.setValue(0);
+      onClose();
+    });
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 5,
+      onPanResponderMove: (_, g) => {
+        if (g.dy > 0) translateY.setValue(g.dy);
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 100) {
+          handleClose();
+        } else {
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
 
   if (!track) return null;
 
@@ -41,7 +100,6 @@ export const SongInfoModal: React.FC<SongInfoModalProps> = ({ visible, onClose, 
     return `${mb.toFixed(2)} MB`;
   };
 
-  // Debug: Log the track object to see what fields are available
   const infoRows = [
     { label: 'Title', value: track.title },
     { label: 'Artist', value: track.artist || 'Unknown' },
@@ -61,41 +119,51 @@ export const SongInfoModal: React.FC<SongInfoModalProps> = ({ visible, onClose, 
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={handleClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>Song Info</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <X size={24} color={theme.colors.text.primary} />
-            </TouchableOpacity>
-          </View>
+      {/* Animated dim overlay - tapping outside closes */}
+      <Pressable onPress={handleClose} style={StyleSheet.absoluteFill}>
+        <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]} />
+      </Pressable>
 
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            {/* Album Art */}
-            {coverArtUrl && (
-              <View style={styles.artworkContainer}>
-                <Image source={{ uri: coverArtUrl }} style={styles.artwork} />
-              </View>
-            )}
-
-            {/* Info Rows */}
-            <View style={styles.infoContainer}>
-              {infoRows.map((row, index) => (
-                <View key={index} style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>{row.label}</Text>
-                  <Text style={styles.infoValue} numberOfLines={2}>
-                    {row.value}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </ScrollView>
+      {/* Animated sheet */}
+      <Animated.View
+        style={[styles.container, { transform: [{ translateY }] }]}
+        {...panResponder.panHandlers}
+      >
+        {/* Swipe handle */}
+        <View style={styles.swipeIndicator}>
+          <View style={styles.swipeHandle} />
         </View>
-      </View>
+
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Song Info</Text>
+          <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+            <X size={24} color={theme.colors.text.primary} />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {coverArtUrl && (
+            <View style={styles.artworkContainer}>
+              <Image source={{ uri: coverArtUrl }} style={styles.artwork} />
+            </View>
+          )}
+          <View style={styles.infoContainer}>
+            {infoRows.map((row, index) => (
+              <View key={index} style={styles.infoRow}>
+                <Text style={styles.infoLabel}>{row.label}</Text>
+                <Text style={styles.infoValue} numberOfLines={2}>
+                  {row.value}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      </Animated.View>
     </Modal>
   );
 };
@@ -104,13 +172,27 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'flex-end',
   },
   container: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: theme.colors.background.card,
     borderTopLeftRadius: theme.borderRadius.xl,
     borderTopRightRadius: theme.borderRadius.xl,
     maxHeight: '90%',
+  },
+  swipeIndicator: {
+    alignItems: 'center',
+    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.xs,
+  },
+  swipeHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
   },
   header: {
     flexDirection: 'row',

@@ -15,6 +15,7 @@ import {
   Image,
   PanResponder,
   Dimensions,
+  BackHandler,
 } from 'react-native';
 import { Lock, Unlock } from 'lucide-react-native';
 
@@ -95,6 +96,15 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
       tension: 300,
       friction: 30,
     }).start();
+  }, []);
+
+  // Intercept hardware back to close lyrics, not full player
+  useEffect(() => {
+    const handler = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleClose();
+      return true;
+    });
+    return () => handler.remove();
   }, []);
 
   const handleClose = () => {

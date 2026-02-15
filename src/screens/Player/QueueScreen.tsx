@@ -12,6 +12,7 @@ import {
   Image,
   Animated,
   PanResponder,
+  BackHandler,
 } from 'react-native';
 import DraggableFlatList, {
   RenderItemParams,
@@ -268,6 +269,15 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
       onClose();
     });
   }, [translateY, onClose]);
+
+  // Intercept hardware back to close queue, not full player
+  useEffect(() => {
+    const handler = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleClose();
+      return true;
+    });
+    return () => handler.remove();
+  }, [handleClose]);
 
   const panResponder = useRef(
     PanResponder.create({
