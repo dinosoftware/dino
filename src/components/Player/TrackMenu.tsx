@@ -20,6 +20,7 @@ import {
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
+  Image,
   Modal,
   PanResponder,
   Pressable,
@@ -33,6 +34,7 @@ import { getSimilarSongs2 } from '../../api/opensubsonic/radio';
 import { createShare } from '../../api/opensubsonic/share';
 import { Artist, Track } from '../../api/opensubsonic/types';
 import { theme } from '../../config';
+import { useCoverArt } from '../../hooks/api';
 import { trackPlayerService } from '../../services/player/TrackPlayerService';
 import { downloadService } from '../../services/DownloadService';
 import { useQueueStore } from '../../stores';
@@ -51,7 +53,7 @@ interface TrackMenuProps {
   onShowAddToPlaylist: () => void;
   onShowConfirm: (title: string, message: string) => void;
   onGoToArtist?: (artists: Artist[]) => void;
-  onCloseAll?: () => void; // Optional callback to close all player screens
+  onCloseAll?: () => void;
 }
 
 interface MenuItemProps {
@@ -76,6 +78,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon, label, onPress }) => {
 
 export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, onShowInfo, onShowAddToPlaylist, onShowConfirm, onGoToArtist, onCloseAll }) => {
   const translateY = useRef(new Animated.Value(0)).current;
+  const { data: coverArtUrl } = useCoverArt(track?.coverArt, 200);
   const { addToQueue, setQueue } = useQueueStore();
   const { isTrackStarred, toggleTrackStar } = useFavoritesStore();
   const { isTrackDownloaded } = useDownloadStore();
@@ -339,6 +342,14 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
 
             {/* Header */}
             <View style={styles.header}>
+              <Image
+                source={
+                  coverArtUrl
+                    ? { uri: coverArtUrl }
+                    : require('../../../assets/images/album_art_placeholder.png')
+                }
+                style={styles.coverArt}
+              />
               <View style={styles.trackInfo}>
                 <Text style={styles.trackTitle} numberOfLines={1}>
                   {track.title}
@@ -450,6 +461,12 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
+  },
+  coverArt: {
+    width: 56,
+    height: 56,
+    borderRadius: theme.borderRadius.md,
+    marginRight: theme.spacing.md,
   },
   trackInfo: {
     flex: 1,

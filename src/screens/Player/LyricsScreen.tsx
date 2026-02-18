@@ -3,7 +3,7 @@
  * Full screen synchronized lyrics display (MVP FEATURE)
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,6 @@ import {
   Image,
   PanResponder,
   Dimensions,
-  BackHandler,
 } from 'react-native';
 import { Lock, Unlock } from 'lucide-react-native';
 
@@ -98,16 +97,7 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
     }).start();
   }, []);
 
-  // Intercept hardware back to close lyrics, not full player
-  useEffect(() => {
-    const handler = BackHandler.addEventListener('hardwareBackPress', () => {
-      handleClose();
-      return true;
-    });
-    return () => handler.remove();
-  }, []);
-
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     Animated.timing(translateY, {
       toValue: SCREEN_HEIGHT,
       duration: 200,
@@ -116,7 +106,7 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
       translateY.setValue(SCREEN_HEIGHT);
       onClose();
     });
-  };
+  }, [translateY, onClose]);
 
   const panResponder = useRef(
     PanResponder.create({

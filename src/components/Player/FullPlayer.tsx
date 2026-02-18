@@ -56,20 +56,26 @@ const Artwork = memo<{ uri?: string }>(({ uri }) => {
 Artwork.displayName = 'Artwork';
 
 // Memoized track info component with navigation
-const TrackInfo = memo<{ track: Track; onNavigate: (action: () => void) => void }>(({ track, onNavigate }) => {
+const TrackInfo = memo<{ track: Track; onNavigate: (action?: () => void) => void }>(({ track, onNavigate }) => {
   const { navigate, currentScreen } = useNavigationStore();
 
   const handleArtistPress = useCallback((artistId?: string, _artistName?: string) => {
     if (!artistId) return;
-    // Don't close if already on this artist page
-    if (currentScreen.name === 'artist-detail' && currentScreen.params?.artistId === artistId) return;
+    // If already on this artist page, just close (no navigation)
+    if (currentScreen.name === 'artist-detail' && currentScreen.params?.artistId === artistId) {
+      onNavigate();
+      return;
+    }
     onNavigate(() => navigate({ name: 'artist-detail', params: { artistId } }));
   }, [navigate, currentScreen, onNavigate]);
 
   const handleAlbumPress = useCallback(() => {
     if (!track.albumId) return;
-    // Don't close if already on this album page
-    if (currentScreen.name === 'album-detail' && currentScreen.params?.albumId === track.albumId) return;
+    // If already on this album page, just close (no navigation)
+    if (currentScreen.name === 'album-detail' && currentScreen.params?.albumId === track.albumId) {
+      onNavigate();
+      return;
+    }
     onNavigate(() => navigate({ name: 'album-detail', params: { albumId: track.albumId! } }));
   }, [track.albumId, navigate, currentScreen, onNavigate]);
 
@@ -153,6 +159,9 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
 
   // Get streaming info from player store
   const streamingInfo = usePlayerStore((state) => state.streamingInfo);
+  
+  // Get overlay setter for back button handling
+  const { setPlayerOverlay, setCloseOverlayCallback } = useNavigationStore();
 
   const { hasLyrics } = useLyrics();
   const { data: coverArtUrl } = useCoverArt(currentTrack?.coverArt, 500);
@@ -162,7 +171,54 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
   const [showLyrics, setShowLyrics] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const isMenuOpenRef = useRef(false);
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  
+  // Function to close current overlay (queue or lyrics)
+  const closeCurrentOverlay = useCallback(() => {
+    if (showQueue) {
+      setShowQueue(false);
+    } else if (showLyrics) {
+      setShowLyrics(false);
+    }
+  }, [showQueue, showLyrics]);
+  
+  // Update overlay state when queue/lyrics open/close
+  useEffect(() => {
+    if (showQueue) {
+      setPlayerOverlay('queue');
+    } else if (showLyrics) {
+      setPlayerOverlay('lyrics');
+    } else {
+      setPlayerOverlay('none');
+    }
+  }, [showQueue, showLyrics, setPlayerOverlay]);
+  
+  // Register callback for closing overlay from outside (e.g., hardware back)
+  useEffect(() => {
+    setCloseOverlayCallback(closeCurrentOverlay);
+    return () => setCloseOverlayCallback(null);
+  }, [closeCurrentOverlay, setCloseOverlayCallback]);
+  
+  // Cleanup overlay state on unmount
+  useEffect(() => {
+    return () => {
+      setPlayerOverlay('none');
+      setCloseOverlayCallback(null);
+    };
+  }, [setPlayerOverlay, setCloseOverlayCallback]);
+
+  // Keep ref in sync with any modal/overlay being open
+  useEffect(() => {
+    const anyModalOpen = 
+      isMenuOpen || 
+      trackMenuState.showSongInfo || 
+      trackMenuState.showAddToPlaylist || 
+      trackMenuState.showConfirm ||
+      showLyrics ||
+      showQueue;
+    isMenuOpenRef.current = anyModalOpen;
+  }, [isMenuOpen, trackMenuState.showSongInfo, trackMenuState.showAddToPlaylist, trackMenuState.showConfirm, showLyrics, showQueue]);
 
   // Slide up animation on mount
   useEffect(() => {
@@ -184,24 +240,22 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
     });
   }, [translateY, onClose]);
 
-  // Animate close then run a navigation action
-  const handleNavigate = useCallback((action: () => void) => {
+  const handleNavigate = useCallback((action?: () => void) => {
     Animated.timing(translateY, {
       toValue: SCREEN_HEIGHT,
       duration: 300,
       useNativeDriver: true,
     }).start(() => {
       onClose();
-      action();
+      action?.();
     });
   }, [translateY, onClose]);
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !isMenuOpen,
+      onStartShouldSetPanResponder: () => !isMenuOpenRef.current,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Don't handle gestures if menu is open
-        if (isMenuOpen) return false;
+        if (isMenuOpenRef.current) return false;
         return gestureState.dy > 10 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
       },
       onPanResponderGrant: () => {

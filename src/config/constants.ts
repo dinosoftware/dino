@@ -114,6 +114,7 @@ export const DEFAULT_SETTINGS = {
   
   // UI
   qualityBadgeDetailed: false, // Show simple quality badges by default (e.g., "MAX", "HIGH")
+  autoFocusSearch: true, // Auto-focus search bar when entering search screen
   
   // Network
   usePostRequests: true, // Use POST for API requests by default (if server supports it)

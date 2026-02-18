@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   Modal,
   Pressable,
-  Image,
   PanResponder,
   Animated,
 } from 'react-native';
@@ -24,8 +23,8 @@ import {
   Radio,
   Info,
   X,
-  User 
 } from 'lucide-react-native';
+import { ArtistArtImage } from '../common';
 import { theme } from '../../config';
 import { Artist } from '../../api/opensubsonic/types';
 import { useFavoritesStore } from '../../stores/favoritesStore';
@@ -171,15 +170,10 @@ export const ArtistMenu: React.FC<ArtistMenuProps> = ({ visible, onClose, artist
 
             {/* Artist Header */}
             <View style={styles.header}>
-              <View style={styles.artistImageContainer}>
-                {coverArtUrl ? (
-                  <Image source={{ uri: coverArtUrl }} style={styles.artistImage} />
-                ) : (
-                  <View style={[styles.artistImage, styles.placeholderImage]}>
-                    <User size={32} color={theme.colors.text.tertiary} />
-                  </View>
-                )}
-              </View>
+              <ArtistArtImage
+                uri={coverArtUrl}
+                style={styles.artistImage}
+              />
               <View style={styles.headerInfo}>
                 <Text style={styles.artistName} numberOfLines={2}>
                   {artist.name}
@@ -270,18 +264,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
-  artistImageContainer: {
-    marginRight: theme.spacing.md,
-  },
   artistImage: {
     width: 56,
     height: 56,
     borderRadius: 28,
-  },
-  placeholderImage: {
-    backgroundColor: theme.colors.background.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginRight: theme.spacing.md,
   },
   headerInfo: {
     flex: 1,

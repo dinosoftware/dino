@@ -4,10 +4,9 @@
  */
 
 import React from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { User } from 'lucide-react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { useArtists, useCoverArt } from '../../hooks/api';
-import { EmptyState, ErrorView } from '../../components/common';
+import { EmptyState, ErrorView, ArtistArtImage } from '../../components/common';
 import { ArtistRowSkeleton } from '../../components/Skeletons';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { theme } from '../../config';
@@ -60,15 +59,10 @@ const ArtistItem: React.FC<{ artist: Artist }> = ({ artist }) => {
       activeOpacity={0.7}
     >
       {/* Artist Avatar */}
-      <View style={styles.avatarContainer}>
-        {coverArtUrl ? (
-          <Image source={{ uri: coverArtUrl }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.placeholderAvatar]}>
-            <User size={28} color={theme.colors.text.tertiary} />
-          </View>
-        )}
-      </View>
+      <ArtistArtImage
+        uri={coverArtUrl}
+        style={styles.avatar}
+      />
 
       <View style={styles.artistInfo}>
         <Text style={styles.artistName}>{artist.name}</Text>
@@ -91,18 +85,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
-  avatarContainer: {
-    marginRight: theme.spacing.md,
-  },
   avatar: {
     width: 56,
     height: 56,
     borderRadius: 28,
-  },
-  placeholderAvatar: {
-    backgroundColor: theme.colors.background.card,
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginRight: theme.spacing.md,
   },
   artistInfo: {
     flex: 1,

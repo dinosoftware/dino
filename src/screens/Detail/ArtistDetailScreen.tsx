@@ -5,7 +5,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronLeft, ChevronRight, ExternalLink, MoreVertical, Play, Shuffle, User } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, ExternalLink, MoreVertical, Play, Shuffle } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -32,7 +32,7 @@ import { ConfirmModal } from '../../components/Modals/ConfirmModal';
 import { SongInfoModal } from '../../components/Modals/SongInfoModal';
 import { TrackMenu } from '../../components/Player/TrackMenu';
 import { ArtistDetailSkeleton } from '../../components/Skeletons';
-import { ErrorView } from '../../components/common/ErrorView';
+import { ErrorView, ArtistArtImage } from '../../components/common';
 import { theme } from '../../config/theme';
 import { useCoverArt } from '../../hooks/api/useAlbums';
 import { useArtistInfo } from '../../hooks/api/useArtistInfo';
@@ -53,13 +53,13 @@ interface ArtistDetailScreenProps {
 // Helper function to clean biography text from HTML tags and Last.fm link
 const cleanBiography = (bio: string): string => {
   if (!bio) return '';
-  
+
   // Remove the Last.fm "Read more" link at the end
   let cleaned = bio.replace(/<a\s+href="[^"]*">Read more on Last\.fm<\/a>\.?/gi, '');
-  
+
   // Strip all other HTML tags but keep the text content
   cleaned = cleaned.replace(/<[^>]*>/g, '');
-  
+
   // Decode common HTML entities
   cleaned = cleaned
     .replace(/&amp;/g, '&')
@@ -68,7 +68,7 @@ const cleanBiography = (bio: string): string => {
     .replace(/&quot;/g, '"')
     .replace(/&#039;/g, "'")
     .replace(/&nbsp;/g, ' ');
-  
+
   // Trim whitespace
   return cleaned.trim();
 };
@@ -266,7 +266,7 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
   const albums = artist.album || [];
   const hasTopSongs = topSongs && topSongs.length > 0;
   const hasSimilarArtists = artistInfo?.similarArtist && artistInfo.similarArtist.length > 0;
-  
+
   // Clean biography text
   const cleanedBiography = artistInfo?.biography ? cleanBiography(artistInfo.biography) : '';
 
@@ -305,15 +305,10 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
 
         {/* Artist Header */}
         <View style={styles.header}>
-          <View style={styles.avatarContainer}>
-            {coverArtUrl ? (
-              <Image source={{ uri: coverArtUrl }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.placeholderAvatar]}>
-                <User size={80} color={theme.colors.text.tertiary} />
-              </View>
-            )}
-          </View>
+          <ArtistArtImage
+            uri={coverArtUrl}
+            style={styles.avatar}
+          />
 
           <Text style={styles.name} numberOfLines={2}>
             {artist.name}
@@ -370,8 +365,8 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
         {cleanedBiography && (
           <View style={styles.biographySection}>
             <Text style={styles.biographyTitle}>About</Text>
-            <Text 
-              style={styles.biographyText} 
+            <Text
+              style={styles.biographyText}
               numberOfLines={bioExpanded ? undefined : 4}
             >
               {cleanedBiography}
@@ -636,20 +631,13 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     gap: theme.spacing.sm,
   },
-  avatarContainer: {
-    marginBottom: theme.spacing.md,
-  },
   avatar: {
     width: 160,
     height: 160,
     borderRadius: theme.borderRadius.round,
-    backgroundColor: theme.colors.background.card,
     borderWidth: 1,
     borderColor: theme.colors.border,
-  },
-  placeholderAvatar: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginBottom: theme.spacing.md,
   },
   name: {
     fontSize: theme.typography.fontSize.xxxl,

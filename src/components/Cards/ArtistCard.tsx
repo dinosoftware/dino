@@ -4,10 +4,10 @@
  */
 
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Animated } from 'react-native';
-import { User } from 'lucide-react-native';
+import { Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Artist } from '../../api/opensubsonic/types';
+import { ArtistArtImage } from '../common';
 import { theme } from '../../config';
 import { useCoverArt } from '../../hooks/api/useAlbums';
 
@@ -68,13 +68,10 @@ export const ArtistCard: React.FC<ArtistCardProps> = ({
           { width, height: width, transform: [{ scale: scaleAnim }] },
         ]}
       >
-        {coverArtUrl ? (
-          <Image source={{ uri: coverArtUrl }} style={styles.image} />
-        ) : (
-          <View style={[styles.image, styles.placeholderImage]}>
-            <User size={40} color={theme.colors.text.tertiary} />
-          </View>
-        )}
+        <ArtistArtImage
+          uri={coverArtUrl}
+          style={styles.image}
+        />
       </Animated.View>
       <Text style={styles.name} numberOfLines={2}>
         {artist.name}
@@ -88,20 +85,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   imageContainer: {
-    borderRadius: 9999, // Fully round for artists
+    borderRadius: 9999,
     overflow: 'hidden',
-    backgroundColor: theme.colors.background.card,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
   image: {
     width: '100%',
     height: '100%',
-  },
-  placeholderImage: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.background.muted,
   },
   name: {
     marginTop: theme.spacing.sm,

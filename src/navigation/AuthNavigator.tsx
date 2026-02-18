@@ -57,6 +57,13 @@ export const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onAuthComplete }) 
     }
   };
 
+  const handleLoginBack = () => {
+    // Go back to server selection if there are servers
+    if (servers.length > 0) {
+      setCurrentScreen('serverSelection');
+    }
+  };
+
   return (
     <View style={styles.container}>
       {currentScreen === 'serverSelection' && (
@@ -73,7 +80,10 @@ export const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onAuthComplete }) 
         />
       )}
       {currentScreen === 'login' && (
-        <LoginScreen onSuccess={onAuthComplete} />
+        <LoginScreen 
+          onSuccess={onAuthComplete}
+          onCancel={servers.length > 0 ? handleLoginBack : undefined}
+        />
       )}
     </View>
   );

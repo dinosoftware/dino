@@ -101,6 +101,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     storageLimit,
     streamCacheSize,
     usePostRequests,
+    autoFocusSearch,
     updateSettings,
   } = useSettingsStore();
 
@@ -753,6 +754,32 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           </View>
         </View>
 
+        {/* Interface Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>INTERFACE</Text>
+          <View style={styles.sectionCard}>
+            <View style={styles.settingItem}>
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Auto-Focus Search</Text>
+                <Text style={styles.settingDescription}>Focus search bar when opening search screen</Text>
+              </View>
+              <Switch
+                value={autoFocusSearch}
+                onValueChange={(value) => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  updateSettings({ autoFocusSearch: value });
+                }}
+                trackColor={{
+                  false: 'rgba(120, 120, 128, 0.16)',
+                  true: theme.colors.accent
+                }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor="rgba(120, 120, 128, 0.16)"
+              />
+            </View>
+          </View>
+        </View>
+
         {/* About Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>ABOUT</Text>
@@ -1249,16 +1276,17 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.medium,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.text.secondary,
     marginBottom: theme.spacing.xs,
   },
   input: {
-    backgroundColor: theme.colors.background.elevated,
-    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.background.secondary,
+    borderRadius: theme.borderRadius.lg,
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.md,
-    fontSize: theme.typography.fontSize.md,
+    paddingVertical: theme.spacing.md + 2,
+    fontSize: theme.typography.fontSize.base,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.text.primary,
     borderWidth: 1,
     borderColor: theme.colors.border,

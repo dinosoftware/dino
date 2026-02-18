@@ -3,7 +3,7 @@
  * Comprehensive offline downloads management
  */
 
-import { Download, Play, Shuffle, Trash2, Music, Disc, ListMusic } from 'lucide-react-native';
+import { Download, Play, Shuffle, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   FlatList,
@@ -269,13 +269,14 @@ export const DownloadsScreen: React.FC = () => {
         activeOpacity={0.7}
       >
         <View style={styles.itemLeft}>
-          {coverUri ? (
-            <Image source={{ uri: coverUri }} style={styles.coverArt} />
-          ) : (
-            <View style={[styles.coverArt, styles.coverArtPlaceholder]}>
-              <Disc size={24} color={theme.colors.text.tertiary} />
-            </View>
-          )}
+          <Image
+            source={
+              coverUri
+                ? { uri: coverUri }
+                : require('../../../assets/images/album_art_placeholder.png')
+            }
+            style={styles.coverArt}
+          />
           <View style={styles.itemInfo}>
             <Text style={styles.itemTitle} numberOfLines={1}>
               {item.album.name}
@@ -311,13 +312,14 @@ export const DownloadsScreen: React.FC = () => {
         activeOpacity={0.7}
       >
         <View style={styles.itemLeft}>
-          {coverUri ? (
-            <Image source={{ uri: coverUri }} style={styles.coverArt} />
-          ) : (
-            <View style={[styles.coverArt, styles.coverArtPlaceholder]}>
-              <ListMusic size={24} color={theme.colors.text.tertiary} />
-            </View>
-          )}
+          <Image
+            source={
+              coverUri
+                ? { uri: coverUri }
+                : require('../../../assets/images/album_art_placeholder.png')
+            }
+            style={styles.coverArt}
+          />
           <View style={styles.itemInfo}>
             <Text style={styles.itemTitle} numberOfLines={1}>
               {item.playlist.name}
@@ -353,13 +355,14 @@ export const DownloadsScreen: React.FC = () => {
         activeOpacity={0.7}
       >
         <View style={styles.itemLeft}>
-          {coverUri ? (
-            <Image source={{ uri: coverUri }} style={styles.coverArt} />
-          ) : (
-            <View style={[styles.coverArt, styles.coverArtPlaceholder]}>
-              <Music size={20} color={theme.colors.text.tertiary} />
-            </View>
-          )}
+          <Image
+            source={
+              coverUri
+                ? { uri: coverUri }
+                : require('../../../assets/images/album_art_placeholder.png')
+            }
+            style={styles.coverArt}
+          />
           <View style={styles.itemInfo}>
             <Text style={styles.itemTitle} numberOfLines={1}>
               {item.track.title}
@@ -592,11 +595,6 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: theme.borderRadius.md,
     marginRight: theme.spacing.md,
-  },
-  coverArtPlaceholder: {
-    backgroundColor: theme.colors.background.elevated,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   itemInfo: {
     flex: 1,

@@ -43,7 +43,7 @@ const SettingsScreenComponent = ({ onLogout }: { onLogout: () => void }) => (
 
 export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
   const { currentTrack } = usePlayerStore();
-  const { currentScreen, navigate, goBack, canGoBack, showFullPlayer, setShowFullPlayer } = useNavigationStore();
+  const { currentScreen, navigate, goBack, canGoBack, showFullPlayer, setShowFullPlayer, isPlayerOverlayOpen, closePlayerOverlay } = useNavigationStore();
   
   const activeTab = currentScreen.name === 'album-detail' || 
     currentScreen.name === 'artist-detail' || 
@@ -55,14 +55,19 @@ export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
   // Handle hardware back button
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      // If queue or lyrics overlay is open, let them handle it (return false)
+      if (useNavigationStore.getState().isPlayerOverlayOpen()) {
+        return false;
+      }
+      
       if (showFullPlayer) {
         setShowFullPlayer(false);
-        return true; // Prevent default behavior
+        return true;
       }
       
       if (canGoBack()) {
         goBack();
-        return true; // Prevent default behavior
+        return true;
       }
       
       // On home screen, allow default behavior (exit app)
@@ -71,13 +76,6 @@ export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
 
     return () => backHandler.remove();
   }, [showFullPlayer, canGoBack, goBack]);
-
-  // Close full player when navigation changes
-  useEffect(() => {
-    if (showFullPlayer) {
-      setShowFullPlayer(false);
-    }
-  }, [currentScreen.name]);
 
   // Initialize TrackPlayer on mount
   useEffect(() => {
@@ -200,7 +198,13 @@ export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
         animationType="none"
         presentationStyle="overFullScreen"
         statusBarTranslucent
-        onRequestClose={() => setShowFullPlayer(false)}
+        onRequestClose={() => {
+          if (isPlayerOverlayOpen()) {
+            closePlayerOverlay();
+          } else {
+            setShowFullPlayer(false);
+          }
+        }}
         transparent={true}
       >
         <FullPlayer onClose={() => setShowFullPlayer(false)} />

@@ -16,7 +16,7 @@ import { ArtistSelectionModal } from '../../components/Modals/ArtistSelectionMod
 import { ConfirmModal } from '../../components/Modals/ConfirmModal';
 import { SongInfoModal } from '../../components/Modals/SongInfoModal';
 import { TrackMenu } from '../../components/Player/TrackMenu';
-import { EmptyState } from '../../components/common';
+import { EmptyState, ArtistArtImage } from '../../components/common';
 import { theme } from '../../config';
 import { useCoverArt } from '../../hooks/api';
 import { useAlbumMenuState } from '../../hooks/useAlbumMenuState';
@@ -377,12 +377,8 @@ const ArtistItem: React.FC<{ artist: Artist }> = ({ artist }) => {
       onPress={() => navigate({ name: 'artist-detail', params: { artistId: artist.id } })}
       activeOpacity={0.7}
     >
-      <Image
-        source={
-          coverArtUrl
-            ? { uri: coverArtUrl }
-            : require('../../../assets/images/icon.png')
-        }
+      <ArtistArtImage
+        uri={coverArtUrl}
         style={styles.artistAvatar}
       />
       <View style={styles.artistInfo}>
@@ -463,7 +459,6 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     marginRight: theme.spacing.md,
-    backgroundColor: theme.colors.background.muted,
   },
   artistInfo: {
     flex: 1,

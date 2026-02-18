@@ -92,7 +92,7 @@ const AlbumCard: React.FC<AlbumCardProps> = ({ album }) => {
           source={
             coverArtUrl
               ? { uri: coverArtUrl }
-              : require('../../../../assets/images/icon.png')
+              : require('../../../../assets/images/album_art_placeholder.png')
           }
           style={styles.artwork}
           resizeMode="cover"

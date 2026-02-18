@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-02-19
+
+### Added
+- **Auto-Focus Search Toggle**: New setting to auto-focus search bar when entering search screen
+  - Enabled by default for quick searching
+  - Can be disabled in Settings → Interface section
+- **Back Button on Login Screen**: Users can now go back to server selection from login screen
+  - Shows back arrow when servers already exist
+  - Allows canceling the login process
+
+### Changed
+- **Input Styling Improvements**: Redesigned all text inputs with shadcn/Tidal-inspired design
+  - Search bar: Clean focus state with white border, proper icon spacing
+  - Server setup inputs: Focus states with white border highlight
+  - Login inputs: Consistent focus states across all fields
+  - Updated placeholder text: "Search your library..." for cleaner look
+  - Medium font weight, proper padding, larger border radius
+- **Tab Styling**: Updated search filter tabs to outlined pill style
+  - Active tab: white fill with inverse text
+  - Inactive tab: outlined with border
+
+### Fixed
+- **Hardware Back on Queue/Lyrics**: Fixed back button closing both overlay AND full player
+  - Back now only closes the queue/lyrics overlay, keeping full player open
+  - Implemented callback system in navigationStore for overlay control
+  - Modal's onRequestClose properly handles nested overlays
+- **Search Bar Icon Spacing**: Fixed missing spacing between search icon and text input
+
+## [1.2.3] - 2026-02-18
+
 ### Added
 - **Scan Library Button**: Added "Scan Library" button to User Settings Menu
   - Starts a media library scan on the server
@@ -57,6 +87,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed verbose console.log statements with complex object logging
   - These logs could cause crashes or undefined behavior in production
   - App now works correctly in both dev and production builds
+- **Queue Modification Disrupting Playback**: Fixed playback restarting when modifying queue
+  - Replaced `TrackPlayer.remove()` loop with `removeUpcomingTracks()` which safely removes only queued tracks
+  - Gapless playback now preserved when adding/removing/reordering queue items
+  - Current track continues uninterrupted during queue operations
+- **App Lag and Infinite Loop**: Fixed severe lag especially around 50% playback mark
+  - Removed 3 native bridge calls/sec from setInterval polling (`getPosition`, `getDuration`, `getBufferedPosition`)
+  - Enabled `progressUpdateEventInterval: 1` in TrackPlayer options for native progress push
+  - LyricsManager now reads from `playerStore.progress.position` instead of calling `TrackPlayer.getPosition()` every 100ms
+  - Fixed infinite loop: `PlaybackTrackChanged` was firing when `TrackPlayer.add()` buffers next track (event.track === null), triggering repeated precache calls every second
+- **Full Player Navigation UX**: Fixed multiple navigation/animation issues
+  - Artist/album press now animates slide-down before navigating (no abrupt close)
+  - If already on artist/album page, still closes full player with animation (skips navigation)
+  - Removed useEffect that instantly closed full player on navigation change
+  - Hardware back on Lyrics/Queue closes overlay instead of full player
+  - Fixed PanResponder stale closure issue using ref for `isMenuOpen` state
+- **SongInfoModal Animation**: Fixed abrupt appearance/disappearance
+  - Custom animated sheet (`translateY`) + dim overlay (`opacity`) that animate together
+  - PanResponder for swipe-to-dismiss
+  - Pressable overlay tap to dismiss
+  - Gestures no longer bleed through to underlying FullPlayer
 
 ## [1.2.2] - 2026-02-06
 

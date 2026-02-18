@@ -4,8 +4,8 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { Search as SearchIcon, User, X } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { Search as SearchIcon, X } from 'lucide-react-native';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Image,
   ScrollView,
@@ -25,7 +25,7 @@ import { ConfirmModal } from '../../components/Modals/ConfirmModal';
 import { SongInfoModal } from '../../components/Modals/SongInfoModal';
 import { TrackMenu } from '../../components/Player/TrackMenu';
 import { AlbumCardSkeleton, ArtistRowSkeleton, TrackRowSkeleton } from '../../components/Skeletons';
-import { EmptyState } from '../../components/common';
+import { EmptyState, ArtistArtImage } from '../../components/common';
 import { theme } from '../../config';
 import { useCoverArt } from '../../hooks/api';
 import { useAlbumMenuState } from '../../hooks/useAlbumMenuState';
@@ -34,8 +34,8 @@ import { trackPlayerService } from '../../services/player/TrackPlayerService';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useQueueStore } from '../../stores/queueStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 
-// Debounce hook
 const useDebounce = (value: string, delay: number) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
@@ -55,7 +55,20 @@ const useDebounce = (value: string, delay: number) => {
 export const SearchScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'tracks' | 'albums' | 'artists'>('all');
+  const [isFocused, setIsFocused] = useState(false);
   const debouncedQuery = useDebounce(searchQuery, 300);
+  const searchInputRef = useRef<TextInput>(null);
+  
+  const { autoFocusSearch } = useSettingsStore();
+
+  useEffect(() => {
+    if (autoFocusSearch && searchInputRef.current) {
+      const timeout = setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timeout);
+    }
+  }, [autoFocusSearch]);
 
   const { data: searchResults, isLoading } = useQuery({
     queryKey: ['search', debouncedQuery],
@@ -65,6 +78,7 @@ export const SearchScreen: React.FC = () => {
 
   const handleClearSearch = () => {
     setSearchQuery('');
+    searchInputRef.current?.focus();
   };
 
   const hasResults =
@@ -80,24 +94,37 @@ export const SearchScreen: React.FC = () => {
         <Text style={styles.title}>Search</Text>
       </View>
 
-      {/* Search Input */}
-      <View style={styles.searchContainer}>
-        <SearchIcon size={20} color={theme.colors.text.secondary} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search tracks, albums, artists..."
-          placeholderTextColor={theme.colors.text.tertiary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={handleClearSearch} style={styles.clearButton}>
-            <X size={20} color={theme.colors.text.secondary} />
-          </TouchableOpacity>
-        )}
+      {/* Search Input - shadcn-inspired design */}
+      <View style={styles.searchWrapper}>
+        <View style={[styles.searchContainer, isFocused && styles.searchContainerFocused]}>
+          <SearchIcon 
+            size={18} 
+            color={isFocused ? theme.colors.text.primary : theme.colors.text.tertiary} 
+            strokeWidth={2.5}
+            style={styles.searchIcon}
+          />
+          <TextInput
+            ref={searchInputRef}
+            style={styles.searchInput}
+            placeholder="Search your library..."
+            placeholderTextColor={theme.colors.text.tertiary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            selectionColor={theme.colors.accent}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={handleClearSearch} style={styles.clearButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <View style={styles.clearButtonInner}>
+                <X size={14} color={theme.colors.text.secondary} strokeWidth={2.5} />
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Tabs */}
@@ -106,6 +133,7 @@ export const SearchScreen: React.FC = () => {
           <TouchableOpacity
             style={[styles.tab, activeTab === 'all' && styles.tabActive]}
             onPress={() => setActiveTab('all')}
+            activeOpacity={0.7}
           >
             <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>
               All
@@ -114,6 +142,7 @@ export const SearchScreen: React.FC = () => {
           <TouchableOpacity
             style={[styles.tab, activeTab === 'tracks' && styles.tabActive]}
             onPress={() => setActiveTab('tracks')}
+            activeOpacity={0.7}
           >
             <Text style={[styles.tabText, activeTab === 'tracks' && styles.tabTextActive]}>
               Tracks
@@ -122,6 +151,7 @@ export const SearchScreen: React.FC = () => {
           <TouchableOpacity
             style={[styles.tab, activeTab === 'albums' && styles.tabActive]}
             onPress={() => setActiveTab('albums')}
+            activeOpacity={0.7}
           >
             <Text style={[styles.tabText, activeTab === 'albums' && styles.tabTextActive]}>
               Albums
@@ -130,6 +160,7 @@ export const SearchScreen: React.FC = () => {
           <TouchableOpacity
             style={[styles.tab, activeTab === 'artists' && styles.tabActive]}
             onPress={() => setActiveTab('artists')}
+            activeOpacity={0.7}
           >
             <Text style={[styles.tabText, activeTab === 'artists' && styles.tabTextActive]}>
               Artists
@@ -139,7 +170,7 @@ export const SearchScreen: React.FC = () => {
       )}
 
       {/* Results */}
-      <ScrollView style={styles.results} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.results} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {debouncedQuery.length < 2 ? (
           <EmptyState
             title="Start searching"
@@ -219,15 +250,10 @@ const ArtistRow: React.FC<{ artist: Artist }> = ({ artist }) => {
       onPress={() => navigate({ name: 'artist-detail', params: { artistId: artist.id } })}
       activeOpacity={0.7}
     >
-      <View style={styles.artistAvatar}>
-        {coverArtUrl ? (
-          <Image source={{ uri: coverArtUrl }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.placeholderAvatar]}>
-            <User size={24} color={theme.colors.text.tertiary} />
-          </View>
-        )}
-      </View>
+      <ArtistArtImage
+        uri={coverArtUrl}
+        style={[styles.avatar, { marginRight: theme.spacing.md }]}
+      />
       <View style={styles.artistInfo}>
         <Text style={styles.artistName} numberOfLines={1}>
           {artist.name}
@@ -355,57 +381,83 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background.primary,
   },
   header: {
-    padding: theme.spacing.lg,
-    paddingTop: theme.spacing.xxl,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.xxl + theme.spacing.sm,
+    paddingBottom: theme.spacing.sm,
   },
   title: {
     fontSize: theme.typography.fontSize.huge,
-    fontWeight: theme.typography.fontWeight.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.text.primary,
+    letterSpacing: theme.typography.letterSpacing.tight,
+  },
+  // shadcn-inspired search bar
+  searchWrapper: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingBottom: theme.spacing.md,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.background.card,
-    marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
+    backgroundColor: theme.colors.background.secondary,
     borderRadius: theme.borderRadius.lg,
     paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  searchContainerFocused: {
+    borderColor: theme.colors.text.primary,
+    backgroundColor: theme.colors.background.primary,
   },
   searchIcon: {
-    marginRight: theme.spacing.sm,
+    marginRight: theme.spacing.md,
   },
   searchInput: {
     flex: 1,
-    fontSize: theme.typography.fontSize.md,
+    fontSize: theme.typography.fontSize.base,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.text.primary,
-    paddingVertical: theme.spacing.md,
+    padding: 0,
+    paddingVertical: theme.spacing.xs,
   },
   clearButton: {
-    padding: theme.spacing.xs,
+    marginLeft: theme.spacing.sm,
+  },
+  clearButtonInner: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: theme.colors.background.muted,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   tabs: {
     flexDirection: 'row',
     paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
     gap: theme.spacing.sm,
   },
   tab: {
     paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.borderRadius.round,
-    backgroundColor: theme.colors.background.card,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   tabActive: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor: theme.colors.text.primary,
+    borderColor: theme.colors.text.primary,
   },
   tabText: {
     fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.medium,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.text.secondary,
   },
   tabTextActive: {
     color: theme.colors.text.inverse,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
   results: {
     flex: 1,
@@ -418,7 +470,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: theme.typography.fontSize.xl,
-    fontWeight: theme.typography.fontWeight.bold,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.text.primary,
     paddingHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.md,
@@ -429,31 +481,24 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.lg,
   },
-  artistAvatar: {
-    marginRight: theme.spacing.md,
-  },
   avatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-  },
-  placeholderAvatar: {
-    backgroundColor: theme.colors.background.card,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   artistInfo: {
     flex: 1,
   },
   artistName: {
     fontSize: theme.typography.fontSize.md,
-    fontWeight: theme.typography.fontWeight.medium,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.text.primary,
     marginBottom: 2,
   },
   artistDetails: {
     fontSize: theme.typography.fontSize.sm,
     color: theme.colors.text.secondary,
+    fontFamily: theme.typography.fontFamily.regular,
   },
   albumsScroll: {
     paddingHorizontal: theme.spacing.lg,
@@ -479,12 +524,13 @@ const styles = StyleSheet.create({
   },
   trackTitle: {
     fontSize: theme.typography.fontSize.md,
-    fontWeight: theme.typography.fontWeight.medium,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.text.primary,
     marginBottom: 2,
   },
   trackArtist: {
     fontSize: theme.typography.fontSize.sm,
     color: theme.colors.text.secondary,
+    fontFamily: theme.typography.fontFamily.regular,
   },
 });

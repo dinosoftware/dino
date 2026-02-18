@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   Modal,
   Pressable,
-  Image,
   PanResponder,
   Animated,
   Share,
@@ -28,6 +27,7 @@ import {
   User,
   X 
 } from 'lucide-react-native';
+import { AlbumArtImage } from '../common';
 import { theme } from '../../config';
 import { Album } from '../../api/opensubsonic/types';
 import { createShare } from '../../api/opensubsonic/share';
@@ -251,9 +251,10 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({ visible, onClose, album, c
 
           {/* Header */}
           <View style={styles.header}>
-            {coverArtUrl && (
-              <Image source={{ uri: coverArtUrl }} style={styles.coverArt} />
-            )}
+            <AlbumArtImage
+              uri={coverArtUrl}
+              style={styles.coverArt}
+            />
             <View style={styles.albumInfo}>
               <Text style={styles.albumTitle} numberOfLines={1}>
                 {album.name}

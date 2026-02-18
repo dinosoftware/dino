@@ -31,6 +31,7 @@ export const ServerSetupScreen: React.FC<ServerSetupScreenProps> = ({ onComplete
   const [serverUrl, setServerUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [focusedInput, setFocusedInput] = useState<'name' | 'url' | null>(null);
 
   const { addServer } = useServerStore();
 
@@ -143,7 +144,7 @@ export const ServerSetupScreen: React.FC<ServerSetupScreenProps> = ({ onComplete
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Server Name</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, focusedInput === 'name' && styles.inputFocused]}
                 placeholder="My Music Server"
                 placeholderTextColor={theme.colors.text.tertiary}
                 value={serverName}
@@ -151,13 +152,16 @@ export const ServerSetupScreen: React.FC<ServerSetupScreenProps> = ({ onComplete
                 autoCapitalize="words"
                 autoCorrect={false}
                 editable={!isLoading}
+                onFocus={() => setFocusedInput('name')}
+                onBlur={() => setFocusedInput(null)}
+                selectionColor={theme.colors.accent}
               />
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Server URL</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, focusedInput === 'url' && styles.inputFocused]}
                 placeholder="https://music.example.com"
                 placeholderTextColor={theme.colors.text.tertiary}
                 value={serverUrl}
@@ -166,6 +170,9 @@ export const ServerSetupScreen: React.FC<ServerSetupScreenProps> = ({ onComplete
                 autoCorrect={false}
                 keyboardType="url"
                 editable={!isLoading}
+                onFocus={() => setFocusedInput('url')}
+                onBlur={() => setFocusedInput(null)}
+                selectionColor={theme.colors.accent}
               />
             </View>
 
@@ -267,19 +274,25 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.lg,
   },
   label: {
-    fontSize: theme.typography.fontSize.md,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.text.primary,
+    fontSize: theme.typography.fontSize.sm,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.text.secondary,
     marginBottom: theme.spacing.sm,
   },
   input: {
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-    fontSize: theme.typography.fontSize.lg,
+    backgroundColor: theme.colors.background.secondary,
+    borderRadius: theme.borderRadius.lg,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md + 2,
+    fontSize: theme.typography.fontSize.base,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.text.primary,
     borderWidth: 1,
     borderColor: theme.colors.border,
+  },
+  inputFocused: {
+    borderColor: theme.colors.text.primary,
+    backgroundColor: theme.colors.background.primary,
   },
   errorContainer: {
     backgroundColor: theme.colors.error + '20',

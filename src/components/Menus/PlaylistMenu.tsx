@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   Modal,
   Pressable,
-  Image,
   PanResponder,
   Animated,
 } from 'react-native';
@@ -24,8 +23,8 @@ import {
   Share2,
   Download,
   X,
-  ListMusic,
 } from 'lucide-react-native';
+import { AlbumArtImage } from '../common';
 import { theme } from '../../config';
 import { Playlist } from '../../api/opensubsonic/types';
 import { useDownloadStore } from '../../stores/downloadStore';
@@ -174,13 +173,10 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
 
           {/* Header */}
           <View style={styles.header}>
-            {coverArtUrl ? (
-              <Image source={{ uri: coverArtUrl }} style={styles.coverArt} />
-            ) : (
-              <View style={[styles.coverArt, styles.placeholderCover]}>
-                <ListMusic size={28} color={theme.colors.text.tertiary} />
-              </View>
-            )}
+            <AlbumArtImage
+              uri={coverArtUrl}
+              style={styles.coverArt}
+            />
             <View style={styles.playlistInfo}>
               <Text style={styles.playlistTitle} numberOfLines={1}>
                 {playlist.name}
@@ -281,11 +277,6 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: theme.borderRadius.md,
     marginRight: theme.spacing.md,
-  },
-  placeholderCover: {
-    backgroundColor: theme.colors.background.muted,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   playlistInfo: {
     flex: 1,

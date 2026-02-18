@@ -3,6 +3,7 @@
  * Authenticate with username and password
  */
 
+import { ChevronLeft } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   View,
@@ -20,15 +21,17 @@ import { theme } from '../../config';
 
 interface LoginScreenProps {
   onSuccess: () => void;
+  onCancel?: () => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess, onCancel }) => {
   const [authMode, setAuthMode] = useState<'password' | 'apikey'>('password');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [focusedInput, setFocusedInput] = useState<string | null>(null);
 
   const { login, loginWithApiKey } = useAuthStore();
   const { getCurrentServer, currentServerId } = useServerStore();
@@ -94,6 +97,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
+          {/* Back Button (only shown when onCancel is provided) */}
+          {onCancel && (
+            <TouchableOpacity style={styles.backButton} onPress={onCancel}>
+              <ChevronLeft size={28} color={theme.colors.text.primary} strokeWidth={2} />
+              <Text style={styles.backButtonText}>Back</Text>
+            </TouchableOpacity>
+          )}
+
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Sign In</Text>
@@ -138,7 +149,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Username</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, focusedInput === 'username' && styles.inputFocused]}
                     placeholder="Enter your username"
                     placeholderTextColor={theme.colors.text.tertiary}
                     value={username}
@@ -147,13 +158,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
                     autoCorrect={false}
                     editable={!isLoading}
                     returnKeyType="next"
+                    onFocus={() => setFocusedInput('username')}
+                    onBlur={() => setFocusedInput(null)}
+                    selectionColor={theme.colors.accent}
                   />
                 </View>
 
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Password</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, focusedInput === 'password' && styles.inputFocused]}
                     placeholder="Enter your password"
                     placeholderTextColor={theme.colors.text.tertiary}
                     value={password}
@@ -164,6 +178,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
                     editable={!isLoading}
                     returnKeyType="go"
                     onSubmitEditing={handleLogin}
+                    onFocus={() => setFocusedInput('password')}
+                    onBlur={() => setFocusedInput(null)}
+                    selectionColor={theme.colors.accent}
                   />
                 </View>
               </>
@@ -171,7 +188,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>API Key</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, focusedInput === 'apiKey' && styles.inputFocused]}
                   placeholder="Enter your API key"
                   placeholderTextColor={theme.colors.text.tertiary}
                   value={apiKey}
@@ -181,6 +198,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
                   editable={!isLoading}
                   returnKeyType="go"
                   onSubmitEditing={handleLogin}
+                  onFocus={() => setFocusedInput('apiKey')}
+                  onBlur={() => setFocusedInput(null)}
+                  selectionColor={theme.colors.accent}
                 />
               </View>
             )}
@@ -221,6 +241,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: theme.spacing.xl,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+  },
+  backButtonText: {
+    fontSize: theme.typography.fontSize.lg,
+    color: theme.colors.text.primary,
+    fontWeight: theme.typography.fontWeight.medium,
+    marginLeft: theme.spacing.xs,
   },
   header: {
     marginBottom: theme.spacing.xxxl,
@@ -273,19 +305,25 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.lg,
   },
   label: {
-    fontSize: theme.typography.fontSize.md,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.text.primary,
+    fontSize: theme.typography.fontSize.sm,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.text.secondary,
     marginBottom: theme.spacing.sm,
   },
   input: {
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-    fontSize: theme.typography.fontSize.lg,
+    backgroundColor: theme.colors.background.secondary,
+    borderRadius: theme.borderRadius.lg,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md + 2,
+    fontSize: theme.typography.fontSize.base,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.text.primary,
     borderWidth: 1,
     borderColor: theme.colors.border,
+  },
+  inputFocused: {
+    borderColor: theme.colors.text.primary,
+    backgroundColor: theme.colors.background.primary,
   },
   errorContainer: {
     backgroundColor: theme.colors.error + '20',

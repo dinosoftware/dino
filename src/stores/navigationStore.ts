@@ -20,17 +20,25 @@ interface NavigationStore {
   currentScreen: Screen;
   screenStack: Screen[];
   showFullPlayer: boolean;
+  playerOverlay: 'none' | 'queue' | 'lyrics';
+  closeOverlayCallback: (() => void) | null;
   navigate: (screen: Screen) => void;
   goBack: () => void;
   canGoBack: () => boolean;
   setShowFullPlayer: (show: boolean) => void;
   closeFullPlayer: () => void;
+  setPlayerOverlay: (overlay: 'none' | 'queue' | 'lyrics') => void;
+  isPlayerOverlayOpen: () => boolean;
+  setCloseOverlayCallback: (callback: (() => void) | null) => void;
+  closePlayerOverlay: () => void;
 }
 
 export const useNavigationStore = create<NavigationStore>((set, get) => ({
   currentScreen: { name: 'home' },
   screenStack: [],
   showFullPlayer: false,
+  playerOverlay: 'none',
+  closeOverlayCallback: null,
 
   navigate: (screen: Screen) =>
     set((state) => ({
@@ -53,5 +61,18 @@ export const useNavigationStore = create<NavigationStore>((set, get) => ({
 
   setShowFullPlayer: (show: boolean) => set({ showFullPlayer: show }),
 
-  closeFullPlayer: () => set({ showFullPlayer: false }),
+  closeFullPlayer: () => set({ showFullPlayer: false, playerOverlay: 'none' }),
+  
+  setPlayerOverlay: (overlay: 'none' | 'queue' | 'lyrics') => set({ playerOverlay: overlay }),
+  
+  isPlayerOverlayOpen: () => get().playerOverlay !== 'none',
+  
+  setCloseOverlayCallback: (callback: (() => void) | null) => set({ closeOverlayCallback: callback }),
+  
+  closePlayerOverlay: () => {
+    const { closeOverlayCallback } = get();
+    if (closeOverlayCallback) {
+      closeOverlayCallback();
+    }
+  },
 }));

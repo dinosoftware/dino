@@ -56,6 +56,7 @@ interface Settings {
   
   // UI
   qualityBadgeDetailed: boolean; // Show detailed quality (e.g., "320 kbps MP3") vs simple (e.g., "HIGH")
+  autoFocusSearch: boolean; // Auto-focus search bar when entering search screen
   
   // Network
   usePostRequests: boolean; // Use POST for API requests (if server supports formPost extension)

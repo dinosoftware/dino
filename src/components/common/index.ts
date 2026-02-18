@@ -11,3 +11,4 @@ export * from './Button';
 export * from './OfflineBanner';
 export * from './Skeleton';
 export * from './Avatar';
+export * from './CoverArtImage';
