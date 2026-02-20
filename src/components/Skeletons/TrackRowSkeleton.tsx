@@ -3,16 +3,55 @@
  * Loading placeholder for track rows
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 
 interface TrackRowSkeletonProps {
   showAlbumArt?: boolean;
 }
 
 export const TrackRowSkeleton: React.FC<TrackRowSkeletonProps> = ({ showAlbumArt = false }) => {
+  const theme = useTheme();
   const opacity = useRef(new Animated.Value(0.3)).current;
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.md,
+    },
+    albumArt: {
+      width: 48,
+      height: 48,
+      backgroundColor: theme.colors.background.card,
+      borderRadius: theme.borderRadius.sm,
+      marginRight: theme.spacing.md,
+    },
+    content: {
+      flex: 1,
+    },
+    title: {
+      height: 16,
+      backgroundColor: theme.colors.background.card,
+      borderRadius: theme.borderRadius.sm,
+      marginBottom: theme.spacing.xs,
+      width: '70%',
+    },
+    artist: {
+      height: 14,
+      backgroundColor: theme.colors.background.card,
+      borderRadius: theme.borderRadius.sm,
+      width: '50%',
+    },
+    duration: {
+      height: 14,
+      width: 40,
+      backgroundColor: theme.colors.background.card,
+      borderRadius: theme.borderRadius.sm,
+    },
+  }), [theme]);
 
   useEffect(() => {
     const animation = Animated.loop(
@@ -46,41 +85,3 @@ export const TrackRowSkeleton: React.FC<TrackRowSkeletonProps> = ({ showAlbumArt
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-  },
-  albumArt: {
-    width: 48,
-    height: 48,
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.sm,
-    marginRight: theme.spacing.md,
-  },
-  content: {
-    flex: 1,
-  },
-  title: {
-    height: 16,
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.sm,
-    marginBottom: theme.spacing.xs,
-    width: '70%',
-  },
-  artist: {
-    height: 14,
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.sm,
-    width: '50%',
-  },
-  duration: {
-    height: 14,
-    width: 40,
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.sm,
-  },
-});

@@ -346,17 +346,12 @@ export class DownloadService {
       // Create download ID
       const downloadId = useDownloadStore.getState().addDownload(track.id, 'track', 0);
       
-      // Update with display info
-      const state = useDownloadStore.getState();
-      const download = state.activeDownloads.get(downloadId);
-      if (download) {
-        state.activeDownloads.set(downloadId, {
-          ...download,
-          title: track.title,
-          artist: track.artist,
-          coverArtUri,
-        });
-      }
+      // Update with display info using proper setter
+      useDownloadStore.getState().updateDownloadMeta(downloadId, {
+        title: track.title,
+        artist: track.artist,
+        coverArtUri,
+      });
 
       // Create resumable download
       const downloadResumable = FileSystem.createDownloadResumable(
@@ -364,7 +359,11 @@ export class DownloadService {
         fileUri,
         {},
         (downloadProgress) => {
-          useDownloadStore.getState().updateProgress(downloadId, downloadProgress.totalBytesWritten);
+          const written = downloadProgress.totalBytesWritten;
+          const expected = downloadProgress.totalBytesExpectedToWrite;
+          if (expected > 0) {
+            useDownloadStore.getState().updateProgress(downloadId, written, undefined, expected);
+          }
         }
       );
 
@@ -414,8 +413,8 @@ export class DownloadService {
       }
 
       // Mark as failed
-      const downloadId = Array.from(this.activeDownloads.keys()).find((id) => {
-        const download = useDownloadStore.getState().activeDownloads.get(id);
+      const downloadId = Object.keys(useDownloadStore.getState().activeDownloads).find((id) => {
+        const download = useDownloadStore.getState().activeDownloads[id];
         return download?.itemId === track.id;
       });
 
@@ -446,17 +445,12 @@ export class DownloadService {
         tracks.length
       );
       
-      // Update with display info
-      const state = useDownloadStore.getState();
-      const download = state.activeDownloads.get(downloadId);
-      if (download) {
-        state.activeDownloads.set(downloadId, {
-          ...download,
-          title: album.name,
-          artist: album.artist,
-          coverArtUri,
-        });
-      }
+      // Update with display info using proper setter
+      useDownloadStore.getState().updateDownloadMeta(downloadId, {
+        title: album.name,
+        artist: album.artist,
+        coverArtUri,
+      });
 
       const downloadedTracks: DownloadedTrack[] = [];
       const failedTracks: string[] = [];
@@ -529,17 +523,12 @@ export class DownloadService {
         tracks.length
       );
       
-      // Update with display info
-      const state = useDownloadStore.getState();
-      const download = state.activeDownloads.get(downloadId);
-      if (download) {
-        state.activeDownloads.set(downloadId, {
-          ...download,
-          title: playlist.name,
-          artist: `${playlist.songCount} tracks`,
-          coverArtUri,
-        });
-      }
+      // Update with display info using proper setter
+      useDownloadStore.getState().updateDownloadMeta(downloadId, {
+        title: playlist.name,
+        artist: `${playlist.songCount} tracks`,
+        coverArtUri,
+      });
 
       const downloadedTracks: DownloadedTrack[] = [];
       const failedTracks: string[] = [];
@@ -594,8 +583,8 @@ export class DownloadService {
    * Cancel a download
    */
   async cancelDownload(itemId: string): Promise<void> {
-    const downloadId = Array.from(this.activeDownloads.keys()).find((id) => {
-      const download = useDownloadStore.getState().activeDownloads.get(id);
+    const downloadId = Object.keys(useDownloadStore.getState().activeDownloads).find((id) => {
+      const download = useDownloadStore.getState().activeDownloads[id];
       return download?.itemId === itemId;
     });
 
@@ -651,8 +640,8 @@ export class DownloadService {
    */
   async clearAllDownloads(): Promise<void> {
     // Cancel all active downloads
-    const promises = Array.from(this.activeDownloads.keys()).map((id) => {
-      const download = useDownloadStore.getState().activeDownloads.get(id);
+    const promises = Object.keys(useDownloadStore.getState().activeDownloads).map((id) => {
+      const download = useDownloadStore.getState().activeDownloads[id];
       if (download) {
         return this.cancelDownload(download.itemId);
       }

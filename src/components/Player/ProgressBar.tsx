@@ -7,17 +7,17 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Slider from '@react-native-community/slider';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 import { useSettingsStore } from '../../stores/settingsStore';
 
 interface ProgressBarProps {
-  position: number; // in seconds
-  duration: number; // in seconds
-  buffered: number; // in seconds
+  position: number;
+  duration: number;
+  buffered: number;
   onSeek: (position: number) => void;
-  color?: string; // Optional color override
-  qualityText?: string; // Detailed quality text (e.g., "320 kbps MP3")
-  qualityTextSimple?: string; // Simple quality text (e.g., "HIGH")
+  color?: string;
+  qualityText?: string;
+  qualityTextSimple?: string;
 }
 
 const formatTime = (seconds: number): string => {
@@ -35,17 +35,96 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   qualityText,
   qualityTextSimple,
 }) => {
+  const theme = useTheme();
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPosition, setSeekPosition] = useState(0);
   
   const qualityBadgeDetailed = useSettingsStore((state) => state.qualityBadgeDetailed);
   const updateSettings = useSettingsStore((state) => state.updateSettings);
   
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      marginTop: 4,
+      marginBottom: 4,
+    },
+    timeContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: -8,
+      paddingHorizontal: 16,
+    },
+    timeText: {
+      fontSize: theme.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+      fontFamily: theme.typography.fontFamily.medium,
+      minWidth: 40,
+    },
+    timeTextLeft: {
+      textAlign: 'left',
+    },
+    timeTextRight: {
+      textAlign: 'right',
+    },
+    centerBadgeContainer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+      pointerEvents: 'box-none',
+    },
+    qualityBadge: {
+      borderWidth: 1.5,
+      borderRadius: 4,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      backgroundColor: 'transparent',
+    },
+    qualityText: {
+      fontSize: theme.typography.fontSize.xs,
+      fontFamily: theme.typography.fontFamily.semibold,
+      letterSpacing: 0.5,
+    },
+    trackContainer: {
+      position: 'relative',
+      height: 48,
+      justifyContent: 'center',
+    },
+    bufferedTrackContainer: {
+      position: 'absolute',
+      left: 16,
+      right: 16,
+      height: 6,
+      top: '50%',
+      marginTop: -3,
+      zIndex: 0,
+      overflow: 'hidden',
+      borderRadius: 3,
+    },
+    bufferedTrack: {
+      position: 'absolute',
+      height: '100%',
+      borderRadius: 3,
+      zIndex: 1,
+    },
+    progressTrack: {
+      position: 'absolute',
+      height: '100%',
+      borderRadius: 3,
+      zIndex: 2,
+    },
+    slider: {
+      width: '100%',
+      height: 48,
+      zIndex: 3,
+    },
+  }), [theme]);
+  
   const toggleQualityMode = useCallback(() => {
     updateSettings({ qualityBadgeDetailed: !qualityBadgeDetailed });
   }, [qualityBadgeDetailed, updateSettings]);
   
-  // Show detailed or simple based on setting
   const displayText = qualityBadgeDetailed ? qualityText : (qualityTextSimple || qualityText);
 
   const currentPosition = isSeeking ? seekPosition : position;
@@ -69,14 +148,11 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Progress Track with Buffer Indicator */}
       <View style={styles.trackContainer}>
-        {/* Background and buffered track */}
         <View style={[
           styles.bufferedTrackContainer,
           { backgroundColor: color ? `${color}40` : theme.colors.player.progressBackground }
         ]}>
-          {/* Buffered portion */}
           <View 
             style={[
               styles.bufferedTrack,
@@ -86,7 +162,6 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
               }
             ]} 
           />
-          {/* Current progress overlay */}
           <View 
             style={[
               styles.progressTrack,
@@ -98,7 +173,6 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
           />
         </View>
 
-        {/* Slider - the actual interactive element (invisible track, just for thumb) */}
         <Slider
           style={styles.slider}
           value={currentPosition}
@@ -113,7 +187,6 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
         />
       </View>
 
-      {/* Time Labels - BELOW the progress bar, inline */}
       <View style={styles.timeContainer}>
         <Text style={[styles.timeText, styles.timeTextLeft]}>{currentTimeText}</Text>
         <View style={styles.centerBadgeContainer}>
@@ -132,84 +205,3 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    marginTop: 4, // Reduced from 12 to push progress bar up closer to track info
-    marginBottom: 4,
-  },
-  timeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: -8, // Negative margin to bring time very close to progress bar
-    paddingHorizontal: 16, // Match slider padding
-  },
-  timeText: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
-    fontFamily: theme.typography.fontFamily.medium,
-    minWidth: 40, // Fixed width to prevent shifting
-  },
-  timeTextLeft: {
-    textAlign: 'left',
-  },
-  timeTextRight: {
-    textAlign: 'right',
-  },
-  centerBadgeContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    pointerEvents: 'box-none', // Allow touches on children but not on container itself
-  },
-  qualityBadge: {
-    borderWidth: 1.5,
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    backgroundColor: 'transparent',
-  },
-  qualityText: {
-    fontSize: theme.typography.fontSize.xs,
-    fontFamily: theme.typography.fontFamily.semibold,
-    letterSpacing: 0.5,
-  },
-  trackContainer: {
-    position: 'relative',
-    height: 48, // Bigger overall height
-    justifyContent: 'center',
-  },
-  bufferedTrackContainer: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    height: 6, // Thicker track
-    top: '50%',
-    marginTop: -3,
-    zIndex: 0,
-    overflow: 'hidden',
-    borderRadius: 3,
-    // backgroundColor is now dynamic (passed inline with opacity)
-  },
-  bufferedTrack: {
-    position: 'absolute',
-    height: '100%',
-    // backgroundColor is now dynamic (passed inline with opacity)
-    borderRadius: 3,
-    zIndex: 1,
-  },
-  progressTrack: {
-    position: 'absolute',
-    height: '100%',
-    borderRadius: 3,
-    zIndex: 2, // Above buffered track
-  },
-  slider: {
-    width: '100%',
-    height: 48, // Match container height
-    zIndex: 3, // Above all tracks
-  },
-});

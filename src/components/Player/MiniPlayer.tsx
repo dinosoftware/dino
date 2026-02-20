@@ -1,6 +1,6 @@
 /**
  * Dino Music App - Mini Player
- * shadcn/ui-inspired mini player with clean, modern design
+ * TIDAL and shadcn/ui-inspired mini player with dynamic theming
  */
 
 import React from 'react';
@@ -10,13 +10,14 @@ import * as Haptics from 'expo-haptics';
 import { usePlayer } from '../../hooks/usePlayer';
 import { useCoverArt } from '../../hooks/api';
 import { useAlbumColors } from '../../hooks/useAlbumColors';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 
 interface MiniPlayerProps {
   onPress: () => void;
 }
 
 export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
+  const theme = useTheme();
   const { currentTrack, isPlaying, playbackState, togglePlayPause, skipToNext, progress } = usePlayer();
   const { data: coverArtUrl } = useCoverArt(currentTrack?.coverArt, 200);
   const albumColors = useAlbumColors(coverArtUrl || undefined);
@@ -42,15 +43,14 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
 
   return (
     <TouchableOpacity
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.colors.background.secondary, borderTopColor: theme.colors.border }]}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
       }}
       activeOpacity={0.95}
     >
-      {/* Progress indicator bar at top */}
-      <View style={styles.progressIndicator}>
+      <View style={[styles.progressIndicator, { backgroundColor: theme.colors.background.muted }]}>
         <View 
           style={[
             styles.progressFill, 
@@ -62,28 +62,25 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
         />
       </View>
 
-      {/* Album Art */}
       <View style={styles.artworkContainer}>
         {coverArtUrl ? (
           <Image source={{ uri: coverArtUrl }} style={styles.artwork} />
         ) : (
-          <View style={[styles.artwork, styles.placeholderArtwork]}>
-            <Text style={styles.placeholderText}>♪</Text>
+          <View style={[styles.artwork, styles.placeholderArtwork, { backgroundColor: theme.colors.background.muted }]}>
+            <Text style={[styles.placeholderText, { color: theme.colors.text.muted }]}>♪</Text>
           </View>
         )}
       </View>
 
-      {/* Track Info */}
       <View style={styles.info}>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={[styles.title, { color: theme.colors.text.primary }]} numberOfLines={1}>
           {currentTrack.title}
         </Text>
-        <Text style={styles.artist} numberOfLines={1}>
+        <Text style={[styles.artist, { color: theme.colors.text.secondary }]} numberOfLines={1}>
           {currentTrack.displayArtist || currentTrack.artist || 'Unknown Artist'}
         </Text>
       </View>
 
-      {/* Controls */}
       <View style={styles.controls}>
         <TouchableOpacity
           onPress={handlePlayPause}
@@ -113,13 +110,11 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: theme.dimensions.miniPlayer.height,
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.sm,
-    paddingBottom: theme.spacing.sm,
-    backgroundColor: theme.colors.background.secondary,
+    height: 72,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
   },
   progressIndicator: {
     position: 'absolute',
@@ -127,59 +122,53 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 3,
-    backgroundColor: theme.colors.background.muted,
   },
   progressFill: {
     height: '100%',
   },
   artworkContainer: {
-    marginRight: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
+    marginRight: 16,
+    borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: theme.colors.border,
     alignSelf: 'center',
   },
   artwork: {
-    width: theme.dimensions.miniPlayer.thumbnailSize,
-    height: theme.dimensions.miniPlayer.thumbnailSize,
+    width: 56,
+    height: 56,
   },
   placeholderArtwork: {
-    backgroundColor: theme.colors.background.muted,
     justifyContent: 'center',
     alignItems: 'center',
   },
   placeholderText: {
-    fontSize: theme.typography.fontSize.lg,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.text.muted,
+    fontSize: 18,
+    fontFamily: 'Inter_500Medium',
   },
   info: {
     flex: 1,
-    marginRight: theme.spacing.md,
+    marginRight: 16,
   },
   title: {
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.semibold,
-    color: theme.colors.text.primary,
+    fontSize: 14,
+    fontFamily: 'Inter_600SemiBold',
     marginBottom: 4,
   },
   artist: {
-    fontSize: theme.typography.fontSize.xs,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.text.secondary,
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
   },
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.sm,
+    gap: 8,
   },
   controlButton: {
     width: 36,
     height: 36,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: theme.borderRadius.round,
+    borderRadius: 9999,
   },
   playButton: {
     width: 40,

@@ -9,7 +9,7 @@ import { ServerSelectionScreen } from '../screens/Auth/ServerSelectionScreen';
 import { ServerSetupScreen } from '../screens/Auth/ServerSetupScreen';
 import { LoginScreen } from '../screens/Auth/LoginScreen';
 import { useServerStore } from '../stores';
-import { theme } from '../config';
+import { useTheme } from '../hooks/useTheme';
 
 interface AuthNavigatorProps {
   onAuthComplete: () => void;
@@ -18,6 +18,7 @@ interface AuthNavigatorProps {
 type AuthScreen = 'serverSelection' | 'serverSetup' | 'login';
 
 export const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onAuthComplete }) => {
+  const theme = useTheme();
   const { servers } = useServerStore();
   const [currentScreen, setCurrentScreen] = useState<AuthScreen>('serverSelection');
 
@@ -65,7 +66,7 @@ export const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onAuthComplete }) 
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background.primary }]}>
       {currentScreen === 'serverSelection' && (
         <ServerSelectionScreen 
           onServerSelected={handleServerSelectedWithAuth}
@@ -92,6 +93,5 @@ export const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onAuthComplete }) 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background.primary,
   },
 });

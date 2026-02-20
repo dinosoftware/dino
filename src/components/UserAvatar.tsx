@@ -3,9 +3,9 @@
  * Displays user initial in a circle (fallback for servers without getAvatar)
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { theme } from '../config';
+import { useTheme } from '../hooks/useTheme';
 
 interface UserAvatarProps {
   username: string;
@@ -13,8 +13,21 @@ interface UserAvatarProps {
 }
 
 export const UserAvatar: React.FC<UserAvatarProps> = ({ username, size = 40 }) => {
-  // Get the first letter of username, uppercase
+  const theme = useTheme();
   const initial = username.charAt(0).toUpperCase();
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      backgroundColor: theme.colors.text.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    initial: {
+      color: theme.colors.background.primary,
+      fontFamily: theme.typography.fontFamily.bold,
+      textAlign: 'center',
+    },
+  }), [theme]);
 
   return (
     <View 
@@ -31,7 +44,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({ username, size = 40 }) =
         style={[
           styles.initial,
           {
-            fontSize: size * 0.5, // 50% of container size
+            fontSize: size * 0.5,
           }
         ]}
       >
@@ -40,16 +53,3 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({ username, size = 40 }) =
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: theme.colors.text.primary, // White circle in dark theme
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  initial: {
-    color: theme.colors.background.primary, // Black text in dark theme (opposite)
-    fontFamily: theme.typography.fontFamily.bold,
-    textAlign: 'center',
-  },
-});

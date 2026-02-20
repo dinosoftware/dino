@@ -3,7 +3,7 @@
  * Quick Action Menu for artist options
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -25,7 +25,7 @@ import {
   X,
 } from 'lucide-react-native';
 import { ArtistArtImage } from '../common';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 import { Artist } from '../../api/opensubsonic/types';
 import { useFavoritesStore } from '../../stores/favoritesStore';
 
@@ -40,9 +40,30 @@ interface MenuItemProps {
   icon: React.ReactNode;
   label: string;
   onPress: () => void;
+  theme: ReturnType<typeof useTheme>;
 }
 
-const MenuItem: React.FC<MenuItemProps> = ({ icon, label, onPress }) => {
+const MenuItem: React.FC<MenuItemProps> = ({ icon, label, onPress, theme }) => {
+  const styles = useMemo(() => StyleSheet.create({
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.md,
+      paddingHorizontal: theme.spacing.lg,
+    },
+    menuIcon: {
+      marginRight: theme.spacing.md,
+      width: 32,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    menuLabel: {
+      fontSize: theme.typography.fontSize.md,
+      fontWeight: theme.typography.fontWeight.medium,
+      color: theme.colors.text.primary,
+    },
+  }), [theme]);
+
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
@@ -57,10 +78,66 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon, label, onPress }) => {
 };
 
 export const ArtistMenu: React.FC<ArtistMenuProps> = ({ visible, onClose, artist, coverArtUrl }) => {
+  const theme = useTheme();
   const translateY = useRef(new Animated.Value(0)).current;
   const { isArtistStarred, toggleArtistStar } = useFavoritesStore();
 
-  // Haptic feedback when menu opens
+  const styles = useMemo(() => StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-end',
+    },
+    menu: {
+      backgroundColor: theme.colors.background.card,
+      borderTopLeftRadius: theme.borderRadius.xl,
+      borderTopRightRadius: theme.borderRadius.xl,
+      paddingBottom: theme.spacing.xl,
+    },
+    swipeHandle: {
+      width: 36,
+      height: 4,
+      backgroundColor: theme.colors.text.tertiary,
+      borderRadius: 2,
+      alignSelf: 'center',
+      marginTop: theme.spacing.sm,
+      marginBottom: theme.spacing.md,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.lg,
+      paddingBottom: theme.spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    artistImage: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      marginRight: theme.spacing.md,
+    },
+    headerInfo: {
+      flex: 1,
+    },
+    artistName: {
+      fontSize: theme.typography.fontSize.lg,
+      fontWeight: theme.typography.fontWeight.semibold,
+      color: theme.colors.text.primary,
+      marginBottom: 2,
+    },
+    artistDetails: {
+      fontSize: theme.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+    },
+    closeButton: {
+      padding: theme.spacing.xs,
+    },
+    menuItems: {
+      paddingTop: theme.spacing.md,
+    },
+  }), [theme]);
+
   useEffect(() => {
     if (visible) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -105,19 +182,16 @@ export const ArtistMenu: React.FC<ArtistMenuProps> = ({ visible, onClose, artist
 
   const handlePlayAll = () => {
     console.log('Play all tracks by artist:', artist?.name);
-    // TODO: Implement play all functionality
     onClose();
   };
 
   const handleShuffle = () => {
     console.log('Shuffle artist:', artist?.name);
-    // TODO: Implement shuffle functionality
     onClose();
   };
 
   const handleRadio = () => {
     console.log('Start artist radio:', artist?.name);
-    // TODO: Implement artist radio functionality
     onClose();
   };
 
@@ -139,13 +213,11 @@ export const ArtistMenu: React.FC<ArtistMenuProps> = ({ visible, onClose, artist
 
   const handleShare = () => {
     console.log('Share artist:', artist?.name);
-    // TODO: Implement share functionality
     onClose();
   };
 
   const handleInfo = () => {
     console.log('Show artist info:', artist?.name);
-    // TODO: Implement artist info functionality
     onClose();
   };
 
@@ -165,10 +237,8 @@ export const ArtistMenu: React.FC<ArtistMenuProps> = ({ visible, onClose, artist
           {...panResponder.panHandlers}
         >
           <Pressable>
-            {/* Swipe Handle */}
             <View style={styles.swipeHandle} />
 
-            {/* Artist Header */}
             <View style={styles.header}>
               <ArtistArtImage
                 uri={coverArtUrl}
@@ -189,22 +259,24 @@ export const ArtistMenu: React.FC<ArtistMenuProps> = ({ visible, onClose, artist
               </TouchableOpacity>
             </View>
 
-            {/* Menu Items */}
             <View style={styles.menuItems}>
               <MenuItem
                 icon={<PlayCircle size={24} color={theme.colors.text.primary} />}
                 label="Play All"
                 onPress={handlePlayAll}
+                theme={theme}
               />
               <MenuItem
                 icon={<Shuffle size={24} color={theme.colors.text.primary} />}
                 label="Shuffle"
                 onPress={handleShuffle}
+                theme={theme}
               />
               <MenuItem
                 icon={<Radio size={24} color={theme.colors.text.primary} />}
                 label="Artist Radio"
                 onPress={handleRadio}
+                theme={theme}
               />
               <MenuItem
                 icon={
@@ -216,16 +288,19 @@ export const ArtistMenu: React.FC<ArtistMenuProps> = ({ visible, onClose, artist
                 }
                 label={artist && isArtistStarred(artist.id) ? "Remove from Favorites" : "Add to Favorites"}
                 onPress={handleFavorite}
+                theme={theme}
               />
               <MenuItem
                 icon={<Share2 size={24} color={theme.colors.text.primary} />}
                 label="Share"
                 onPress={handleShare}
+                theme={theme}
               />
               <MenuItem
                 icon={<Info size={24} color={theme.colors.text.primary} />}
                 label="Artist Info"
                 onPress={handleInfo}
+                theme={theme}
               />
             </View>
           </Pressable>
@@ -234,76 +309,3 @@ export const ArtistMenu: React.FC<ArtistMenuProps> = ({ visible, onClose, artist
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  menu: {
-    backgroundColor: theme.colors.background.card,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    paddingBottom: theme.spacing.xl,
-  },
-  swipeHandle: {
-    width: 36,
-    height: 4,
-    backgroundColor: theme.colors.text.tertiary,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  artistImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    marginRight: theme.spacing.md,
-  },
-  headerInfo: {
-    flex: 1,
-  },
-  artistName: {
-    fontSize: theme.typography.fontSize.lg,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.text.primary,
-    marginBottom: 2,
-  },
-  artistDetails: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
-  },
-  closeButton: {
-    padding: theme.spacing.xs,
-  },
-  menuItems: {
-    paddingTop: theme.spacing.md,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-  },
-  menuIcon: {
-    marginRight: theme.spacing.md,
-    width: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  menuLabel: {
-    fontSize: theme.typography.fontSize.md,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.text.primary,
-  },
-});

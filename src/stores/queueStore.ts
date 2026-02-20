@@ -140,6 +140,28 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
 
   addToQueue: (tracks, position = 'end') => {
     const tracksArray = Array.isArray(tracks) ? tracks : [tracks];
+    const state = get();
+    
+    // If queue is empty, create new queue and start playing
+    if (state.queue.length === 0) {
+      const { usePlayerStore } = require('./playerStore');
+      const { trackPlayerService } = require('../services/player/TrackPlayerService');
+      
+      set({
+        queue: tracksArray,
+        currentIndex: 0,
+        originalQueue: tracksArray,
+      });
+      
+      usePlayerStore.getState().setCurrentTrack(tracksArray[0]);
+      trackPlayerService.playTrack(0).catch((err: Error) => {
+        console.error('[QueueStore] Failed to play track:', err);
+      });
+      
+      get().saveToStorage();
+      triggerSync(true);
+      return;
+    }
     
     set((state) => {
       let newQueue: Track[];

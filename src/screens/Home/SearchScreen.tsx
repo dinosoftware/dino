@@ -5,7 +5,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Search as SearchIcon, X } from 'lucide-react-native';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Image,
   ScrollView,
@@ -26,7 +26,8 @@ import { SongInfoModal } from '../../components/Modals/SongInfoModal';
 import { TrackMenu } from '../../components/Player/TrackMenu';
 import { AlbumCardSkeleton, ArtistRowSkeleton, TrackRowSkeleton } from '../../components/Skeletons';
 import { EmptyState, ArtistArtImage } from '../../components/common';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
+import { Theme } from '../../config/theme';
 import { useCoverArt } from '../../hooks/api';
 import { useAlbumMenuState } from '../../hooks/useAlbumMenuState';
 import { useTrackMenuState } from '../../hooks/useTrackMenuState';
@@ -53,6 +54,7 @@ const useDebounce = (value: string, delay: number) => {
 };
 
 export const SearchScreen: React.FC = () => {
+  const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'tracks' | 'albums' | 'artists'>('all');
   const [isFocused, setIsFocused] = useState(false);
@@ -60,6 +62,8 @@ export const SearchScreen: React.FC = () => {
   const searchInputRef = useRef<TextInput>(null);
   
   const { autoFocusSearch } = useSettingsStore();
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
     if (autoFocusSearch && searchInputRef.current) {
@@ -239,10 +243,12 @@ export const SearchScreen: React.FC = () => {
   );
 };
 
-// Artist Row Component
 const ArtistRow: React.FC<{ artist: Artist }> = ({ artist }) => {
+  const theme = useTheme();
   const { data: coverArtUrl } = useCoverArt(artist.coverArt, 200);
   const { navigate } = useNavigationStore();
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
     <TouchableOpacity
@@ -268,11 +274,13 @@ const ArtistRow: React.FC<{ artist: Artist }> = ({ artist }) => {
   );
 };
 
-// Album Item Component
 const AlbumItem: React.FC<{ album: Album }> = ({ album }) => {
+  const theme = useTheme();
   const { data: coverArtUrl } = useCoverArt(album.coverArt, 300);
   const { navigate } = useNavigationStore();
   const albumMenuState = useAlbumMenuState();
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
     <>
@@ -298,13 +306,15 @@ const AlbumItem: React.FC<{ album: Album }> = ({ album }) => {
   );
 };
 
-// Track Item Component
 const TrackItem: React.FC<{ track: Track }> = ({ track }) => {
+  const theme = useTheme();
   const { data: coverArtUrl } = useCoverArt(track.coverArt, 100);
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
   const { setQueue } = useQueueStore();
   const { navigate } = useNavigationStore();
   const trackMenuState = useTrackMenuState();
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const handlePlayTrack = async () => {
     setQueue([track], 0);
@@ -375,7 +385,7 @@ const TrackItem: React.FC<{ track: Track }> = ({ track }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background.primary,
@@ -391,7 +401,6 @@ const styles = StyleSheet.create({
     color: theme.colors.text.primary,
     letterSpacing: theme.typography.letterSpacing.tight,
   },
-  // shadcn-inspired search bar
   searchWrapper: {
     paddingHorizontal: theme.spacing.lg,
     paddingBottom: theme.spacing.md,

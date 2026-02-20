@@ -3,7 +3,7 @@
  * Horizontal carousel of recently played albums
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { RefreshCw } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -14,11 +14,14 @@ import { EmptyState, ErrorView, Skeleton } from '../../../components/common';
 import { AlbumCardSkeleton } from '../../../components/Skeletons';
 import { useNavigationStore } from '../../../stores/navigationStore';
 import { useAlbumMenuState } from '../../../hooks/useAlbumMenuState';
-import { theme } from '../../../config';
+import { useTheme } from '../../../hooks/useTheme';
+import { Theme } from '../../../config/theme';
 import { Album } from '../../../api/opensubsonic/types';
 
 export const RecentlyPlayed: React.FC = () => {
+  const theme = useTheme();
   const { data: albums, isLoading, error, refetch } = useAlbums('recent', 10);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   if (isLoading) {
     return (
@@ -90,11 +93,13 @@ export const RecentlyPlayed: React.FC = () => {
   );
 };
 
-// Helper component to fetch cover art for each album
 const AlbumCardWithArt: React.FC<{ album: Album }> = ({ album }) => {
+  const theme = useTheme();
   const { data: coverArtUrl } = useCoverArt(album.coverArt, 300);
   const { navigate } = useNavigationStore();
   const albumMenuState = useAlbumMenuState();
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const handleLongPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -127,7 +132,7 @@ const AlbumCardWithArt: React.FC<{ album: Album }> = ({ album }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     marginBottom: theme.spacing.xl,
   },

@@ -3,7 +3,7 @@
  * Quick Action Menu for album options
  */
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -25,10 +25,12 @@ import {
   Info,
   ListPlus,
   User,
-  X 
+  X,
+  ListMusic,
+  Play
 } from 'lucide-react-native';
 import { AlbumArtImage } from '../common';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 import { Album } from '../../api/opensubsonic/types';
 import { createShare } from '../../api/opensubsonic/share';
 import { useFavoritesStore } from '../../stores/favoritesStore';
@@ -45,15 +47,40 @@ interface AlbumMenuProps {
   coverArtUrl?: string;
   onShowInfo: () => void;
   onAddToPlaylist: () => void;
+  onPlayNext?: () => void;
+  onAddToQueue?: () => void;
 }
 
 interface MenuItemProps {
   icon: React.ReactNode;
   label: string;
   onPress: () => void;
+  theme: ReturnType<typeof useTheme>;
 }
 
-const MenuItem: React.FC<MenuItemProps> = ({ icon, label, onPress }) => {
+const MenuItem: React.FC<MenuItemProps> = ({ icon, label, onPress, theme }) => {
+  const styles = useMemo(() => StyleSheet.create({
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.xs,
+      paddingHorizontal: theme.spacing.lg,
+      minHeight: 48,
+    },
+    menuIcon: {
+      width: 32,
+      height: 32,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: theme.spacing.sm,
+    },
+    menuLabel: {
+      fontSize: theme.typography.fontSize.md,
+      color: theme.colors.text.primary,
+      fontWeight: theme.typography.fontWeight.medium,
+    },
+  }), [theme]);
+
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
@@ -67,14 +94,85 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon, label, onPress }) => {
   );
 };
 
-export const AlbumMenu: React.FC<AlbumMenuProps> = ({ visible, onClose, album, coverArtUrl, onShowInfo, onAddToPlaylist }) => {
+export const AlbumMenu: React.FC<AlbumMenuProps> = ({ 
+  visible, 
+  onClose, 
+  album, 
+  coverArtUrl, 
+  onShowInfo, 
+  onAddToPlaylist,
+  onPlayNext,
+  onAddToQueue,
+}) => {
+  const theme = useTheme();
   const translateY = useRef(new Animated.Value(0)).current;
   const { isAlbumStarred, toggleAlbumStar } = useFavoritesStore();
   const { isAlbumDownloaded } = useDownloadStore();
   const { showToast } = useToastStore();
   const { navigate } = useNavigationStore();
 
-  // Haptic feedback when menu opens
+  const styles = useMemo(() => StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      justifyContent: 'flex-end',
+    },
+    menu: {
+      backgroundColor: theme.colors.background.card,
+      borderTopLeftRadius: theme.borderRadius.xl,
+      borderTopRightRadius: theme.borderRadius.xl,
+      paddingBottom: theme.spacing.lg,
+    },
+    swipeIndicator: {
+      alignItems: 'center',
+      paddingVertical: theme.spacing.xs,
+    },
+    swipeHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: theme.colors.text.tertiary,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    coverArt: {
+      width: 56,
+      height: 56,
+      borderRadius: theme.borderRadius.md,
+      marginRight: theme.spacing.md,
+    },
+    albumInfo: {
+      flex: 1,
+      marginRight: theme.spacing.md,
+    },
+    albumTitle: {
+      fontSize: theme.typography.fontSize.lg,
+      fontWeight: theme.typography.fontWeight.semibold,
+      color: theme.colors.text.primary,
+      marginBottom: theme.spacing.xs,
+    },
+    albumArtist: {
+      fontSize: theme.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+    },
+    closeButton: {
+      width: 44,
+      height: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    menuItems: {
+      paddingVertical: theme.spacing.xs,
+    },
+  }), [theme]);
+
   useEffect(() => {
     if (visible) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -135,7 +233,6 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({ visible, onClose, album, c
     const albumIsDownloaded = isAlbumDownloaded(album.id);
     
     if (albumIsDownloaded) {
-      // Album is already downloaded - delete it
       try {
         await downloadService.deleteAlbum(album.id);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -168,11 +265,9 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({ visible, onClose, album, c
     const includeShareMessage = useSettingsStore.getState().includeShareMessage;
     
     try {
-      // Create OpenSubsonic share
       const description = album.artist ? `${album.name} by ${album.artist}` : album.name;
       const share = await createShare([album.id], description);
 
-      // Build message based on setting
       let message: string;
       if (includeShareMessage) {
         message = `Check out "${album.name}"`;
@@ -244,12 +339,10 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({ visible, onClose, album, c
             style={[styles.menu, { transform: [{ translateY }] }]}
             {...panResponder.panHandlers}
           >
-          {/* Swipe Indicator */}
           <View style={styles.swipeIndicator}>
             <View style={styles.swipeHandle} />
           </View>
 
-          {/* Header */}
           <View style={styles.header}>
             <AlbumArtImage
               uri={coverArtUrl}
@@ -268,23 +361,41 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({ visible, onClose, album, c
             </TouchableOpacity>
           </View>
 
-          {/* Menu Items */}
           <View style={styles.menuItems}>
             <MenuItem
               icon={<PlayCircle size={22} color={theme.colors.text.primary} strokeWidth={2} />}
               label="Play All"
               onPress={handlePlayAll}
+              theme={theme}
             />
             <MenuItem
               icon={<Shuffle size={22} color={theme.colors.text.primary} strokeWidth={2} />}
               label="Shuffle"
               onPress={handleShuffle}
+              theme={theme}
             />
+            {onPlayNext && (
+              <MenuItem
+                icon={<Play size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Play Next"
+                onPress={() => { onClose(); onPlayNext(); }}
+                theme={theme}
+              />
+            )}
+            {onAddToQueue && (
+              <MenuItem
+                icon={<ListMusic size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Add to Queue"
+                onPress={() => { onClose(); onAddToQueue(); }}
+                theme={theme}
+              />
+            )}
             {album.artistId && (
               <MenuItem
                 icon={<User size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                 label="Go to Artist"
                 onPress={handleGoToArtist}
+                theme={theme}
               />
             )}
             <MenuItem
@@ -298,26 +409,31 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({ visible, onClose, album, c
               }
               label={isAlbumStarred(album.id) ? "Remove from Favorites" : "Add to Favorites"}
               onPress={handleAddToFavorites}
+              theme={theme}
             />
             <MenuItem
               icon={<ListPlus size={22} color={theme.colors.text.primary} strokeWidth={2} />}
               label="Add to Playlist"
               onPress={handleAddToPlaylist}
+              theme={theme}
             />
             <MenuItem
               icon={<Download size={22} color={theme.colors.text.primary} strokeWidth={2} />}
               label={isAlbumDownloaded(album.id) ? "Remove Download" : "Download Album"}
               onPress={handleDownload}
+              theme={theme}
             />
             <MenuItem
               icon={<Share2 size={22} color={theme.colors.text.primary} strokeWidth={2} />}
               label="Share"
               onPress={handleShare}
+              theme={theme}
             />
             <MenuItem
               icon={<Info size={22} color={theme.colors.text.primary} strokeWidth={2} />}
               label="Album Info"
               onPress={handleShowInfo}
+              theme={theme}
             />
           </View>
         </Animated.View>
@@ -326,84 +442,3 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({ visible, onClose, album, c
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  menu: {
-    backgroundColor: theme.colors.background.card,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    paddingBottom: theme.spacing.lg,
-  },
-  swipeIndicator: {
-    alignItems: 'center',
-    paddingVertical: theme.spacing.xs,
-  },
-  swipeHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.text.tertiary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  coverArt: {
-    width: 56,
-    height: 56,
-    borderRadius: theme.borderRadius.md,
-    marginRight: theme.spacing.md,
-  },
-  albumInfo: {
-    flex: 1,
-    marginRight: theme.spacing.md,
-  },
-  albumTitle: {
-    fontSize: theme.typography.fontSize.lg,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
-  },
-  albumArtist: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
-  },
-  closeButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  menuItems: {
-    paddingVertical: theme.spacing.xs,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.lg,
-    minHeight: 48,
-  },
-  menuIcon: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: theme.spacing.sm,
-  },
-  menuLabel: {
-    fontSize: theme.typography.fontSize.md,
-    color: theme.colors.text.primary,
-    fontWeight: theme.typography.fontWeight.medium,
-  },
-});

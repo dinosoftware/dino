@@ -3,7 +3,7 @@
  * List view of all playlists
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, RefreshControl, Share } from 'react-native';
 import { Plus, Download } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -13,7 +13,8 @@ import { CreatePlaylistModal } from '../../components/Modals/CreatePlaylistModal
 import { ConfirmModal } from '../../components/Modals/ConfirmModal';
 import { PlaylistMenu } from '../../components/Menus';
 import { LoadingSpinner, EmptyState, ErrorView } from '../../components/common';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
+import { Theme } from '../../config/theme';
 import { Playlist } from '../../api/opensubsonic/types';
 import { deletePlaylist } from '../../api/opensubsonic/playlists';
 import { createShare } from '../../api/opensubsonic/share';
@@ -22,11 +23,13 @@ import { useToastStore } from '../../stores/toastStore';
 import { useDownloadStore } from '../../stores/downloadStore';
 
 export const PlaylistsTab: React.FC = () => {
+  const theme = useTheme();
   const { data: playlists, isLoading, error, refetch, isRefetching } = usePlaylists();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
-  const { showToast } = useToastStore();
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   if (isLoading && !isRefetching) {
     return <LoadingSpinner message="Loading playlists..." />;
@@ -211,10 +214,13 @@ const PlaylistMenuWrapper: React.FC<{
 };
 
 const PlaylistItem: React.FC<{ playlist: Playlist; onLongPress: () => void }> = ({ playlist, onLongPress }) => {
+  const theme = useTheme();
   const { data: coverArtUrl } = useCoverArt(playlist.coverArt, 200);
   const { navigate } = useNavigationStore();
   const { isPlaylistDownloaded } = useDownloadStore();
   const isDownloaded = isPlaylistDownloaded(playlist.id);
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
   
   return (
     <TouchableOpacity
@@ -254,7 +260,7 @@ const PlaylistItem: React.FC<{ playlist: Playlist; onLongPress: () => void }> = 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
   },

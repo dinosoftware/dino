@@ -4,6 +4,7 @@
  */
 
 import Constants from 'expo-constants';
+import { ThemeMode } from './theme';
 
 // App Info
 export const APP_NAME = 'Dino';
@@ -69,6 +70,8 @@ export const STREAMING_FORMAT_OPTIONS = [
   { value: 'original', label: 'Original' },
 ] as const;
 
+export type BackgroundStyle = 'blur' | 'solid' | 'gradient';
+
 // Default Settings
 export const DEFAULT_SETTINGS = {
   // Streaming
@@ -118,6 +121,10 @@ export const DEFAULT_SETTINGS = {
   
   // Network
   usePostRequests: true, // Use POST for API requests by default (if server supports it)
+  
+  // Appearance
+  themeMode: 'dark' as ThemeMode,
+  backgroundStyle: 'blur' as BackgroundStyle,
 };
 
 // Lyrics Font Sizes (all text stays bold, only opacity changes)

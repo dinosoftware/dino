@@ -5,7 +5,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { ArrowLeft, Check, ChevronRight, Edit3, Plus, Server as ServerIcon, Trash2 } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Modal,
   ScrollView,
@@ -19,8 +19,8 @@ import {
 import { apiClient } from '../../api/client';
 import { Avatar } from '../../components/common';
 import { ConfirmModal } from '../../components/Modals/ConfirmModal';
-import { theme } from '../../config';
 import { APP_VERSION } from '../../config/constants';
+import { useTheme } from '../../hooks/useTheme';
 import { useAuthStore, useServerStore, useSettingsStore } from '../../stores';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { useToastStore } from '../../stores/toastStore';
@@ -30,7 +30,7 @@ interface SettingsScreenProps {
   onLogout: () => void;
 }
 
-type ModalType = 'quality-wifi' | 'quality-mobile' | 'format-wifi' | 'format-mobile' | 'lyrics-font' | 'servers' | 'max-downloads' | 'instant-mix' | 'storage-limit' | 'cache-size' | 'edit-credentials' | null;
+type ModalType = 'quality-wifi' | 'quality-mobile' | 'format-wifi' | 'format-mobile' | 'lyrics-font' | 'servers' | 'max-downloads' | 'instant-mix' | 'storage-limit' | 'cache-size' | 'edit-credentials' | 'theme' | 'background-style' | null;
 
 interface ConfirmDialog {
   visible: boolean;
@@ -42,6 +42,7 @@ interface ConfirmDialog {
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
+  const theme = useTheme();
   const { goBack } = useNavigationStore();
   const { showToast } = useToastStore();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
@@ -51,7 +52,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     message: '',
   });
 
-  // Edit server state
   const [editingServerId, setEditingServerId] = useState<string | null>(null);
   const [editServerName, setEditServerName] = useState('');
   const [editServerUrl, setEditServerUrl] = useState('');
@@ -73,10 +73,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
   const auth = getCurrentServerAuth();
   const { user } = useUserStore();
 
-  // Get username from user store (for API key auth) or fall back to auth store
   const username = user?.username || auth?.username || 'Unknown';
 
-  // Build avatar URL
   const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (user) {
@@ -102,8 +100,306 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     streamCacheSize,
     usePostRequests,
     autoFocusSearch,
+    themeMode,
+    backgroundStyle,
     updateSettings,
   } = useSettingsStore();
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background.primary,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: theme.spacing.lg,
+      paddingTop: theme.spacing.xxl + theme.spacing.sm,
+      paddingBottom: theme.spacing.lg,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    title: {
+      fontSize: theme.typography.fontSize.huge,
+      fontFamily: theme.typography.fontFamily.bold,
+      color: theme.colors.text.primary,
+      letterSpacing: theme.typography.letterSpacing.tight,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    section: {
+      marginBottom: theme.spacing.xl,
+    },
+    sectionTitle: {
+      fontSize: theme.typography.fontSize.xs,
+      fontWeight: theme.typography.fontWeight.semibold,
+      color: theme.colors.text.tertiary,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      paddingHorizontal: theme.spacing.lg,
+      marginBottom: theme.spacing.sm,
+    },
+    sectionCard: {
+      backgroundColor: theme.colors.background.card,
+      marginHorizontal: theme.spacing.lg,
+      borderRadius: theme.borderRadius.lg,
+      overflow: 'hidden',
+    },
+    settingItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: theme.spacing.md,
+      paddingHorizontal: theme.spacing.lg,
+      minHeight: 56,
+    },
+    borderTop: {
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+    },
+    settingLeft: {
+      flex: 1,
+      marginRight: theme.spacing.md,
+    },
+    settingLabel: {
+      fontSize: theme.typography.fontSize.md,
+      fontWeight: theme.typography.fontWeight.medium,
+      color: theme.colors.text.primary,
+      marginBottom: 2,
+    },
+    settingValue: {
+      fontSize: theme.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+    },
+    settingSubtitle: {
+      fontSize: theme.typography.fontSize.xs,
+      color: theme.colors.text.tertiary,
+      marginTop: 2,
+    },
+    settingDescription: {
+      fontSize: theme.typography.fontSize.xs,
+      color: theme.colors.text.tertiary,
+      marginTop: 4,
+    },
+    logoutButton: {
+      backgroundColor: theme.colors.error,
+      marginHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.md,
+      borderRadius: theme.borderRadius.lg,
+      alignItems: 'center',
+      marginTop: theme.spacing.md,
+    },
+    logoutButtonText: {
+      fontSize: theme.typography.fontSize.lg,
+      fontWeight: theme.typography.fontWeight.semibold,
+      color: theme.colors.text.primary,
+    },
+    modalOverlay: {
+      flex: 1,
+      justifyContent: 'center',
+    },
+    modalOverlayEnd: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    modalBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    },
+    modalContainer: {
+      backgroundColor: theme.colors.background.card,
+      borderTopLeftRadius: theme.borderRadius.xl,
+      borderTopRightRadius: theme.borderRadius.xl,
+      maxHeight: '90%',
+    },
+    swipeIndicator: {
+      alignItems: 'center',
+      paddingVertical: theme.spacing.sm,
+    },
+    swipeHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: theme.colors.text.tertiary,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    modalTitle: {
+      fontSize: theme.typography.fontSize.lg,
+      fontWeight: theme.typography.fontWeight.semibold,
+      color: theme.colors.text.primary,
+      flex: 1,
+    },
+    addButton: {
+      width: 36,
+      height: 36,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContent: {
+      paddingVertical: theme.spacing.md,
+    },
+    modalContentContainer: {
+      paddingBottom: 40,
+    },
+    optionItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: theme.spacing.md,
+      paddingHorizontal: theme.spacing.lg,
+      minHeight: 64,
+    },
+    optionInfo: {
+      flex: 1,
+      marginRight: theme.spacing.md,
+    },
+    optionLabel: {
+      fontSize: theme.typography.fontSize.md,
+      fontWeight: theme.typography.fontWeight.medium,
+      color: theme.colors.text.primary,
+      marginBottom: 2,
+    },
+    optionLabelSelected: {
+      color: theme.colors.accent,
+    },
+    optionDescription: {
+      fontSize: theme.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+    },
+    serverItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.lg,
+      minHeight: 72,
+    },
+    serverInfo: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    serverIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.colors.background.elevated,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: theme.spacing.md,
+    },
+    serverDetails: {
+      flex: 1,
+      marginRight: theme.spacing.md,
+    },
+    serverName: {
+      fontSize: theme.typography.fontSize.md,
+      fontWeight: theme.typography.fontWeight.medium,
+      color: theme.colors.text.primary,
+      marginBottom: 2,
+    },
+    serverNameSelected: {
+      color: theme.colors.accent,
+    },
+    serverUrl: {
+      fontSize: theme.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+    },
+    deleteButton: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginLeft: theme.spacing.sm,
+    },
+    serverActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    serverActionButton: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginLeft: theme.spacing.xs,
+    },
+    inputLabel: {
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.medium,
+      color: theme.colors.text.secondary,
+      marginBottom: theme.spacing.xs,
+    },
+    input: {
+      backgroundColor: theme.colors.background.secondary,
+      borderRadius: theme.borderRadius.lg,
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.md + 2,
+      fontSize: theme.typography.fontSize.base,
+      fontFamily: theme.typography.fontFamily.medium,
+      color: theme.colors.text.primary,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    saveButton: {
+      backgroundColor: theme.colors.accent,
+      borderRadius: theme.borderRadius.md,
+      paddingVertical: theme.spacing.md,
+      alignItems: 'center',
+      marginTop: theme.spacing.xl,
+      marginBottom: theme.spacing.lg,
+    },
+    saveButtonText: {
+      fontSize: theme.typography.fontSize.md,
+      fontWeight: theme.typography.fontWeight.semibold,
+      color: theme.colors.text.inverse,
+    },
+    authModeToggle: {
+      flexDirection: 'row',
+      marginTop: theme.spacing.sm,
+      backgroundColor: theme.colors.background.elevated,
+      borderRadius: theme.borderRadius.md,
+      padding: 4,
+    },
+    authToggleButton: {
+      flex: 1,
+      paddingVertical: theme.spacing.sm,
+      alignItems: 'center',
+      borderRadius: theme.borderRadius.sm,
+    },
+    authToggleButtonActive: {
+      backgroundColor: theme.colors.accent,
+    },
+    authToggleText: {
+      fontSize: theme.typography.fontSize.md,
+      fontWeight: theme.typography.fontWeight.medium,
+      color: theme.colors.text.secondary,
+    },
+    authToggleTextActive: {
+      color: theme.colors.accentForeground,
+      fontWeight: theme.typography.fontWeight.semibold,
+    },
+    editCredentialsContainer: {
+      backgroundColor: theme.colors.background.card,
+      borderRadius: theme.borderRadius.xl,
+      marginHorizontal: theme.spacing.lg,
+      maxWidth: 400,
+      width: '90%',
+      alignSelf: 'center',
+    },
+  }), [theme]);
 
   const qualityOptions = [
     { value: '0', label: 'Original', description: 'Highest quality, no transcoding' },
@@ -162,6 +458,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     { value: 1024, label: '1 GB', description: '1 GB cache' },
   ];
 
+  const themeOptions = [
+    { value: 'dark', label: 'Dark', description: 'Zinc-based dark theme' },
+    { value: 'light', label: 'Light', description: 'Clean light theme' },
+    { value: 'amoled', label: 'AMOLED', description: 'Pure black for OLED screens' },
+  ];
+
+  const backgroundStyleOptions = [
+    { value: 'blur', label: 'Blurred Cover', description: 'Blurred album art background' },
+    { value: 'solid', label: 'Solid Color', description: 'Theme-based solid background' },
+    { value: 'gradient', label: 'Dynamic Gradient', description: 'Color-changing gradient from cover art' },
+  ];
+
   const getQualityLabel = (value: string) => {
     const option = qualityOptions.find(opt => opt.value === value);
     return option?.label || value;
@@ -203,6 +511,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
       case 'cache-size':
         updateSettings({ streamCacheSize: value });
         break;
+      case 'theme':
+        updateSettings({ themeMode: value });
+        break;
+      case 'background-style':
+        updateSettings({ backgroundStyle: value });
+        break;
     }
 
     setActiveModal(null);
@@ -214,7 +528,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     const hasCredentials = checkAuth(serverId);
 
     if (hasCredentials) {
-      // Has saved credentials for this server - switch directly
       setConfirmDialog({
         visible: true,
         title: 'Switch Server',
@@ -222,25 +535,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
         confirmText: 'Switch',
         destructive: false,
         onConfirm: () => {
-          // Set new current server in server store
           setCurrentServer(serverId);
-
-          // Switch server in auth store (loads credentials into API client)
           const success = switchServer(serverId);
-
           setActiveModal(null);
 
           if (success) {
-            // Successfully switched - navigate to home and refresh
-            goBack(); // Go back to previous screen
+            goBack();
           } else {
-            // Failed to switch (shouldn't happen since we checked credentials)
             onLogout();
           }
         },
       });
     } else {
-      // No credentials - need to log in
       setConfirmDialog({
         visible: true,
         title: 'Switch Server',
@@ -250,7 +556,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
         onConfirm: () => {
           setCurrentServer(serverId);
           setActiveModal(null);
-          onLogout(); // Will show login screen
+          onLogout();
         },
       });
     }
@@ -292,10 +598,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     setEditServerName(server?.name || '');
     setEditServerUrl(server?.url || '');
 
-    // Detect current auth mode
     if (auth?.apiKey) {
       setEditAuthMode('apikey');
-      setEditApiKey(''); // Don't show existing API key
+      setEditApiKey('');
       setEditUsername('');
       setEditPassword('');
     } else {
@@ -313,7 +618,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
       return;
     }
 
-    // Validate fields
     if (!editServerName.trim()) {
       showToast('Please enter a server name', 'error');
       return;
@@ -327,16 +631,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      // Update server name and URL
       updateServer(editingServerId, editServerName.trim(), editServerUrl.trim());
 
-      // Update credentials based on auth mode
       if (editAuthMode === 'apikey' && editApiKey.trim()) {
-        // API Key authentication
         await useAuthStore.getState().loginWithApiKey(editingServerId, editApiKey.trim());
         showToast('Server and API key updated successfully');
       } else if (editAuthMode === 'password' && editUsername.trim() && editPassword.trim()) {
-        // Password authentication
         await useAuthStore.getState().login(editingServerId, editUsername.trim(), editPassword.trim());
         showToast('Server and credentials updated successfully');
       } else {
@@ -376,17 +676,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           onPress={() => setActiveModal(null)}
         />
         <View style={styles.modalContainer}>
-          {/* Swipe Handle */}
           <View style={styles.swipeIndicator}>
             <View style={styles.swipeHandle} />
           </View>
 
-          {/* Header */}
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{title}</Text>
           </View>
 
-          {/* Options */}
           <ScrollView
             style={styles.modalContent}
             contentContainerStyle={styles.modalContentContainer}
@@ -421,7 +718,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={goBack} style={styles.backButton}>
           <ArrowLeft size={24} color={theme.colors.text.primary} strokeWidth={2} />
@@ -431,7 +727,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Account Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>ACCOUNT</Text>
           <View style={styles.sectionCard}>
@@ -463,7 +758,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           </View>
         </View>
 
-        {/* Streaming Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>STREAMING</Text>
           <View style={styles.sectionCard}>
@@ -518,7 +812,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           </View>
         </View>
 
-        {/* Network Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>NETWORK</Text>
           <View style={styles.sectionCard}>
@@ -542,7 +835,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           </View>
         </View>
 
-        {/* Downloads Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>DOWNLOADS</Text>
           <View style={styles.sectionCard}>
@@ -580,7 +872,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           </View>
         </View>
 
-        {/* Storage Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>STORAGE</Text>
           <View style={styles.sectionCard}>
@@ -610,7 +901,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           </View>
         </View>
 
-        {/* Playback Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>PLAYBACK</Text>
           <View style={styles.sectionCard}>
@@ -677,7 +967,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
             <View style={[styles.settingItem, styles.borderTop]}>
               <View style={styles.settingLeft}>
                 <Text style={styles.settingLabel}>Include Share Message</Text>
-                <Text style={styles.settingDescription}>Add "Check out X" when sharing content</Text>
+                <Text style={styles.settingDescription}>Add &quot;Check out X&quot; when sharing content</Text>
               </View>
               <Switch
                 value={includeShareMessage}
@@ -696,7 +986,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           </View>
         </View>
 
-        {/* Radio Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>RADIO</Text>
           <View style={styles.sectionCard}>
@@ -715,7 +1004,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           </View>
         </View>
 
-        {/* Lyrics Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>LYRICS</Text>
           <View style={styles.sectionCard}>
@@ -754,7 +1042,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           </View>
         </View>
 
-        {/* Interface Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>INTERFACE</Text>
           <View style={styles.sectionCard}>
@@ -780,7 +1067,41 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           </View>
         </View>
 
-        {/* About Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>APPEARANCE</Text>
+          <View style={styles.sectionCard}>
+            <TouchableOpacity
+              style={styles.settingItem}
+              onPress={() => setActiveModal('theme')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Theme</Text>
+                <Text style={styles.settingValue}>
+                  {themeMode.charAt(0).toUpperCase() + themeMode.slice(1)}
+                </Text>
+              </View>
+              <ChevronRight size={20} color={theme.colors.text.tertiary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.settingItem, styles.borderTop]}
+              onPress={() => setActiveModal('background-style')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Background Style</Text>
+                <Text style={styles.settingDescription}>Player and detail screen backgrounds</Text>
+                <Text style={styles.settingValue}>
+                  {backgroundStyle === 'blur' ? 'Blurred Cover' : 
+                   backgroundStyle === 'gradient' ? 'Dynamic Gradient' : 'Solid Color'}
+                </Text>
+              </View>
+              <ChevronRight size={20} color={theme.colors.text.tertiary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>ABOUT</Text>
           <View style={styles.sectionCard}>
@@ -793,7 +1114,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           </View>
         </View>
 
-        {/* Logout Button */}
         <TouchableOpacity
           style={styles.logoutButton}
           onPress={() => {
@@ -808,7 +1128,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Option Modals */}
       {renderOptionModal('Streaming Quality (WiFi)', qualityOptions, streamingQualityWiFi, 'quality-wifi')}
       {renderOptionModal('Streaming Quality (Mobile)', qualityOptions, streamingQualityMobile, 'quality-mobile')}
       {renderOptionModal('Streaming Format (WiFi)', formatOptions, streamingFormatWiFi, 'format-wifi')}
@@ -818,8 +1137,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
       {renderOptionModal('Instant Mix Size', instantMixOptions, instantMixSize, 'instant-mix')}
       {renderOptionModal('Download Storage Limit', storageLimitOptions, storageLimit, 'storage-limit')}
       {renderOptionModal('Stream Cache Size', cacheSizeOptions, streamCacheSize, 'cache-size')}
+      {renderOptionModal('Theme', themeOptions, themeMode, 'theme')}
+      {renderOptionModal('Background Style', backgroundStyleOptions, backgroundStyle, 'background-style')}
 
-      {/* Confirm Dialog */}
       <ConfirmModal
         visible={confirmDialog.visible}
         title={confirmDialog.title}
@@ -830,7 +1150,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
         destructive={confirmDialog.destructive}
       />
 
-      {/* Server Management Modal */}
       <Modal
         visible={activeModal === 'servers'}
         transparent
@@ -845,12 +1164,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
             onPress={() => setActiveModal(null)}
           />
           <View style={styles.modalContainer}>
-            {/* Swipe Handle */}
             <View style={styles.swipeIndicator}>
               <View style={styles.swipeHandle} />
             </View>
 
-            {/* Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Servers</Text>
               <TouchableOpacity onPress={handleAddServer} style={styles.addButton}>
@@ -858,7 +1175,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
               </TouchableOpacity>
             </View>
 
-            {/* Server List */}
             <ScrollView
               style={styles.modalContent}
               contentContainerStyle={styles.modalContentContainer}
@@ -912,7 +1228,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
         </View>
       </Modal>
 
-      {/* Edit Credentials Modal */}
       <Modal
         visible={activeModal === 'edit-credentials'}
         transparent
@@ -927,12 +1242,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
             onPress={() => setActiveModal(null)}
           />
           <View style={styles.editCredentialsContainer}>
-            {/* Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit Server</Text>
             </View>
 
-            {/* Form */}
             <ScrollView style={{ paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.md }}>
               <Text style={styles.inputLabel}>Server Name</Text>
               <TextInput
@@ -957,7 +1270,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                 keyboardType="url"
               />
 
-              {/* Auth Mode Toggle */}
               <Text style={[styles.inputLabel, { marginTop: theme.spacing.lg }]}>Authentication</Text>
               <View style={styles.authModeToggle}>
                 <TouchableOpacity
@@ -1038,303 +1350,3 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background.primary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.xxl + theme.spacing.sm,
-    paddingBottom: theme.spacing.lg,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: theme.typography.fontSize.huge,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.text.primary,
-    letterSpacing: theme.typography.letterSpacing.tight,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  section: {
-    marginBottom: theme.spacing.xl,
-  },
-  sectionTitle: {
-    fontSize: theme.typography.fontSize.xs,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.text.tertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.sm,
-  },
-  sectionCard: {
-    backgroundColor: theme.colors.background.card,
-    marginHorizontal: theme.spacing.lg,
-    borderRadius: theme.borderRadius.lg,
-    overflow: 'hidden',
-  },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    minHeight: 56,
-  },
-  borderTop: {
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  settingLeft: {
-    flex: 1,
-    marginRight: theme.spacing.md,
-  },
-  settingLabel: {
-    fontSize: theme.typography.fontSize.md,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.text.primary,
-    marginBottom: 2,
-  },
-  settingValue: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
-  },
-  settingSubtitle: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.text.tertiary,
-    marginTop: 2,
-  },
-  settingDescription: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.text.tertiary,
-    marginTop: 4,
-  },
-  logoutButton: {
-    backgroundColor: theme.colors.error,
-    marginHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.borderRadius.lg,
-    alignItems: 'center',
-    marginTop: theme.spacing.md,
-  },
-  logoutButtonText: {
-    fontSize: theme.typography.fontSize.lg,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.text.primary,
-  },
-
-  // Modal Styles (QAM-style)
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  modalOverlayEnd: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-  },
-  modalContainer: {
-    backgroundColor: theme.colors.background.card,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    maxHeight: '90%',
-  },
-  swipeIndicator: {
-    alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
-  },
-  swipeHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.text.tertiary,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  modalTitle: {
-    fontSize: theme.typography.fontSize.lg,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.text.primary,
-    flex: 1,
-  },
-  addButton: {
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    paddingVertical: theme.spacing.md,
-  },
-  modalContentContainer: {
-    paddingBottom: 40,
-  },
-  optionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    minHeight: 64,
-  },
-  optionInfo: {
-    flex: 1,
-    marginRight: theme.spacing.md,
-  },
-  optionLabel: {
-    fontSize: theme.typography.fontSize.md,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.text.primary,
-    marginBottom: 2,
-  },
-  optionLabelSelected: {
-    color: theme.colors.accent,
-  },
-  optionDescription: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
-  },
-
-  // Server Management Styles
-  serverItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    minHeight: 72,
-  },
-  serverInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  serverIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.background.elevated,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: theme.spacing.md,
-  },
-  serverDetails: {
-    flex: 1,
-    marginRight: theme.spacing.md,
-  },
-  serverName: {
-    fontSize: theme.typography.fontSize.md,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.text.primary,
-    marginBottom: 2,
-  },
-  serverNameSelected: {
-    color: theme.colors.accent,
-  },
-  serverUrl: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
-  },
-  deleteButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: theme.spacing.sm,
-  },
-  serverActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  serverActionButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: theme.spacing.xs,
-  },
-  inputLabel: {
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.xs,
-  },
-  input: {
-    backgroundColor: theme.colors.background.secondary,
-    borderRadius: theme.borderRadius.lg,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.md + 2,
-    fontSize: theme.typography.fontSize.base,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.text.primary,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  saveButton: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: theme.borderRadius.md,
-    paddingVertical: theme.spacing.md,
-    alignItems: 'center',
-    marginTop: theme.spacing.xl,
-    marginBottom: theme.spacing.lg,
-  },
-  saveButtonText: {
-    fontSize: theme.typography.fontSize.md,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.text.inverse,
-  },
-  authModeToggle: {
-    flexDirection: 'row',
-    marginTop: theme.spacing.sm,
-    backgroundColor: theme.colors.background.elevated,
-    borderRadius: theme.borderRadius.md,
-    padding: 4,
-  },
-  authToggleButton: {
-    flex: 1,
-    paddingVertical: theme.spacing.sm,
-    alignItems: 'center',
-    borderRadius: theme.borderRadius.sm,
-  },
-  authToggleButtonActive: {
-    backgroundColor: theme.colors.accent,
-  },
-  authToggleText: {
-    fontSize: theme.typography.fontSize.md,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.text.secondary,
-  },
-  authToggleTextActive: {
-    color: theme.colors.accentForeground,
-    fontWeight: theme.typography.fontWeight.semibold,
-  },
-  editCredentialsContainer: {
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.xl,
-    marginHorizontal: theme.spacing.lg,
-    maxWidth: 400,
-    width: '90%',
-    alignSelf: 'center',
-  },
-});

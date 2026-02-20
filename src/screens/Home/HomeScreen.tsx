@@ -14,7 +14,7 @@ import { RecommendedAlbums } from './components/RecommendedAlbums';
 import { UserSettingsMenu, AppInfoSheet } from '../../components/Menus';
 import { Avatar } from '../../components/common';
 import { useAuthStore, useServerStore, useUserStore } from '../../stores';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 
 const queryClient = new QueryClient();
 
@@ -23,6 +23,7 @@ interface HomeScreenProps {
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout }) => {
+  const theme = useTheme();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showAppInfo, setShowAppInfo] = useState(false);
   
@@ -40,6 +41,40 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout }) => {
     const creds = credentials[currentServerId];
     return creds?.username || 'User';
   }, [credentials, currentServerId, user]);
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background.primary,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: theme.spacing.lg,
+      paddingTop: theme.spacing.xxl + theme.spacing.sm,
+      paddingBottom: theme.spacing.xl,
+    },
+    title: {
+      fontSize: theme.typography.fontSize.huge,
+      fontFamily: theme.typography.fontFamily.bold,
+      color: theme.colors.text.primary,
+      letterSpacing: theme.typography.letterSpacing.tight,
+    },
+    profileButton: {
+      width: 40,
+      height: 40,
+      borderRadius: theme.borderRadius.round,
+      backgroundColor: theme.colors.background.card,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+  }), [theme]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -89,37 +124,3 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onLogout }) => {
     </QueryClientProvider>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background.primary,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.xxl + theme.spacing.sm,
-    paddingBottom: theme.spacing.xl,
-  },
-  title: {
-    fontSize: theme.typography.fontSize.huge,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.text.primary,
-    letterSpacing: theme.typography.letterSpacing.tight,
-  },
-  profileButton: {
-    width: 40,
-    height: 40,
-    borderRadius: theme.borderRadius.round,
-    backgroundColor: theme.colors.background.card,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});

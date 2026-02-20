@@ -5,7 +5,8 @@
 
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { STORAGE_KEYS, DEFAULT_SETTINGS } from '../config/constants';
+import { STORAGE_KEYS, DEFAULT_SETTINGS, BackgroundStyle } from '../config/constants';
+import { ThemeMode } from '../config/theme';
 import * as Network from 'expo-network';
 
 type StreamingQuality = '0' | '64' | '96' | '128' | '160' | '192' | '256' | '320';
@@ -13,57 +14,35 @@ type StreamingFormat = 'mp3' | 'opus' | 'aac' | 'flac' | 'original';
 type LyricsFontSize = 'small' | 'medium' | 'large';
 
 interface Settings {
-  // Streaming
   streamingQualityWiFi: StreamingQuality;
   streamingQualityMobile: StreamingQuality;
   streamingFormatWiFi: StreamingFormat;
   streamingFormatMobile: StreamingFormat;
-  
-  // Downloads
   wifiOnlyDownloads: boolean;
   maxConcurrentDownloads: number;
-  
-  // Playback
   crossfadeDuration: number;
   gaplessPlayback: boolean;
   normalizeVolume: boolean;
-  
-  // Instant Mix
   instantMixSize: number;
-  
-  // Storage
-  storageLimit: number; // in MB
-  streamCacheSize: number; // in MB
-  
-  // Chromecast
+  storageLimit: number;
+  streamCacheSize: number;
   autoCastOnConnect: boolean;
-  
-  // Lyrics
   lyricsFontSize: LyricsFontSize;
   autoScrollLyrics: boolean;
   showLyricsTimestamps: boolean;
-  
-  // Queue Sync
   autoSyncQueue: boolean;
-  queueSyncInterval: number; // in milliseconds
-  
-  // Scrobbling
+  queueSyncInterval: number;
   enableScrobbling: boolean;
-  scrobbleProgressInterval: number; // in milliseconds
-  
-  // Sharing
-  includeShareMessage: boolean; // "Check out X" in share messages
-  
-  // UI
-  qualityBadgeDetailed: boolean; // Show detailed quality (e.g., "320 kbps MP3") vs simple (e.g., "HIGH")
-  autoFocusSearch: boolean; // Auto-focus search bar when entering search screen
-  
-  // Network
-  usePostRequests: boolean; // Use POST for API requests (if server supports formPost extension)
+  scrobbleProgressInterval: number;
+  includeShareMessage: boolean;
+  qualityBadgeDetailed: boolean;
+  autoFocusSearch: boolean;
+  usePostRequests: boolean;
+  themeMode: ThemeMode;
+  backgroundStyle: BackgroundStyle;
 }
 
 interface SettingsStore extends Settings {
-  // Actions
   updateSettings: (settings: Partial<Settings>) => void;
   resetToDefaults: () => void;
   getActiveStreamingQuality: () => Promise<StreamingQuality>;
@@ -76,7 +55,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   updateSettings: (settings: Partial<Settings>) => {
     set((state) => {
       const newSettings = { ...state, ...settings };
-      // Save to storage (exclude actions)
       const { updateSettings, resetToDefaults, getActiveStreamingQuality, loadFromStorage, ...settingsToSave } = newSettings;
       AsyncStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settingsToSave));
       return newSettings;
@@ -96,7 +74,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       return isWiFi ? get().streamingQualityWiFi : get().streamingQualityMobile;
     } catch (error) {
       console.error('Failed to get network state:', error);
-      return get().streamingQualityMobile; // Fallback to mobile quality
+      return get().streamingQualityMobile;
     }
   },
 

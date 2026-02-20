@@ -15,9 +15,10 @@ import { trackPlayerService } from '../services/player/TrackPlayerService';
 import { queueSyncManager } from '../services/player/QueueSyncManager';
 import { getOpenSubsonicExtensions, supportsFormPost, supportsApiKeyAuth, supportsSongLyrics } from '../api/opensubsonic/extensions';
 import { apiClient } from '../api/client';
-import { theme } from '../config';
+import { useTheme } from '../hooks/useTheme';
 
 export const AppNavigator: React.FC = () => {
+  const theme = useTheme();
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   
@@ -222,7 +223,7 @@ export const AppNavigator: React.FC = () => {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background.primary }]}>
         <ActivityIndicator size="large" color={theme.colors.accent} />
       </View>
     );
@@ -247,6 +248,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.background.primary,
   },
 });

@@ -3,7 +3,7 @@
  * Modal to display all songs for an artist (top songs or all album songs)
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import {
 import { X, Play, Shuffle } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Track } from '../../api/opensubsonic/types';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 import { TrackRow } from '../Cards/TrackRow';
 
 interface ArtistSongsModalProps {
@@ -44,6 +44,99 @@ export const ArtistSongsModal: React.FC<ArtistSongsModalProps> = ({
   onPlayAll,
   onShuffle,
 }) => {
+  const theme = useTheme();
+
+  const styles = useMemo(() => StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      justifyContent: 'flex-end',
+    },
+    modal: {
+      backgroundColor: theme.colors.background.card,
+      borderTopLeftRadius: theme.borderRadius.xl,
+      borderTopRightRadius: theme.borderRadius.xl,
+      height: '85%',
+      paddingBottom: theme.spacing.xl,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: theme.spacing.lg,
+      paddingTop: theme.spacing.lg,
+      paddingBottom: theme.spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    title: {
+      fontSize: theme.typography.fontSize.xl,
+      fontFamily: theme.typography.fontFamily.bold,
+      color: theme.colors.text.primary,
+    },
+    closeButton: {
+      padding: theme.spacing.xs,
+    },
+    actions: {
+      flexDirection: 'row',
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.md,
+      gap: theme.spacing.sm,
+    },
+    actionButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.background.muted,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.md,
+      paddingVertical: theme.spacing.sm,
+      gap: theme.spacing.xs,
+    },
+    actionButtonText: {
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.medium,
+      color: theme.colors.text.primary,
+    },
+    trackCount: {
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.regular,
+      color: theme.colors.text.secondary,
+      paddingHorizontal: theme.spacing.lg,
+      marginBottom: theme.spacing.sm,
+    },
+    listContainer: {
+      flex: 1,
+    },
+    listContent: {
+      paddingHorizontal: theme.spacing.sm,
+      paddingBottom: theme.spacing.md,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.xxl,
+    },
+    loadingText: {
+      marginTop: theme.spacing.md,
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.regular,
+      color: theme.colors.text.secondary,
+    },
+    emptyContainer: {
+      paddingVertical: theme.spacing.xxl,
+      alignItems: 'center',
+    },
+    emptyText: {
+      fontSize: theme.typography.fontSize.base,
+      fontFamily: theme.typography.fontFamily.regular,
+      color: theme.colors.text.secondary,
+    },
+  }), [theme]);
+
   const handlePlayAll = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onPlayAll();
@@ -64,7 +157,6 @@ export const ArtistSongsModal: React.FC<ArtistSongsModalProps> = ({
     >
       <View style={styles.overlay}>
         <View style={styles.modal}>
-          {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>{title}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -72,7 +164,6 @@ export const ArtistSongsModal: React.FC<ArtistSongsModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Action Buttons */}
           <View style={styles.actions}>
             <TouchableOpacity
               style={styles.actionButton}
@@ -95,12 +186,10 @@ export const ArtistSongsModal: React.FC<ArtistSongsModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Track count */}
           <Text style={styles.trackCount}>
             {tracks.length} {tracks.length === 1 ? 'song' : 'songs'}
           </Text>
 
-          {/* Songs List */}
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={theme.colors.accent} />
@@ -142,94 +231,3 @@ export const ArtistSongsModal: React.FC<ArtistSongsModalProps> = ({
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  modal: {
-    backgroundColor: theme.colors.background.card,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    height: '85%',
-    paddingBottom: theme.spacing.xl,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  title: {
-    fontSize: theme.typography.fontSize.xl,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.text.primary,
-  },
-  closeButton: {
-    padding: theme.spacing.xs,
-  },
-  actions: {
-    flexDirection: 'row',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    gap: theme.spacing.sm,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.background.muted,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    paddingVertical: theme.spacing.sm,
-    gap: theme.spacing.xs,
-  },
-  actionButtonText: {
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.text.primary,
-  },
-  trackCount: {
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.text.secondary,
-    paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.sm,
-  },
-  listContainer: {
-    flex: 1,
-  },
-  listContent: {
-    paddingHorizontal: theme.spacing.sm,
-    paddingBottom: theme.spacing.md,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.xxl,
-  },
-  loadingText: {
-    marginTop: theme.spacing.md,
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.text.secondary,
-  },
-  emptyContainer: {
-    paddingVertical: theme.spacing.xxl,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: theme.typography.fontSize.base,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.text.secondary,
-  },
-});

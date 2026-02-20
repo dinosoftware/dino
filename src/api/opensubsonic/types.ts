@@ -33,6 +33,8 @@ export interface Album {
   name: string;
   artist?: string;
   artistId?: string;
+  artists?: Artist[];
+  displayArtist?: string;
   coverArt?: string;
   songCount: number;
   duration: number;

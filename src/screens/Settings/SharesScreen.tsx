@@ -3,7 +3,7 @@
  * Manage all created shares
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,9 +22,10 @@ import { useNavigationStore } from '../../stores/navigationStore';
 import { LoadingSpinner, EmptyState, ErrorView } from '../../components/common';
 import { ConfirmModal } from '../../components/Modals/ConfirmModal';
 import { EditShareModal } from '../../components/Modals/EditShareModal';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 
 export const SharesScreen: React.FC = () => {
+  const theme = useTheme();
   const { goBack } = useNavigationStore();
   const queryClient = useQueryClient();
   const [selectedShare, setSelectedShare] = useState<Share | null>(null);
@@ -35,6 +36,89 @@ export const SharesScreen: React.FC = () => {
     queryKey: ['shares'],
     queryFn: getShares,
   });
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background.primary,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: theme.spacing.lg,
+      paddingTop: theme.spacing.xxl + theme.spacing.sm,
+      paddingBottom: theme.spacing.lg,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    title: {
+      fontSize: theme.typography.fontSize.huge,
+      fontFamily: theme.typography.fontFamily.bold,
+      color: theme.colors.text.primary,
+      letterSpacing: theme.typography.letterSpacing.tight,
+    },
+    list: {
+      padding: theme.spacing.lg,
+    },
+    shareItem: {
+      backgroundColor: theme.colors.background.card,
+      borderRadius: theme.borderRadius.lg,
+      padding: theme.spacing.md,
+      marginBottom: theme.spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    shareItemExpired: {
+      opacity: 0.5,
+    },
+    shareInfo: {
+      flex: 1,
+      marginRight: theme.spacing.md,
+    },
+    shareDescription: {
+      fontSize: theme.typography.fontSize.md,
+      fontFamily: theme.typography.fontFamily.semibold,
+      color: theme.colors.text.primary,
+      marginBottom: theme.spacing.xs,
+    },
+    shareMeta: {
+      flexDirection: 'row',
+      gap: theme.spacing.md,
+    },
+    metaItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    metaText: {
+      fontSize: theme.typography.fontSize.xs,
+      color: theme.colors.text.tertiary,
+    },
+    expiredText: {
+      fontSize: theme.typography.fontSize.xs,
+      color: theme.colors.error,
+      marginTop: theme.spacing.xs,
+      fontFamily: theme.typography.fontFamily.semibold,
+    },
+    shareActions: {
+      flexDirection: 'row',
+      gap: theme.spacing.xs,
+    },
+    actionButton: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.colors.background.elevated,
+      borderRadius: theme.borderRadius.md,
+    },
+  }), [theme]);
 
   const handleCopyLink = async (url: string) => {
     try {
@@ -81,6 +165,84 @@ export const SharesScreen: React.FC = () => {
     });
   };
 
+  interface ShareItemProps {
+    share: Share;
+    onCopyLink: (url: string) => void;
+    onShareLink: (share: Share) => void;
+    onEdit: () => void;
+    onDelete: () => void;
+  }
+
+  const ShareItem: React.FC<ShareItemProps> = ({ share, onCopyLink, onShareLink, onEdit, onDelete }) => {
+    const isExpired = share.expires && new Date(share.expires) < new Date();
+
+    return (
+      <View style={[styles.shareItem, isExpired && styles.shareItemExpired]}>
+        <View style={styles.shareInfo}>
+          <Text style={styles.shareDescription} numberOfLines={2}>
+            {share.description || 'Shared content'}
+          </Text>
+          <View style={styles.shareMeta}>
+            <View style={styles.metaItem}>
+              <Clock size={14} color={theme.colors.text.tertiary} />
+              <Text style={styles.metaText}>
+                Created {formatDate(share.created)}
+              </Text>
+            </View>
+            <View style={styles.metaItem}>
+              <Eye size={14} color={theme.colors.text.tertiary} />
+              <Text style={styles.metaText}>
+                {share.visitCount} {share.visitCount === 1 ? 'visit' : 'visits'}
+              </Text>
+            </View>
+          </View>
+          {isExpired && (
+            <Text style={styles.expiredText}>Expired</Text>
+          )}
+        </View>
+
+        <View style={styles.shareActions}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onCopyLink(share.url);
+            }}
+          >
+            <Copy size={20} color={theme.colors.text.secondary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onShareLink(share);
+            }}
+          >
+            <ExternalLink size={20} color={theme.colors.text.secondary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onEdit();
+            }}
+          >
+            <Edit size={20} color={theme.colors.accent} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              onDelete();
+            }}
+          >
+            <Trash2 size={20} color={theme.colors.error} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
   if (isLoading && !isRefetching) {
     return <LoadingSpinner message="Loading shares..." />;
   }
@@ -91,7 +253,6 @@ export const SharesScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={goBack} style={styles.backButton}>
           <ArrowLeft size={24} color={theme.colors.text.primary} strokeWidth={2} />
@@ -100,7 +261,6 @@ export const SharesScreen: React.FC = () => {
         <View style={styles.backButton} />
       </View>
 
-      {/* Shares List */}
       {!shares || shares.length === 0 ? (
         <EmptyState
           title="No shares yet"
@@ -138,7 +298,6 @@ export const SharesScreen: React.FC = () => {
         />
       )}
 
-      {/* Edit Modal */}
       <EditShareModal
         visible={showEditModal}
         onClose={() => {
@@ -151,7 +310,6 @@ export const SharesScreen: React.FC = () => {
         share={selectedShare}
       />
 
-      {/* Delete Confirmation */}
       <ConfirmModal
         visible={showDeleteConfirm}
         title="Delete Share"
@@ -168,174 +326,3 @@ export const SharesScreen: React.FC = () => {
     </View>
   );
 };
-
-interface ShareItemProps {
-  share: Share;
-  onCopyLink: (url: string) => void;
-  onShareLink: (share: Share) => void;
-  onEdit: () => void;
-  onDelete: () => void;
-}
-
-const ShareItem: React.FC<ShareItemProps> = ({ share, onCopyLink, onShareLink, onEdit, onDelete }) => {
-  const isExpired = share.expires && new Date(share.expires) < new Date();
-
-  return (
-    <View style={[styles.shareItem, isExpired && styles.shareItemExpired]}>
-      <View style={styles.shareInfo}>
-        <Text style={styles.shareDescription} numberOfLines={2}>
-          {share.description || 'Shared content'}
-        </Text>
-        <View style={styles.shareMeta}>
-          <View style={styles.metaItem}>
-            <Clock size={14} color={theme.colors.text.tertiary} />
-            <Text style={styles.metaText}>
-              Created {formatDate(share.created)}
-            </Text>
-          </View>
-          <View style={styles.metaItem}>
-            <Eye size={14} color={theme.colors.text.tertiary} />
-            <Text style={styles.metaText}>
-              {share.visitCount} {share.visitCount === 1 ? 'visit' : 'visits'}
-            </Text>
-          </View>
-        </View>
-        {isExpired && (
-          <Text style={styles.expiredText}>Expired</Text>
-        )}
-      </View>
-
-      <View style={styles.shareActions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onCopyLink(share.url);
-          }}
-        >
-          <Copy size={20} color={theme.colors.text.secondary} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onShareLink(share);
-          }}
-        >
-          <ExternalLink size={20} color={theme.colors.text.secondary} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onEdit();
-          }}
-        >
-          <Edit size={20} color={theme.colors.accent} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            onDelete();
-          }}
-        >
-          <Trash2 size={20} color={theme.colors.error} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-};
-
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background.primary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.xxl + theme.spacing.sm,
-    paddingBottom: theme.spacing.lg,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: theme.typography.fontSize.huge,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.text.primary,
-    letterSpacing: theme.typography.letterSpacing.tight,
-  },
-  list: {
-    padding: theme.spacing.lg,
-  },
-  shareItem: {
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  shareItemExpired: {
-    opacity: 0.5,
-  },
-  shareInfo: {
-    flex: 1,
-    marginRight: theme.spacing.md,
-  },
-  shareDescription: {
-    fontSize: theme.typography.fontSize.md,
-    fontFamily: theme.typography.fontFamily.semibold,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
-  },
-  shareMeta: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.text.tertiary,
-  },
-  expiredText: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.error,
-    marginTop: theme.spacing.xs,
-    fontFamily: theme.typography.fontFamily.semibold,
-  },
-  shareActions: {
-    flexDirection: 'row',
-    gap: theme.spacing.xs,
-  },
-    actionButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.background.elevated,
-    borderRadius: theme.borderRadius.md,
-  },
-});
-

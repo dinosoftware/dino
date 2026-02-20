@@ -3,7 +3,7 @@
  * Auto-swiping banner with random songs
  */
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -28,26 +28,31 @@ import { useQueueStore } from '../../../stores/queueStore';
 import { usePlayerStore } from '../../../stores/playerStore';
 import { useServerStore } from '../../../stores/serverStore';
 import { trackPlayerService } from '../../../services/player/TrackPlayerService';
-import { theme } from '../../../config';
+import { useTheme } from '../../../hooks/useTheme';
+import { Theme } from '../../../config/theme';
 import { Track } from '../../../api/opensubsonic/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_HEIGHT = 200;
-const CARD_WIDTH = SCREEN_WIDTH - theme.spacing.lg * 2;
-const CARD_GAP = theme.spacing.md;
-const AUTO_SCROLL_INTERVAL = 5000; // 5 seconds
 
 export const HeroBanner: React.FC = () => {
+  const theme = useTheme();
+  const CARD_WIDTH = SCREEN_WIDTH - theme.spacing.lg * 2;
+  const CARD_GAP = theme.spacing.md;
+  const AUTO_SCROLL_INTERVAL = 5000;
+  
   const scrollViewRef = useRef<ScrollView>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { currentServerId } = useServerStore();
 
+  const styles = useMemo(() => createStyles(theme, CARD_WIDTH), [theme, CARD_WIDTH]);
+
   // Fetch random songs
   const { data: response, isLoading } = useQuery({
     queryKey: ['hero-random-songs', currentServerId],
     queryFn: async () => getRandomSongs(10),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
     enabled: !!currentServerId,
   });
 
@@ -77,7 +82,7 @@ export const HeroBanner: React.FC = () => {
         clearInterval(autoScrollTimer.current);
       }
     };
-  }, [tracks.length]);
+  }, [tracks.length, CARD_WIDTH, CARD_GAP]);
 
   // Handle manual scroll
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -131,7 +136,7 @@ export const HeroBanner: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
       >
         {tracks.map((track) => (
-          <HeroCard key={track.id} track={track} />
+          <HeroCard key={track.id} track={track} cardWidth={CARD_WIDTH} />
         ))}
       </ScrollView>
 
@@ -155,13 +160,17 @@ export const HeroBanner: React.FC = () => {
 
 interface HeroCardProps {
   track: Track;
+  cardWidth: number;
 }
 
-const HeroCard: React.FC<HeroCardProps> = ({ track }) => {
+const HeroCard: React.FC<HeroCardProps> = ({ track, cardWidth }) => {
+  const theme = useTheme();
   const { data: coverArtUrl } = useCoverArt(track.coverArt, 500);
   const { navigate } = useNavigationStore();
   const { setQueue } = useQueueStore();
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
+
+  const styles = useMemo(() => createCardStyles(theme, cardWidth), [theme, cardWidth]);
 
   const handlePlay = async () => {
     try {
@@ -278,16 +287,36 @@ const HeroCard: React.FC<HeroCardProps> = ({ track }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme, cardWidth: number) => StyleSheet.create({
   container: {
     marginBottom: theme.spacing.xl,
   },
   scrollContent: {
     paddingHorizontal: theme.spacing.lg,
-    gap: CARD_GAP,
+    gap: theme.spacing.md,
   },
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: theme.spacing.md,
+    gap: theme.spacing.xs,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.colors.background.elevated,
+  },
+  dotActive: {
+    width: 20,
+    backgroundColor: theme.colors.accent,
+  },
+});
+
+const createCardStyles = (theme: Theme, cardWidth: number) => StyleSheet.create({
   card: {
-    width: CARD_WIDTH,
+    width: cardWidth,
     height: BANNER_HEIGHT,
     borderRadius: theme.borderRadius.xl,
     overflow: 'hidden',
@@ -357,22 +386,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: theme.colors.border,
-  },
-  pagination: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: theme.spacing.md,
-    gap: theme.spacing.xs,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.colors.background.elevated,
-  },
-  dotActive: {
-    width: 20,
-    backgroundColor: theme.colors.accent,
   },
 });

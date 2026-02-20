@@ -3,10 +3,10 @@
  * Non-obtrusive top-center toast for success messages
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { Check, Info, AlertCircle } from 'lucide-react-native';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export type ToastType = 'success' | 'info' | 'error';
@@ -26,16 +26,47 @@ export const Toast: React.FC<ToastProps> = ({
   duration = 3000,
   onHide,
 }) => {
+  const theme = useTheme();
   const translateY = useRef(new Animated.Value(-100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
 
-  // Debug logging
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      position: 'absolute',
+      left: '5%',
+      right: '5%',
+      borderRadius: theme.borderRadius.lg,
+      borderWidth: 1,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+      zIndex: 9999,
+    },
+    contentContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.md,
+    },
+    iconContainer: {
+      marginRight: theme.spacing.sm,
+    },
+    message: {
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.medium,
+      color: '#FFFFFF',
+      flex: 1,
+      lineHeight: 20,
+    },
+  }), [theme]);
+
   console.log('[Toast] Rendering:', { message, type, visible, messageLength: message?.length });
 
   useEffect(() => {
     if (visible) {
-      // Show animation
       Animated.parallel([
         Animated.timing(translateY, {
           toValue: 0,
@@ -49,7 +80,6 @@ export const Toast: React.FC<ToastProps> = ({
         }),
       ]).start();
 
-      // Auto-hide after duration
       const timer = setTimeout(() => {
         hideToast();
       }, duration);
@@ -92,12 +122,12 @@ export const Toast: React.FC<ToastProps> = ({
   const getBackgroundColor = () => {
     switch (type) {
       case 'success':
-        return 'rgba(21, 128, 61, 0.95)'; // Darker green for better contrast
+        return 'rgba(21, 128, 61, 0.95)';
       case 'error':
-        return 'rgba(185, 28, 28, 0.95)'; // Darker red for better contrast
+        return 'rgba(185, 28, 28, 0.95)';
       case 'info':
       default:
-        return 'rgba(39, 39, 42, 0.95)'; // Darker zinc for better contrast
+        return 'rgba(39, 39, 42, 0.95)';
     }
   };
 
@@ -135,35 +165,3 @@ export const Toast: React.FC<ToastProps> = ({
     </Animated.View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    left: '5%',
-    right: '5%',
-    borderRadius: theme.borderRadius.lg,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    zIndex: 9999,
-  },
-  contentContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-  },
-  iconContainer: {
-    marginRight: theme.spacing.sm,
-  },
-  message: {
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: '#FFFFFF',
-    flex: 1,
-    lineHeight: 20,
-  },
-});

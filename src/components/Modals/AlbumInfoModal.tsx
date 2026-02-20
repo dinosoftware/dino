@@ -3,7 +3,7 @@
  * Displays detailed information about an album
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { X } from 'lucide-react-native';
 import { Album } from '../../api/opensubsonic/types';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 
 interface AlbumInfoModalProps {
   visible: boolean;
@@ -25,13 +25,77 @@ interface AlbumInfoModalProps {
 }
 
 export const AlbumInfoModal: React.FC<AlbumInfoModalProps> = ({ visible, onClose, album, coverArtUrl }) => {
-  if (!album) return null;
+  const theme = useTheme();
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  const styles = useMemo(() => StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      justifyContent: 'flex-end',
+    },
+    container: {
+      backgroundColor: theme.colors.background.card,
+      borderTopLeftRadius: theme.borderRadius.xl,
+      borderTopRightRadius: theme.borderRadius.xl,
+      maxHeight: '90%',
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: theme.spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    title: {
+      fontSize: theme.typography.fontSize.xl,
+      fontFamily: theme.typography.fontFamily.bold,
+      color: theme.colors.text.primary,
+    },
+    closeButton: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    content: {
+      padding: theme.spacing.lg,
+    },
+    artworkContainer: {
+      alignItems: 'center',
+      marginBottom: theme.spacing.xl,
+    },
+    artwork: {
+      width: 200,
+      height: 200,
+      borderRadius: theme.borderRadius.lg,
+    },
+    infoContainer: {
+      gap: theme.spacing.md,
+    },
+    infoRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: theme.spacing.sm,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    infoLabel: {
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.medium,
+      color: theme.colors.text.secondary,
+      flex: 1,
+    },
+    infoValue: {
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.medium,
+      color: theme.colors.text.primary,
+      flex: 1,
+      textAlign: 'right',
+    },
+  }), [theme]);
+
+  if (!album) return null;
 
   const formatTotalDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -62,7 +126,6 @@ export const AlbumInfoModal: React.FC<AlbumInfoModalProps> = ({ visible, onClose
     >
       <View style={styles.overlay}>
         <View style={styles.container}>
-          {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Album Info</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -71,14 +134,12 @@ export const AlbumInfoModal: React.FC<AlbumInfoModalProps> = ({ visible, onClose
           </View>
 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            {/* Album Art */}
             {coverArtUrl && (
               <View style={styles.artworkContainer}>
                 <Image source={{ uri: coverArtUrl }} style={styles.artwork} />
               </View>
             )}
 
-            {/* Info Rows */}
             <View style={styles.infoContainer}>
               {infoRows.map((row, index) => (
                 <View key={index} style={styles.infoRow}>
@@ -95,71 +156,3 @@ export const AlbumInfoModal: React.FC<AlbumInfoModalProps> = ({ visible, onClose
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'flex-end',
-  },
-  container: {
-    backgroundColor: theme.colors.background.card,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    maxHeight: '90%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: theme.spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  title: {
-    fontSize: theme.typography.fontSize.xl,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.text.primary,
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  content: {
-    padding: theme.spacing.lg,
-  },
-  artworkContainer: {
-    alignItems: 'center',
-    marginBottom: theme.spacing.xl,
-  },
-  artwork: {
-    width: 200,
-    height: 200,
-    borderRadius: theme.borderRadius.lg,
-  },
-  infoContainer: {
-    gap: theme.spacing.md,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  infoLabel: {
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.text.secondary,
-    flex: 1,
-  },
-  infoValue: {
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.text.primary,
-    flex: 1,
-    textAlign: 'right',
-  },
-});

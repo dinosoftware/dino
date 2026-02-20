@@ -3,7 +3,7 @@
  * Quick Action Menu for playlist options
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -23,9 +23,10 @@ import {
   Share2,
   Download,
   X,
+  ListMusic,
 } from 'lucide-react-native';
 import { AlbumArtImage } from '../common';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 import { Playlist } from '../../api/opensubsonic/types';
 import { useDownloadStore } from '../../stores/downloadStore';
 import { useToastStore } from '../../stores/toastStore';
@@ -41,6 +42,8 @@ interface PlaylistMenuProps {
   onEdit?: () => void;
   onDelete?: () => void;
   onShare?: () => void;
+  onPlayNext?: () => void;
+  onAddToQueue?: () => void;
 }
 
 interface MenuItemProps {
@@ -48,9 +51,35 @@ interface MenuItemProps {
   label: string;
   onPress: () => void;
   destructive?: boolean;
+  theme: ReturnType<typeof useTheme>;
 }
 
-const MenuItem: React.FC<MenuItemProps> = ({ icon, label, onPress, destructive }) => {
+const MenuItem: React.FC<MenuItemProps> = ({ icon, label, onPress, destructive, theme }) => {
+  const styles = useMemo(() => StyleSheet.create({
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.xs,
+      paddingHorizontal: theme.spacing.lg,
+      minHeight: 48,
+    },
+    menuIcon: {
+      width: 32,
+      height: 32,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: theme.spacing.sm,
+    },
+    menuLabel: {
+      fontSize: theme.typography.fontSize.md,
+      color: theme.colors.text.primary,
+      fontWeight: theme.typography.fontWeight.medium,
+    },
+    menuLabelDestructive: {
+      color: theme.colors.error,
+    },
+  }), [theme]);
+
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
@@ -74,12 +103,76 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
   onEdit,
   onDelete,
   onShare,
+  onPlayNext,
+  onAddToQueue,
 }) => {
+  const theme = useTheme();
   const translateY = useRef(new Animated.Value(0)).current;
   const { isPlaylistDownloaded } = useDownloadStore();
   const { showToast } = useToastStore();
 
-  // Haptic feedback when menu opens
+  const styles = useMemo(() => StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      justifyContent: 'flex-end',
+    },
+    menu: {
+      backgroundColor: theme.colors.background.card,
+      borderTopLeftRadius: theme.borderRadius.xl,
+      borderTopRightRadius: theme.borderRadius.xl,
+      paddingBottom: theme.spacing.lg,
+    },
+    swipeIndicator: {
+      alignItems: 'center',
+      paddingVertical: theme.spacing.xs,
+    },
+    swipeHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: theme.colors.text.tertiary,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    coverArt: {
+      width: 56,
+      height: 56,
+      borderRadius: theme.borderRadius.md,
+      marginRight: theme.spacing.md,
+    },
+    playlistInfo: {
+      flex: 1,
+      marginRight: theme.spacing.md,
+    },
+    playlistTitle: {
+      fontSize: theme.typography.fontSize.lg,
+      fontWeight: theme.typography.fontWeight.semibold,
+      color: theme.colors.text.primary,
+      marginBottom: theme.spacing.xs,
+    },
+    playlistDetails: {
+      fontSize: theme.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+    },
+    closeButton: {
+      width: 44,
+      height: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    menuItems: {
+      paddingVertical: theme.spacing.xs,
+    },
+  }), [theme]);
+
   useEffect(() => {
     if (visible) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -125,7 +218,6 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
     const playlistIsDownloaded = isPlaylistDownloaded(playlist.id);
     
     if (playlistIsDownloaded) {
-      // Playlist is already downloaded - delete it
       try {
         await downloadService.deletePlaylist(playlist.id);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -166,12 +258,10 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
             style={[styles.menu, { transform: [{ translateY }] }]}
             {...panResponder.panHandlers}
           >
-          {/* Swipe Indicator */}
           <View style={styles.swipeIndicator}>
             <View style={styles.swipeHandle} />
           </View>
 
-          {/* Header */}
           <View style={styles.header}>
             <AlbumArtImage
               uri={coverArtUrl}
@@ -190,13 +280,13 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Menu Items */}
           <View style={styles.menuItems}>
             {onPlay && (
               <MenuItem
                 icon={<Play size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                 label="Play All"
                 onPress={onPlay}
+                theme={theme}
               />
             )}
             {onShuffle && (
@@ -204,6 +294,23 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
                 icon={<Shuffle size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                 label="Shuffle"
                 onPress={onShuffle}
+                theme={theme}
+              />
+            )}
+            {onPlayNext && (
+              <MenuItem
+                icon={<Play size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Play Next"
+                onPress={() => { onClose(); onPlayNext(); }}
+                theme={theme}
+              />
+            )}
+            {onAddToQueue && (
+              <MenuItem
+                icon={<ListMusic size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Add to Queue"
+                onPress={() => { onClose(); onAddToQueue(); }}
+                theme={theme}
               />
             )}
             {onEdit && (
@@ -211,18 +318,21 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
                 icon={<Edit3 size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                 label="Edit Playlist"
                 onPress={onEdit}
+                theme={theme}
               />
             )}
             <MenuItem
               icon={<Download size={22} color={theme.colors.text.primary} strokeWidth={2} />}
               label={isPlaylistDownloaded(playlist.id) ? "Remove Download" : "Download Playlist"}
               onPress={handleDownload}
+              theme={theme}
             />
             {onShare && (
               <MenuItem
                 icon={<Share2 size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                 label="Share"
                 onPress={onShare}
+                theme={theme}
               />
             )}
             {onDelete && (
@@ -231,6 +341,7 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
                 label="Delete Playlist"
                 onPress={onDelete}
                 destructive
+                theme={theme}
               />
             )}
           </View>
@@ -240,87 +351,3 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  menu: {
-    backgroundColor: theme.colors.background.card,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    paddingBottom: theme.spacing.lg,
-  },
-  swipeIndicator: {
-    alignItems: 'center',
-    paddingVertical: theme.spacing.xs,
-  },
-  swipeHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.text.tertiary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  coverArt: {
-    width: 56,
-    height: 56,
-    borderRadius: theme.borderRadius.md,
-    marginRight: theme.spacing.md,
-  },
-  playlistInfo: {
-    flex: 1,
-    marginRight: theme.spacing.md,
-  },
-  playlistTitle: {
-    fontSize: theme.typography.fontSize.lg,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
-  },
-  playlistDetails: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
-  },
-  closeButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  menuItems: {
-    paddingVertical: theme.spacing.xs,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.lg,
-    minHeight: 48,
-  },
-  menuIcon: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: theme.spacing.sm,
-  },
-  menuLabel: {
-    fontSize: theme.typography.fontSize.md,
-    color: theme.colors.text.primary,
-    fontWeight: theme.typography.fontWeight.medium,
-  },
-  menuLabelDestructive: {
-    color: theme.colors.error,
-  },
-});

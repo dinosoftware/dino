@@ -3,12 +3,46 @@
  * Loading placeholder for artist list rows
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 
 export const ArtistRowSkeleton: React.FC = () => {
+  const theme = useTheme();
   const opacity = useRef(new Animated.Value(0.3)).current;
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    avatar: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: theme.colors.background.card,
+      marginRight: theme.spacing.md,
+    },
+    content: {
+      flex: 1,
+    },
+    name: {
+      height: 18,
+      backgroundColor: theme.colors.background.card,
+      borderRadius: theme.borderRadius.sm,
+      marginBottom: theme.spacing.xs,
+      width: '60%',
+    },
+    details: {
+      height: 14,
+      backgroundColor: theme.colors.background.card,
+      borderRadius: theme.borderRadius.sm,
+      width: '40%',
+    },
+  }), [theme]);
 
   useEffect(() => {
     const animation = Animated.loop(
@@ -39,36 +73,3 @@ export const ArtistRowSkeleton: React.FC = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: theme.colors.background.card,
-    marginRight: theme.spacing.md,
-  },
-  content: {
-    flex: 1,
-  },
-  name: {
-    height: 18,
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.sm,
-    marginBottom: theme.spacing.xs,
-    width: '60%',
-  },
-  details: {
-    height: 14,
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.sm,
-    width: '40%',
-  },
-});

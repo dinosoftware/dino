@@ -3,14 +3,14 @@
  * User avatar with fallback to initials
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, Image, StyleSheet, ViewStyle } from 'react-native';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 
 interface AvatarProps {
   username: string;
-  avatarUrl?: string; // Optional: if not provided, will auto-build from username
+  avatarUrl?: string;
   size?: number;
   style?: ViewStyle;
 }
@@ -21,11 +21,30 @@ export const Avatar: React.FC<AvatarProps> = ({
   size = 40,
   style 
 }) => {
+  const theme = useTheme();
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [builtAvatarUrl, setBuiltAvatarUrl] = useState<string | null>(null);
 
-  // Auto-build avatar URL if not provided
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      overflow: 'hidden',
+    },
+    image: {
+      resizeMode: 'cover',
+    },
+    fallback: {
+      backgroundColor: theme.colors.text.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    initial: {
+      color: theme.colors.background.primary,
+      fontFamily: theme.typography.fontFamily.bold,
+      textAlign: 'center',
+    },
+  }), [theme]);
+
   useEffect(() => {
     if (!providedAvatarUrl && username) {
       apiClient.buildAvatarUrl(username).then(url => {
@@ -34,7 +53,6 @@ export const Avatar: React.FC<AvatarProps> = ({
     }
   }, [username, providedAvatarUrl]);
 
-  // Get initial from username (first letter only, like UserAvatar)
   const getInitial = (name: string): string => {
     if (!name) return '?';
     return name.charAt(0).toUpperCase();
@@ -71,22 +89,3 @@ export const Avatar: React.FC<AvatarProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    overflow: 'hidden',
-  },
-  image: {
-    resizeMode: 'cover',
-  },
-  fallback: {
-    backgroundColor: theme.colors.text.primary, // White circle
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  initial: {
-    color: theme.colors.background.primary, // Dark text on white background
-    fontFamily: theme.typography.fontFamily.bold,
-    textAlign: 'center',
-  },
-});

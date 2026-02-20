@@ -3,13 +3,65 @@
  * Loading placeholder for artist detail screen
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, StyleSheet, Animated, ScrollView, FlatList } from 'react-native';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 import { AlbumCardSkeleton } from './AlbumCardSkeleton';
 
 export const ArtistDetailSkeleton: React.FC = () => {
+  const theme = useTheme();
   const opacity = useRef(new Animated.Value(0.3)).current;
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background.primary,
+    },
+    header: {
+      padding: theme.spacing.xl,
+      alignItems: 'center',
+      paddingTop: 60,
+    },
+    avatar: {
+      width: 160,
+      height: 160,
+      borderRadius: 80,
+      backgroundColor: theme.colors.background.card,
+      marginBottom: theme.spacing.lg,
+    },
+    name: {
+      height: 32,
+      width: '70%',
+      backgroundColor: theme.colors.background.card,
+      borderRadius: theme.borderRadius.sm,
+      marginBottom: theme.spacing.xs,
+    },
+    albumCount: {
+      height: 18,
+      width: '40%',
+      backgroundColor: theme.colors.background.card,
+      borderRadius: theme.borderRadius.sm,
+    },
+    albumsSection: {
+      paddingTop: theme.spacing.lg,
+    },
+    sectionTitle: {
+      height: 24,
+      width: 100,
+      backgroundColor: theme.colors.background.card,
+      borderRadius: theme.borderRadius.sm,
+      marginHorizontal: theme.spacing.lg,
+      marginBottom: theme.spacing.md,
+    },
+    albumsList: {
+      paddingHorizontal: theme.spacing.md,
+    },
+    albumContainer: {
+      flex: 1,
+      margin: theme.spacing.sm,
+      maxWidth: '50%',
+    },
+  }), [theme]);
 
   useEffect(() => {
     const animation = Animated.loop(
@@ -60,54 +112,3 @@ export const ArtistDetailSkeleton: React.FC = () => {
     </ScrollView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background.primary,
-  },
-  header: {
-    padding: theme.spacing.xl,
-    alignItems: 'center',
-    paddingTop: 60,
-  },
-  avatar: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: theme.colors.background.card,
-    marginBottom: theme.spacing.lg,
-  },
-  name: {
-    height: 32,
-    width: '70%',
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.sm,
-    marginBottom: theme.spacing.xs,
-  },
-  albumCount: {
-    height: 18,
-    width: '40%',
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.sm,
-  },
-  albumsSection: {
-    paddingTop: theme.spacing.lg,
-  },
-  sectionTitle: {
-    height: 24,
-    width: 100,
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.sm,
-    marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-  },
-  albumsList: {
-    paddingHorizontal: theme.spacing.md,
-  },
-  albumContainer: {
-    flex: 1,
-    margin: theme.spacing.sm,
-    maxWidth: '50%',
-  },
-});

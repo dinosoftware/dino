@@ -3,17 +3,20 @@
  * List view of all artists
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { useArtists, useCoverArt } from '../../hooks/api';
 import { EmptyState, ErrorView, ArtistArtImage } from '../../components/common';
 import { ArtistRowSkeleton } from '../../components/Skeletons';
 import { useNavigationStore } from '../../stores/navigationStore';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
+import { Theme } from '../../config/theme';
 import { Artist } from '../../api/opensubsonic/types';
 
 export const ArtistsTab: React.FC = () => {
+  const theme = useTheme();
   const { data: artists, isLoading, error, refetch } = useArtists();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   if (isLoading) {
     return (
@@ -47,8 +50,11 @@ export const ArtistsTab: React.FC = () => {
 };
 
 const ArtistItem: React.FC<{ artist: Artist }> = ({ artist }) => {
+  const theme = useTheme();
   const { data: coverArtUrl } = useCoverArt(artist.coverArt, 200);
   const { navigate } = useNavigationStore();
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
     <TouchableOpacity
@@ -74,7 +80,7 @@ const ArtistItem: React.FC<{ artist: Artist }> = ({ artist }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   list: {
     padding: theme.spacing.lg,
   },

@@ -5,8 +5,8 @@
 
 import * as Haptics from 'expo-haptics';
 import { Play } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import { FlatList, Image, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState, useMemo } from 'react';
+import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Album, Artist, Track } from '../../api/opensubsonic/types';
 import { AlbumCard } from '../../components/Cards/AlbumCard';
 import { TrackRow } from '../../components/Cards/TrackRow';
@@ -17,7 +17,8 @@ import { ConfirmModal } from '../../components/Modals/ConfirmModal';
 import { SongInfoModal } from '../../components/Modals/SongInfoModal';
 import { TrackMenu } from '../../components/Player/TrackMenu';
 import { EmptyState, ArtistArtImage } from '../../components/common';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
+import { Theme } from '../../config/theme';
 import { useCoverArt } from '../../hooks/api';
 import { useAlbumMenuState } from '../../hooks/useAlbumMenuState';
 import { useTrackMenuState } from '../../hooks/useTrackMenuState';
@@ -30,14 +31,17 @@ import { useQueueStore } from '../../stores/queueStore';
 type SubTab = 'tracks' | 'albums' | 'artists';
 
 export const FavoritesTab: React.FC = () => {
+  const theme = useTheme();
   const [subTab, setSubTab] = useState<SubTab>('tracks');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { starredTrackObjects, starredAlbumObjects, starredArtistObjects, loadStarred } = useFavoritesStore();
 
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   // Load starred items when component mounts
   useEffect(() => {
     loadStarred();
-  }, []);
+  }, [loadStarred]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -105,10 +109,13 @@ const StarredTracks: React.FC<{
   isRefreshing: boolean;
   onRefresh: () => void;
 }> = ({ tracks, isRefreshing, onRefresh }) => {
+  const theme = useTheme();
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
   const { setQueue } = useQueueStore();
   const { navigate } = useNavigationStore();
   const trackMenuState = useTrackMenuState();
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const handlePlayAll = async () => {
     if (tracks.length === 0) return;
@@ -227,9 +234,12 @@ const StarredAlbums: React.FC<{
   isRefreshing: boolean;
   onRefresh: () => void;
 }> = ({ albums, isRefreshing, onRefresh }) => {
+  const theme = useTheme();
   const { navigate } = useNavigationStore();
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
   const [showMenu, setShowMenu] = useState(false);
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   if (albums.length === 0) {
     return (
@@ -315,7 +325,7 @@ const AlbumMenuWrapper: React.FC<{
     } else if (!visible) {
       albumMenuState.closeAlbumMenu();
     }
-  }, [visible, album]);
+  }, [visible, album, albumMenuState]);
 
   return (
     <AlbumMenuWrapperComponent
@@ -339,6 +349,9 @@ const StarredArtists: React.FC<{
   isRefreshing: boolean;
   onRefresh: () => void;
 }> = ({ artists, isRefreshing, onRefresh }) => {
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   if (artists.length === 0) {
     return (
       <EmptyState
@@ -368,8 +381,11 @@ const StarredArtists: React.FC<{
 };
 
 const ArtistItem: React.FC<{ artist: Artist }> = ({ artist }) => {
+  const theme = useTheme();
   const { data: coverArtUrl } = useCoverArt(artist.coverArt, 100);
   const { navigate } = useNavigationStore();
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
     <TouchableOpacity
@@ -391,7 +407,7 @@ const ArtistItem: React.FC<{ artist: Artist }> = ({ artist }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
   },

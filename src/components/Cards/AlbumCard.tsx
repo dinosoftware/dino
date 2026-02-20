@@ -3,12 +3,12 @@
  * shadcn/ui-inspired album card with clean, modern aesthetics
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Download } from 'lucide-react-native';
 import { Album } from '../../api/opensubsonic/types';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 import { useDownloadStore } from '../../stores/downloadStore';
 
 interface AlbumCardProps {
@@ -16,7 +16,7 @@ interface AlbumCardProps {
   onPress: () => void;
   onLongPress?: () => void;
   coverArtUrl?: string;
-  width?: number; // Optional fixed width for horizontal scrolls
+  width?: number;
 }
 
 export const AlbumCard: React.FC<AlbumCardProps> = ({
@@ -26,9 +26,69 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({
   coverArtUrl,
   width,
 }) => {
+  const theme = useTheme();
   const [scaleAnim] = useState(new Animated.Value(1));
   const { isAlbumDownloaded } = useDownloadStore();
   const isDownloaded = isAlbumDownloaded(album.id);
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      width: '100%',
+    },
+    coverContainer: {
+      width: '100%',
+      aspectRatio: 1,
+      borderRadius: theme.borderRadius.lg,
+      overflow: 'hidden',
+      backgroundColor: theme.colors.background.card,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      ...theme.shadows.sm,
+    },
+    cover: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
+    },
+    placeholderCover: {
+      backgroundColor: theme.colors.background.muted,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    placeholderText: {
+      fontSize: theme.typography.fontSize.huge,
+      color: theme.colors.text.muted,
+      fontFamily: theme.typography.fontFamily.medium,
+    },
+    info: {
+      marginTop: theme.spacing.sm,
+      gap: 4,
+    },
+    title: {
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.semibold,
+      color: theme.colors.text.primary,
+      lineHeight: theme.typography.fontSize.sm * theme.typography.lineHeight.tight,
+    },
+    artist: {
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.regular,
+      color: theme.colors.text.secondary,
+      lineHeight: theme.typography.fontSize.sm * theme.typography.lineHeight.normal,
+    },
+    downloadBadge: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      backgroundColor: theme.colors.accent,
+      borderRadius: 12,
+      width: 24,
+      height: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+      ...theme.shadows.md,
+    },
+  }), [theme]);
 
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -43,9 +103,8 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({
   };
 
   const handlePressIn = () => {
-    // Don't trigger haptic here - it fires on scroll swipes too
     Animated.spring(scaleAnim, {
-      toValue: 0.98, // Subtle scale
+      toValue: 0.98,
       useNativeDriver: true,
       tension: 300,
       friction: 20,
@@ -84,7 +143,6 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({
             <Text style={styles.placeholderText}>♪</Text>
           </View>
         )}
-        {/* Download Badge */}
         {isDownloaded && (
           <View style={styles.downloadBadge}>
             <Download size={14} color={theme.colors.text.inverse} strokeWidth={2.5} />
@@ -102,62 +160,3 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({
     </TouchableOpacity>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-  },
-  coverContainer: {
-    width: '100%',
-    aspectRatio: 1,
-    borderRadius: theme.borderRadius.lg,
-    overflow: 'hidden',
-    backgroundColor: theme.colors.background.card,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    ...theme.shadows.sm, // Minimal shadow
-  },
-  cover: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  placeholderCover: {
-    backgroundColor: theme.colors.background.muted,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  placeholderText: {
-    fontSize: theme.typography.fontSize.huge,
-    color: theme.colors.text.muted,
-    fontFamily: theme.typography.fontFamily.medium,
-  },
-  info: {
-    marginTop: theme.spacing.sm,
-    gap: 4,
-  },
-  title: {
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.semibold,
-    color: theme.colors.text.primary,
-    lineHeight: theme.typography.fontSize.sm * theme.typography.lineHeight.tight,
-  },
-  artist: {
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.text.secondary,
-    lineHeight: theme.typography.fontSize.sm * theme.typography.lineHeight.normal,
-  },
-  downloadBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: theme.colors.accent,
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...theme.shadows.md,
-  },
-});

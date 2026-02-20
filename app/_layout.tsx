@@ -10,9 +10,14 @@ import { useEffect } from 'react';
 import { AppNavigator } from '../src/navigation/AppNavigator';
 import { useFonts } from '../src/hooks/useFonts';
 import { deepLinkService } from '../src/services/deeplink/DeepLinkService';
+import { ThemeProvider, useThemeMode } from '../src/hooks/useTheme';
 
-// Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
+
+function ThemedStatusBar() {
+  const themeMode = useThemeMode();
+  return <StatusBar style={themeMode === 'light' ? 'dark' : 'light'} />;
+}
 
 export default function RootLayout() {
   const fontsLoaded = useFonts();
@@ -21,7 +26,6 @@ export default function RootLayout() {
     if (fontsLoaded) {
       SplashScreen.hideAsync();
       
-      // Initialize deep linking after app is ready
       deepLinkService.initialize();
     }
   }, [fontsLoaded]);
@@ -32,8 +36,10 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AppNavigator />
-      <StatusBar style="light" />
+      <ThemeProvider>
+        <AppNavigator />
+        <ThemedStatusBar />
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }

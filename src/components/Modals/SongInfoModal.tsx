@@ -3,7 +3,7 @@
  * Displays detailed information about a track
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { X } from 'lucide-react-native';
 import { Track } from '../../api/opensubsonic/types';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 import { useCoverArt } from '../../hooks/api';
 
 interface SongInfoModalProps {
@@ -28,9 +28,92 @@ interface SongInfoModalProps {
 }
 
 export const SongInfoModal: React.FC<SongInfoModalProps> = ({ visible, onClose, track }) => {
+  const theme = useTheme();
   const { data: coverArtUrl } = useCoverArt(track?.coverArt, 300);
   const translateY = useRef(new Animated.Value(600)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+  const styles = useMemo(() => StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    },
+    container: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: theme.colors.background.card,
+      borderTopLeftRadius: theme.borderRadius.xl,
+      borderTopRightRadius: theme.borderRadius.xl,
+      maxHeight: '90%',
+    },
+    swipeIndicator: {
+      alignItems: 'center',
+      paddingTop: theme.spacing.sm,
+      paddingBottom: theme.spacing.xs,
+    },
+    swipeHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: 'rgba(255,255,255,0.3)',
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: theme.spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    title: {
+      fontSize: theme.typography.fontSize.xl,
+      fontFamily: theme.typography.fontFamily.bold,
+      color: theme.colors.text.primary,
+    },
+    closeButton: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    content: {
+      padding: theme.spacing.lg,
+    },
+    artworkContainer: {
+      alignItems: 'center',
+      marginBottom: theme.spacing.xl,
+    },
+    artwork: {
+      width: 200,
+      height: 200,
+      borderRadius: theme.borderRadius.lg,
+    },
+    infoContainer: {
+      gap: theme.spacing.md,
+    },
+    infoRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: theme.spacing.sm,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    infoLabel: {
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.medium,
+      color: theme.colors.text.secondary,
+      flex: 1,
+    },
+    infoValue: {
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.medium,
+      color: theme.colors.text.primary,
+      flex: 1,
+      textAlign: 'right',
+    },
+  }), [theme]);
 
   useEffect(() => {
     if (visible) {
@@ -123,22 +206,18 @@ export const SongInfoModal: React.FC<SongInfoModalProps> = ({ visible, onClose, 
       statusBarTranslucent
       onRequestClose={handleClose}
     >
-      {/* Animated dim overlay - tapping outside closes */}
       <Pressable onPress={handleClose} style={StyleSheet.absoluteFill}>
         <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]} />
       </Pressable>
 
-      {/* Animated sheet */}
       <Animated.View
         style={[styles.container, { transform: [{ translateY }] }]}
         {...panResponder.panHandlers}
       >
-        {/* Swipe handle */}
         <View style={styles.swipeIndicator}>
           <View style={styles.swipeHandle} />
         </View>
 
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Song Info</Text>
           <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
@@ -167,85 +246,3 @@ export const SongInfoModal: React.FC<SongInfoModalProps> = ({ visible, onClose, 
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-  },
-  container: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: theme.colors.background.card,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    maxHeight: '90%',
-  },
-  swipeIndicator: {
-    alignItems: 'center',
-    paddingTop: theme.spacing.sm,
-    paddingBottom: theme.spacing.xs,
-  },
-  swipeHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: theme.spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  title: {
-    fontSize: theme.typography.fontSize.xl,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.text.primary,
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  content: {
-    padding: theme.spacing.lg,
-  },
-  artworkContainer: {
-    alignItems: 'center',
-    marginBottom: theme.spacing.xl,
-  },
-  artwork: {
-    width: 200,
-    height: 200,
-    borderRadius: theme.borderRadius.lg,
-  },
-  infoContainer: {
-    gap: theme.spacing.md,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  infoLabel: {
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.text.secondary,
-    flex: 1,
-  },
-  infoValue: {
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.text.primary,
-    flex: 1,
-    textAlign: 'right',
-  },
-});

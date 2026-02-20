@@ -13,7 +13,8 @@ import { FavoritesTab } from './FavoritesTab';
 import { UserSettingsMenu, AppInfoSheet } from '../../components/Menus';
 import { Avatar } from '../../components/common';
 import { useAuthStore, useServerStore, useUserStore } from '../../stores';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
+import { Theme } from '../../config/theme';
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,7 @@ interface LibraryScreenProps {
 }
 
 export const LibraryScreen: React.FC<LibraryScreenProps> = ({ onLogout }) => {
+  const theme = useTheme();
   const [activeTab, setActiveTab] = useState<Tab>('albums');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showAppInfo, setShowAppInfo] = useState(false);
@@ -42,6 +44,8 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ onLogout }) => {
     const creds = credentials[currentServerId];
     return creds?.username || 'User';
   }, [credentials, currentServerId, user]);
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const renderTab = () => {
     switch (activeTab) {
@@ -144,7 +148,7 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ onLogout }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background.primary,

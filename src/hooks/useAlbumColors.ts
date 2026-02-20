@@ -5,33 +5,33 @@
 
 import { useState, useEffect } from 'react';
 import { getColors } from 'react-native-image-colors';
-import { theme } from '../config';
+import { useTheme } from './useTheme';
 import { getContrastColor } from '../utils/colorUtils';
 
 interface AlbumColors {
   primary: string;
+  secondary: string;
   background: string;
   detail: string;
-  textColor: string; // Contrasting text color for primary background
+  textColor: string;
 }
 
 export const useAlbumColors = (imageUri?: string): AlbumColors => {
-  const [colors, setColors] = useState<AlbumColors>({
+  const theme = useTheme();
+  
+  const getDefaultColors = () => ({
     primary: theme.colors.accent,
+    secondary: theme.colors.background.secondary,
     background: theme.colors.background.primary,
     detail: theme.colors.text.secondary,
     textColor: getContrastColor(theme.colors.accent),
   });
+  
+  const [colors, setColors] = useState<AlbumColors>(getDefaultColors);
 
   useEffect(() => {
     if (!imageUri) {
-      const defaultPrimary = theme.colors.accent;
-      setColors({
-        primary: defaultPrimary,
-        background: theme.colors.background.primary,
-        detail: theme.colors.text.secondary,
-        textColor: getContrastColor(defaultPrimary),
-      });
+      setColors(getDefaultColors());
       return;
     }
 
@@ -41,22 +41,20 @@ export const useAlbumColors = (imageUri?: string): AlbumColors => {
       key: imageUri,
     })
       .then((result) => {
-        let primaryColor = theme.colors.accent;
-        
         if (result.platform === 'android') {
-          // Prefer vibrant colors over dominant for brightness
-          primaryColor = result.vibrant || result.lightVibrant || result.dominant || theme.colors.accent;
+          const primaryColor = result.vibrant || result.lightVibrant || result.dominant || theme.colors.accent;
           setColors({
             primary: primaryColor,
+            secondary: result.darkVibrant || result.darkMuted || theme.colors.background.secondary,
             background: result.darkMuted || theme.colors.background.primary,
             detail: result.vibrant || theme.colors.text.secondary,
             textColor: getContrastColor(primaryColor),
           });
         } else if (result.platform === 'ios') {
-          // iOS: prefer detail (usually vibrant) over primary
-          primaryColor = result.detail || result.primary || theme.colors.accent;
+          const primaryColor = result.detail || result.primary || theme.colors.accent;
           setColors({
             primary: primaryColor,
+            secondary: result.secondary || theme.colors.background.secondary,
             background: result.background || theme.colors.background.primary,
             detail: result.detail || theme.colors.text.secondary,
             textColor: getContrastColor(primaryColor),
@@ -65,15 +63,9 @@ export const useAlbumColors = (imageUri?: string): AlbumColors => {
       })
       .catch((error) => {
         console.error('Failed to extract colors:', error);
-        const defaultPrimary = theme.colors.accent;
-        setColors({
-          primary: defaultPrimary,
-          background: theme.colors.background.primary,
-          detail: theme.colors.text.secondary,
-          textColor: getContrastColor(defaultPrimary),
-        });
+        setColors(getDefaultColors());
       });
-  }, [imageUri]);
+  }, [imageUri, theme]);
 
   return colors;
 };

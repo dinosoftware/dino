@@ -7,6 +7,7 @@ export * from './LoadingSpinner';
 export * from './EmptyState';
 export * from './ErrorView';
 export * from './BlurredBackground';
+export * from './DynamicBackground';
 export * from './Button';
 export * from './OfflineBanner';
 export * from './Skeleton';

@@ -4,7 +4,7 @@
  */
 
 import { Download, Play, Shuffle, Trash2 } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   FlatList,
   Image,
@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 import { downloadService } from '../../services/DownloadService';
 import { trackPlayerService } from '../../services/player/TrackPlayerService';
 import { useDownloadStore, DownloadedTrack, DownloadedAlbum, DownloadedPlaylist } from '../../stores/downloadStore';
@@ -33,8 +33,14 @@ type DownloadSection = {
 };
 
 export const DownloadsScreen: React.FC = () => {
+  const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { downloadedTracks, downloadedAlbums, downloadedPlaylists, totalStorageUsed, activeDownloads } = useDownloadStore();
+  const downloadedTracks = useDownloadStore((state) => state.downloadedTracks);
+  const downloadedAlbums = useDownloadStore((state) => state.downloadedAlbums);
+  const downloadedPlaylists = useDownloadStore((state) => state.downloadedPlaylists);
+  const totalStorageUsed = useDownloadStore((state) => state.totalStorageUsed);
+  const activeDownloads = useDownloadStore((state) => state.activeDownloads);
+  const clearCompletedDownloads = useDownloadStore((state) => state.clearCompletedDownloads);
   const { storageLimit } = useSettingsStore();
   const { navigate } = useNavigationStore();
   const { setCurrentTrack } = usePlayerStore();
@@ -43,9 +49,9 @@ export const DownloadsScreen: React.FC = () => {
   
   const albums = Object.values(downloadedAlbums);
   const playlists = Object.values(downloadedPlaylists);
-  const activeDownloadsList = Array.from(activeDownloads.values());
+  const activeDownloadsList = Object.values(activeDownloads);
+  const completedCount = activeDownloadsList.filter(d => d.status === 'completed' || d.status === 'failed').length;
   
-  // Get all track IDs that are part of albums or playlists
   const albumTrackIds = new Set(
     albums.flatMap(album => album.tracks.map(t => t.track.id))
   );
@@ -53,13 +59,246 @@ export const DownloadsScreen: React.FC = () => {
     playlists.flatMap(playlist => playlist.tracks.map(t => t.track.id))
   );
   
-  // Filter out tracks that are part of albums or playlists (only show standalone downloads)
   const tracks = Object.values(downloadedTracks).filter(
     downloadedTrack => !albumTrackIds.has(downloadedTrack.track.id) && !playlistTrackIds.has(downloadedTrack.track.id)
   );
 
-  const storageLimitBytes = storageLimit * 1024 * 1024; // Convert MB to bytes
+  const storageLimitBytes = storageLimit * 1024 * 1024;
   const storagePercentage = (totalStorageUsed / storageLimitBytes) * 100;
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background.primary,
+    },
+    topBar: {
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    screenTitle: {
+      fontSize: theme.typography.fontSize.xxl,
+      fontWeight: theme.typography.fontWeight.bold,
+      color: theme.colors.text.primary,
+    },
+    listContent: {
+      flexGrow: 1,
+      paddingBottom: theme.spacing.xl,
+    },
+    storageCard: {
+      backgroundColor: theme.colors.background.card,
+      borderRadius: theme.borderRadius.lg,
+      padding: theme.spacing.lg,
+      marginHorizontal: theme.spacing.lg,
+      marginTop: theme.spacing.lg,
+      marginBottom: theme.spacing.md,
+    },
+    storageHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: theme.spacing.md,
+    },
+    storageTitle: {
+      fontSize: theme.typography.fontSize.md,
+      fontWeight: theme.typography.fontWeight.semibold,
+      color: theme.colors.text.primary,
+    },
+    storageValue: {
+      fontSize: theme.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+    },
+    progressBarBackground: {
+      height: 8,
+      backgroundColor: theme.colors.background.elevated,
+      borderRadius: 4,
+      overflow: 'hidden',
+      marginBottom: theme.spacing.md,
+    },
+    progressBarFill: {
+      height: '100%',
+      backgroundColor: theme.colors.accent,
+      borderRadius: 4,
+    },
+    storageActions: {
+      flexDirection: 'row',
+      marginBottom: theme.spacing.sm,
+    },
+    actionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.md,
+      backgroundColor: theme.colors.accent,
+      borderRadius: theme.borderRadius.md,
+      borderWidth: 1,
+      borderColor: theme.colors.accent,
+    },
+    actionButtonText: {
+      fontSize: theme.typography.fontSize.sm,
+      fontWeight: theme.typography.fontWeight.semibold,
+      color: theme.colors.text.inverse,
+      marginLeft: theme.spacing.xs,
+    },
+    actionButtonTextDisabled: {
+      color: theme.colors.text.disabled,
+    },
+    clearAllButton: {
+      marginTop: theme.spacing.sm,
+      paddingVertical: theme.spacing.sm,
+      alignItems: 'center',
+    },
+    clearAllText: {
+      fontSize: theme.typography.fontSize.sm,
+      fontWeight: theme.typography.fontWeight.semibold,
+      color: '#EF4444',
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.sm,
+      marginTop: theme.spacing.md,
+    },
+    sectionTitle: {
+      fontSize: theme.typography.fontSize.sm,
+      fontWeight: theme.typography.fontWeight.semibold,
+      color: theme.colors.text.secondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    sectionCount: {
+      fontSize: theme.typography.fontSize.sm,
+      fontWeight: theme.typography.fontWeight.medium,
+      color: theme.colors.text.tertiary,
+    },
+    clearCompletedButton: {
+      paddingHorizontal: theme.spacing.sm,
+      paddingVertical: theme.spacing.xs,
+    },
+    clearCompletedText: {
+      fontSize: theme.typography.fontSize.xs,
+      fontWeight: theme.typography.fontWeight.semibold,
+      color: theme.colors.accent,
+    },
+    itemRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.sm,
+      backgroundColor: theme.colors.background.primary,
+    },
+    itemLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      marginRight: theme.spacing.md,
+    },
+    coverArt: {
+      width: 56,
+      height: 56,
+      borderRadius: theme.borderRadius.md,
+      marginRight: theme.spacing.md,
+    },
+    itemInfo: {
+      flex: 1,
+    },
+    itemTitle: {
+      fontSize: theme.typography.fontSize.md,
+      fontWeight: theme.typography.fontWeight.medium,
+      color: theme.colors.text.primary,
+      marginBottom: theme.spacing.xs,
+    },
+    itemSubtitle: {
+      fontSize: theme.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+      marginBottom: theme.spacing.xs,
+    },
+    itemDetails: {
+      fontSize: theme.typography.fontSize.xs,
+      color: theme.colors.text.tertiary,
+    },
+    deleteButton: {
+      padding: theme.spacing.sm,
+    },
+    activeDownloadRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.md,
+      backgroundColor: theme.colors.background.card,
+      marginHorizontal: theme.spacing.lg,
+      marginBottom: theme.spacing.xs,
+      borderRadius: theme.borderRadius.md,
+    },
+    activeDownloadCover: {
+      width: 48,
+      height: 48,
+      borderRadius: theme.borderRadius.sm,
+      marginRight: theme.spacing.md,
+    },
+    activeDownloadCoverPlaceholder: {
+      backgroundColor: theme.colors.background.elevated,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    activeDownloadInfo: {
+      flex: 1,
+    },
+    activeDownloadTitle: {
+      fontSize: theme.typography.fontSize.md,
+      fontWeight: theme.typography.fontWeight.medium,
+      color: theme.colors.text.primary,
+      marginBottom: 2,
+    },
+    activeDownloadSubtitle: {
+      fontSize: theme.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+      marginBottom: theme.spacing.xs,
+    },
+    activeDownloadStatus: {
+      fontSize: theme.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+      marginBottom: theme.spacing.xs,
+    },
+    activeDownloadError: {
+      fontSize: theme.typography.fontSize.sm,
+      color: '#EF4444',
+    },
+    miniProgressBar: {
+      height: 4,
+      backgroundColor: theme.colors.background.elevated,
+      borderRadius: 2,
+      overflow: 'hidden',
+    },
+    miniProgressFill: {
+      height: '100%',
+      backgroundColor: theme.colors.accent,
+    },
+    emptyState: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.xl,
+      paddingTop: theme.spacing.xxl * 2,
+    },
+    emptyTitle: {
+      fontSize: theme.typography.fontSize.xl,
+      fontWeight: theme.typography.fontWeight.bold,
+      color: theme.colors.text.primary,
+      marginTop: theme.spacing.lg,
+      marginBottom: theme.spacing.sm,
+    },
+    emptySubtitle: {
+      fontSize: theme.typography.fontSize.md,
+      color: theme.colors.text.secondary,
+      textAlign: 'center',
+    },
+  }), [theme]);
 
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 B';
@@ -70,7 +309,6 @@ export const DownloadsScreen: React.FC = () => {
   };
 
   const handlePlayAll = async () => {
-    // Get ALL downloaded tracks (standalone + from albums + from playlists)
     const allTracks = Object.values(downloadedTracks).map(d => d.track);
     
     if (allTracks.length === 0) {
@@ -86,7 +324,6 @@ export const DownloadsScreen: React.FC = () => {
   };
 
   const handleShuffleAll = async () => {
-    // Get ALL downloaded tracks (standalone + from albums + from playlists)
     const allTracks = Object.values(downloadedTracks).map(d => d.track);
     
     if (allTracks.length === 0) {
@@ -94,7 +331,6 @@ export const DownloadsScreen: React.FC = () => {
       return;
     }
 
-    // Shuffle tracks
     const shuffled = [...allTracks].sort(() => Math.random() - 0.5);
     
     setQueue(shuffled, 0);
@@ -391,10 +627,25 @@ export const DownloadsScreen: React.FC = () => {
   const renderSectionHeader = ({ section }: { section: DownloadSection }) => {
     if (section.data.length === 0) return null;
 
+    const isActiveSection = section.type === 'active';
+
     return (
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{section.title}</Text>
-        <Text style={styles.sectionCount}>{section.data.length}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {isActiveSection && completedCount > 0 && (
+            <TouchableOpacity 
+              style={styles.clearCompletedButton}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                clearCompletedDownloads();
+              }}
+            >
+              <Text style={styles.clearCompletedText}>Clear Completed</Text>
+            </TouchableOpacity>
+          )}
+          <Text style={styles.sectionCount}>{section.data.length}</Text>
+        </View>
       </View>
     );
   };
@@ -466,228 +717,3 @@ export const DownloadsScreen: React.FC = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background.primary,
-  },
-  topBar: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  screenTitle: {
-    fontSize: theme.typography.fontSize.xxl,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text.primary,
-  },
-  listContent: {
-    flexGrow: 1,
-    paddingBottom: theme.spacing.xl,
-  },
-  storageCard: {
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.lg,
-    marginHorizontal: theme.spacing.lg,
-    marginTop: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-  },
-  storageHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  storageTitle: {
-    fontSize: theme.typography.fontSize.md,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.text.primary,
-  },
-  storageValue: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
-  },
-  progressBarBackground: {
-    height: 8,
-    backgroundColor: theme.colors.background.elevated,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: theme.spacing.md,
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: theme.colors.accent,
-    borderRadius: 4,
-  },
-  storageActions: {
-    flexDirection: 'row',
-    marginBottom: theme.spacing.sm,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    backgroundColor: theme.colors.accent,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.accent,
-  },
-  actionButtonText: {
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.text.inverse,
-    marginLeft: theme.spacing.xs,
-  },
-  actionButtonTextDisabled: {
-    color: theme.colors.text.disabled,
-  },
-  clearAllButton: {
-    marginTop: theme.spacing.sm,
-    paddingVertical: theme.spacing.sm,
-    alignItems: 'center',
-  },
-  clearAllText: {
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: '#EF4444',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-    marginTop: theme.spacing.md,
-  },
-  sectionTitle: {
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  sectionCount: {
-    fontSize: theme.typography.fontSize.sm,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.text.tertiary,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-    backgroundColor: theme.colors.background.primary,
-  },
-  itemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: theme.spacing.md,
-  },
-  coverArt: {
-    width: 56,
-    height: 56,
-    borderRadius: theme.borderRadius.md,
-    marginRight: theme.spacing.md,
-  },
-  itemInfo: {
-    flex: 1,
-  },
-  itemTitle: {
-    fontSize: theme.typography.fontSize.md,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
-  },
-  itemSubtitle: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.xs,
-  },
-  itemDetails: {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.text.tertiary,
-  },
-  deleteButton: {
-    padding: theme.spacing.sm,
-  },
-  activeDownloadRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    backgroundColor: theme.colors.background.card,
-    marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.xs,
-    borderRadius: theme.borderRadius.md,
-  },
-  activeDownloadCover: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.borderRadius.sm,
-    marginRight: theme.spacing.md,
-  },
-  activeDownloadCoverPlaceholder: {
-    backgroundColor: theme.colors.background.elevated,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  activeDownloadInfo: {
-    flex: 1,
-  },
-  activeDownloadTitle: {
-    fontSize: theme.typography.fontSize.md,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.text.primary,
-    marginBottom: 2,
-  },
-  activeDownloadSubtitle: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.xs,
-  },
-  activeDownloadStatus: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.xs,
-  },
-  activeDownloadError: {
-    fontSize: theme.typography.fontSize.sm,
-    color: '#EF4444',
-  },
-  miniProgressBar: {
-    height: 4,
-    backgroundColor: theme.colors.background.elevated,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  miniProgressFill: {
-    height: '100%',
-    backgroundColor: theme.colors.accent,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.xxl * 2,
-  },
-  emptyTitle: {
-    fontSize: theme.typography.fontSize.xl,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text.primary,
-    marginTop: theme.spacing.lg,
-    marginBottom: theme.spacing.sm,
-  },
-  emptySubtitle: {
-    fontSize: theme.typography.fontSize.md,
-    color: theme.colors.text.secondary,
-    textAlign: 'center',
-  },
-});

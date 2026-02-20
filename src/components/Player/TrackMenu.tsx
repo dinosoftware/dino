@@ -17,7 +17,7 @@ import {
   User,
   X,
 } from 'lucide-react-native';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import {
   Animated,
   Image,
@@ -33,7 +33,7 @@ import {
 import { getSimilarSongs2 } from '../../api/opensubsonic/radio';
 import { createShare } from '../../api/opensubsonic/share';
 import { Artist, Track } from '../../api/opensubsonic/types';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 import { useCoverArt } from '../../hooks/api';
 import { trackPlayerService } from '../../services/player/TrackPlayerService';
 import { downloadService } from '../../services/DownloadService';
@@ -56,27 +56,8 @@ interface TrackMenuProps {
   onCloseAll?: () => void;
 }
 
-interface MenuItemProps {
-  icon: React.ReactNode;
-  label: string;
-  onPress: () => void;
-}
-
-const MenuItem: React.FC<MenuItemProps> = ({ icon, label, onPress }) => {
-  const handlePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onPress();
-  };
-
-  return (
-    <TouchableOpacity style={styles.menuItem} onPress={handlePress} activeOpacity={0.7}>
-      <View style={styles.menuIcon}>{icon}</View>
-      <Text style={styles.menuLabel}>{label}</Text>
-    </TouchableOpacity>
-  );
-};
-
 export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, onShowInfo, onShowAddToPlaylist, onShowConfirm, onGoToArtist, onCloseAll }) => {
+  const theme = useTheme();
   const translateY = useRef(new Animated.Value(0)).current;
   const { data: coverArtUrl } = useCoverArt(track?.coverArt, 200);
   const { addToQueue, setQueue } = useQueueStore();
@@ -86,7 +67,87 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
   const { navigate } = useNavigationStore();
   const { showToast } = useToastStore();
 
-  // Haptic feedback when menu opens
+  const styles = useMemo(() => StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      justifyContent: 'flex-end',
+    },
+    menu: {
+      backgroundColor: theme.colors.background.card,
+      borderTopLeftRadius: theme.borderRadius.xl,
+      borderTopRightRadius: theme.borderRadius.xl,
+      paddingBottom: theme.spacing.lg,
+    },
+    swipeIndicator: {
+      alignItems: 'center',
+      paddingVertical: theme.spacing.xs,
+    },
+    swipeHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: theme.colors.text.tertiary,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    coverArt: {
+      width: 56,
+      height: 56,
+      borderRadius: theme.borderRadius.md,
+      marginRight: theme.spacing.md,
+    },
+    trackInfo: {
+      flex: 1,
+      marginRight: theme.spacing.md,
+    },
+    trackTitle: {
+      fontSize: theme.typography.fontSize.lg,
+      fontWeight: theme.typography.fontWeight.semibold,
+      color: theme.colors.text.primary,
+      marginBottom: theme.spacing.xs,
+    },
+    trackArtist: {
+      fontSize: theme.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+    },
+    closeButton: {
+      width: 44,
+      height: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    menuItems: {
+      paddingVertical: theme.spacing.xs,
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.xs,
+      paddingHorizontal: theme.spacing.lg,
+      minHeight: 48,
+    },
+    menuIcon: {
+      width: 32,
+      height: 32,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: theme.spacing.sm,
+    },
+    menuLabel: {
+      fontSize: theme.typography.fontSize.md,
+      color: theme.colors.text.primary,
+      fontWeight: theme.typography.fontWeight.medium,
+    },
+  }), [theme]);
+
   useEffect(() => {
     if (visible) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -97,7 +158,6 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only respond to downward swipes
         return gestureState.dy > 5;
       },
       onPanResponderMove: (_, gestureState) => {
@@ -107,7 +167,6 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
       },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dy > 100) {
-          // Swipe down threshold exceeded, close menu
           Animated.timing(translateY, {
             toValue: 500,
             duration: 200,
@@ -117,7 +176,6 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
             onClose();
           });
         } else {
-          // Snap back
           Animated.spring(translateY, {
             toValue: 0,
             useNativeDriver: true,
@@ -135,7 +193,6 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
     onClose();
 
     try {
-      // Fetch similar songs
       const response = await getSimilarSongs2(track.id);
       const similarSongs = response.similarSongs2?.song || [];
 
@@ -144,7 +201,6 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
         return;
       }
 
-      // Create queue with current track + similar songs
       const mixQueue = [track, ...similarSongs];
       setQueue(mixQueue, 0);
       setCurrentTrack(track);
@@ -194,7 +250,6 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
     const trackIsDownloaded = isTrackDownloaded(track.id);
     
     if (trackIsDownloaded) {
-      // Track is already downloaded - delete it
       try {
         await downloadService.deleteTrack(track.id);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -227,18 +282,15 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
     const includeShareMessage = useSettingsStore.getState().includeShareMessage;
     
     try {
-      // Create OpenSubsonic share
       const share = await createShare(
         [track.id],
         `${track.title} by ${track.artist || 'Unknown Artist'}`
       );
 
-      // Build share message based on setting
       const message = includeShareMessage
         ? `Check out "${track.title}" by ${track.artist || 'Unknown Artist'}\n\n${share.url}`
         : share.url;
 
-      // Share the URL
       await Share.share({
         message,
         url: share.url,
@@ -264,7 +316,7 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
     if (track?.albumId) {
       onClose();
       if (onCloseAll) {
-        onCloseAll(); // Close full player and all screens
+        onCloseAll();
       }
       setTimeout(() => {
         navigate({ name: 'album-detail', params: { albumId: track.albumId! } });
@@ -283,9 +335,7 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
       return;
     }
 
-    // Check if track has multiple artists
     if (track.artists && track.artists.length > 1) {
-      // Trigger modal to select artist
       onClose();
       setTimeout(() => {
         if (onGoToArtist) {
@@ -293,22 +343,19 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
         }
       }, 100);
     } else if (track.artistId) {
-      // Single artist - navigate directly
       onClose();
       if (onCloseAll) {
-        onCloseAll(); // Close full player and all screens
+        onCloseAll();
       }
       setTimeout(() => {
         navigate({ name: 'artist-detail', params: { artistId: track.artistId! } });
       }, 100);
     } else if (track.artists && track.artists.length === 1) {
-      // Single artist in artists array
       onClose();
       setTimeout(() => {
         navigate({ name: 'artist-detail', params: { artistId: track.artists![0].id } });
       }, 100);
     } else {
-      // No artist info available
       onClose();
       setTimeout(() => {
         onShowConfirm('No Artist Information', `No artist information available for "${track?.title}".`);
@@ -319,6 +366,20 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
   const handleShowInfo = () => {
     onClose();
     setTimeout(() => onShowInfo(), 100);
+  };
+
+  const MenuItem: React.FC<{ icon: React.ReactNode; label: string; onPress: () => void }> = ({ icon, label, onPress }) => {
+    const handlePress = () => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      onPress();
+    };
+
+    return (
+      <TouchableOpacity style={styles.menuItem} onPress={handlePress} activeOpacity={0.7}>
+        <View style={styles.menuIcon}>{icon}</View>
+        <Text style={styles.menuLabel}>{label}</Text>
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -335,12 +396,10 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
             style={[styles.menu, { transform: [{ translateY }] }]}
             {...panResponder.panHandlers}
           >
-            {/* Swipe Indicator */}
             <View style={styles.swipeIndicator}>
               <View style={styles.swipeHandle} />
             </View>
 
-            {/* Header */}
             <View style={styles.header}>
               <Image
                 source={
@@ -363,7 +422,6 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
               </TouchableOpacity>
             </View>
 
-            {/* Menu Items */}
             <View style={styles.menuItems}>
               <MenuItem
                 icon={<Radio size={22} color={theme.colors.accent} strokeWidth={2} />}
@@ -430,84 +488,3 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  menu: {
-    backgroundColor: theme.colors.background.card,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    paddingBottom: theme.spacing.lg,
-  },
-  swipeIndicator: {
-    alignItems: 'center',
-    paddingVertical: theme.spacing.xs,
-  },
-  swipeHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.text.tertiary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  coverArt: {
-    width: 56,
-    height: 56,
-    borderRadius: theme.borderRadius.md,
-    marginRight: theme.spacing.md,
-  },
-  trackInfo: {
-    flex: 1,
-    marginRight: theme.spacing.md,
-  },
-  trackTitle: {
-    fontSize: theme.typography.fontSize.lg,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
-  },
-  trackArtist: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
-  },
-  closeButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  menuItems: {
-    paddingVertical: theme.spacing.xs,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.lg,
-    minHeight: 48,
-  },
-  menuIcon: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: theme.spacing.sm,
-  },
-  menuLabel: {
-    fontSize: theme.typography.fontSize.md,
-    color: theme.colors.text.primary,
-    fontWeight: theme.typography.fontWeight.medium,
-  },
-});

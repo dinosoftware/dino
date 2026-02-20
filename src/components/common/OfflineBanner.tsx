@@ -3,15 +3,35 @@
  * Shows when the app is in offline mode
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WifiOff } from 'lucide-react-native';
 import * as Network from 'expo-network';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 
 export const OfflineBanner: React.FC = () => {
+  const theme = useTheme();
   const [isOffline, setIsOffline] = useState(false);
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      backgroundColor: theme.colors.warning || '#f59e0b',
+    },
+    content: {
+      paddingVertical: 6,
+      paddingHorizontal: theme.spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    text: {
+      color: theme.colors.text.inverse,
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.semibold,
+    },
+  }), [theme]);
 
   useEffect(() => {
     const checkNetworkStatus = async () => {
@@ -19,10 +39,8 @@ export const OfflineBanner: React.FC = () => {
       setIsOffline(!networkState.isConnected);
     };
 
-    // Check immediately
     checkNetworkStatus();
 
-    // Poll every 5 seconds
     const interval = setInterval(checkNetworkStatus, 5000);
 
     return () => clearInterval(interval);
@@ -41,22 +59,3 @@ export const OfflineBanner: React.FC = () => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: theme.colors.warning || '#f59e0b',
-  },
-  content: {
-    paddingVertical: 6,
-    paddingHorizontal: theme.spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  text: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.semibold,
-  },
-});

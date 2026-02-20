@@ -3,7 +3,7 @@ module.exports = {
     name: "Dino",
     slug: "dino",
     scheme: "dino",
-    version: "1.2.4",
+    version: "1.2.5",
     orientation: "portrait",
     icon: "./assets/images/icon-square.png", // Square icon as main app icon
     userInterfaceStyle: "dark", // Force dark mode for Tidal-inspired design

@@ -6,7 +6,7 @@
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronLeft, ChevronRight, ExternalLink, MoreVertical, Play, Shuffle } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -33,7 +33,7 @@ import { SongInfoModal } from '../../components/Modals/SongInfoModal';
 import { TrackMenu } from '../../components/Player/TrackMenu';
 import { ArtistDetailSkeleton } from '../../components/Skeletons';
 import { ErrorView, ArtistArtImage } from '../../components/common';
-import { theme } from '../../config/theme';
+import { useTheme, useBackgroundStyle } from '../../hooks/useTheme';
 import { useCoverArt } from '../../hooks/api/useAlbums';
 import { useArtistInfo } from '../../hooks/api/useArtistInfo';
 import { useArtist } from '../../hooks/api/useArtists';
@@ -50,17 +50,11 @@ interface ArtistDetailScreenProps {
   artistId: string;
 }
 
-// Helper function to clean biography text from HTML tags and Last.fm link
 const cleanBiography = (bio: string): string => {
   if (!bio) return '';
 
-  // Remove the Last.fm "Read more" link at the end
   let cleaned = bio.replace(/<a\s+href="[^"]*">Read more on Last\.fm<\/a>\.?/gi, '');
-
-  // Strip all other HTML tags but keep the text content
   cleaned = cleaned.replace(/<[^>]*>/g, '');
-
-  // Decode common HTML entities
   cleaned = cleaned
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
@@ -69,11 +63,12 @@ const cleanBiography = (bio: string): string => {
     .replace(/&#039;/g, "'")
     .replace(/&nbsp;/g, ' ');
 
-  // Trim whitespace
   return cleaned.trim();
 };
 
 export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps) {
+  const theme = useTheme();
+  const backgroundStyle = useBackgroundStyle();
   const { data: artist, isLoading, error, refetch } = useArtist(artistId);
   const { data: coverArtUrl } = useCoverArt(artist?.coverArt, 500);
   const artistColors = useAlbumColors(coverArtUrl || undefined);
@@ -81,26 +76,241 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
   const { setQueue } = useQueueStore();
 
-  // Top songs and artist info hooks
   const { data: topSongs } = useTopSongs(artist?.name);
   const { data: artistInfo } = useArtistInfo(artistId);
 
-  // Loading state for play/shuffle
   const [isLoadingTracks, setIsLoadingTracks] = useState(false);
   const [showArtistMenu, setShowArtistMenu] = useState(false);
-
-  // Biography state
   const [bioExpanded, setBioExpanded] = useState(false);
-
-  // Songs modal state
   const [showSongsModal, setShowSongsModal] = useState(false);
   const [allAlbumSongs, setAllAlbumSongs] = useState<Track[]>([]);
   const [isLoadingAllSongs, setIsLoadingAllSongs] = useState(false);
 
-  // Track menu state
   const trackMenuState = useTrackMenuState();
 
-  // Helper function to collect all tracks from all albums
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background.primary,
+    },
+    headerSection: {
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    backButton: {
+      position: 'absolute',
+      top: 50,
+      left: theme.spacing.md,
+      zIndex: 10,
+      width: 40,
+      height: 40,
+      borderRadius: theme.borderRadius.round,
+      backgroundColor: theme.colors.background.card,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    header: {
+      padding: theme.spacing.lg,
+      alignItems: 'center',
+      paddingTop: 60,
+      gap: theme.spacing.sm,
+    },
+    avatar: {
+      width: 160,
+      height: 160,
+      borderRadius: theme.borderRadius.round,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginBottom: theme.spacing.md,
+    },
+    name: {
+      fontSize: theme.typography.fontSize.xxxl,
+      fontFamily: theme.typography.fontFamily.bold,
+      color: theme.colors.text.primary,
+      textAlign: 'center',
+      letterSpacing: theme.typography.letterSpacing.tight,
+    },
+    albumCount: {
+      fontSize: theme.typography.fontSize.base,
+      fontFamily: theme.typography.fontFamily.regular,
+      color: theme.colors.text.secondary,
+      textAlign: 'center',
+    },
+    actions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.lg,
+      gap: theme.spacing.sm,
+    },
+    playButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.accent,
+      height: 44,
+      borderRadius: theme.borderRadius.md,
+      gap: theme.spacing.sm,
+    },
+    playButtonText: {
+      fontSize: theme.typography.fontSize.base,
+      fontFamily: theme.typography.fontFamily.semibold,
+    },
+    shuffleButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.background.card,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      height: 44,
+      paddingHorizontal: theme.spacing.md,
+      borderRadius: theme.borderRadius.md,
+      gap: theme.spacing.sm,
+    },
+    shuffleButtonText: {
+      fontSize: theme.typography.fontSize.base,
+      fontFamily: theme.typography.fontFamily.medium,
+      color: theme.colors.text.primary,
+    },
+    iconButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.background.card,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.md,
+    },
+    topSongsSection: {
+      paddingTop: theme.spacing.md,
+      marginBottom: theme.spacing.md,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: theme.spacing.lg,
+      marginBottom: theme.spacing.md,
+    },
+    seeAllButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.xs,
+      backgroundColor: theme.colors.accent + '20',
+      paddingVertical: theme.spacing.xs,
+      paddingHorizontal: theme.spacing.md,
+      borderRadius: theme.borderRadius.round,
+      borderWidth: 1,
+      borderColor: theme.colors.accent + '40',
+    },
+    seeAllText: {
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.semibold,
+      color: theme.colors.accent,
+    },
+    topSongsList: {
+      paddingHorizontal: theme.spacing.sm,
+    },
+    noTopSongsHint: {
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.md,
+    },
+    noTopSongsText: {
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.regular,
+      color: theme.colors.text.muted,
+    },
+    albumsSection: {
+      paddingTop: theme.spacing.xl,
+    },
+    sectionTitle: {
+      fontSize: theme.typography.fontSize.xl,
+      fontFamily: theme.typography.fontFamily.semibold,
+      color: theme.colors.text.primary,
+    },
+    sectionTitleWithPadding: {
+      fontSize: theme.typography.fontSize.xl,
+      fontFamily: theme.typography.fontFamily.semibold,
+      color: theme.colors.text.primary,
+      paddingHorizontal: theme.spacing.lg,
+      marginBottom: theme.spacing.md,
+    },
+    albumsList: {
+      paddingHorizontal: theme.spacing.md,
+    },
+    albumContainer: {
+      flex: 1,
+      margin: theme.spacing.sm,
+      maxWidth: '50%',
+    },
+    emptyContainer: {
+      padding: theme.spacing.xl,
+      alignItems: 'center',
+    },
+    emptyText: {
+      fontSize: theme.typography.fontSize.base,
+      fontFamily: theme.typography.fontFamily.regular,
+      color: theme.colors.text.secondary,
+    },
+    similarArtistsSection: {
+      marginTop: theme.spacing.xl,
+      marginBottom: theme.spacing.md,
+    },
+    similarArtistsContent: {
+      paddingHorizontal: theme.spacing.lg,
+    },
+    similarArtistCard: {
+      marginRight: theme.spacing.md,
+    },
+    biographySection: {
+      paddingHorizontal: theme.spacing.lg,
+      paddingTop: theme.spacing.md,
+      paddingBottom: theme.spacing.lg,
+      gap: theme.spacing.sm,
+    },
+    biographyTitle: {
+      fontSize: theme.typography.fontSize.xl,
+      fontFamily: theme.typography.fontFamily.semibold,
+      color: theme.colors.text.primary,
+      marginBottom: theme.spacing.xs,
+    },
+    biographyText: {
+      fontSize: theme.typography.fontSize.base,
+      fontFamily: theme.typography.fontFamily.regular,
+      color: theme.colors.text.secondary,
+      lineHeight: 22,
+    },
+    readMoreText: {
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.semibold,
+      color: theme.colors.accent,
+      marginTop: theme.spacing.xs,
+    },
+    lastFmButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.xs,
+      backgroundColor: theme.colors.accent + '20',
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.md,
+      borderRadius: theme.borderRadius.md,
+      borderWidth: 1,
+      borderColor: theme.colors.accent + '40',
+      alignSelf: 'flex-start',
+      marginTop: theme.spacing.sm,
+    },
+    lastFmButtonText: {
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.semibold,
+      color: theme.colors.accent,
+    },
+  }), [theme]);
+
   const getAllArtistTracks = async (): Promise<Track[]> => {
     if (!artist?.album || artist.album.length === 0) return [];
 
@@ -119,7 +329,6 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
   };
 
   const handlePlayAll = async () => {
-    // Prefer top songs if available
     if (topSongs && topSongs.length > 0) {
       setQueue(topSongs, 0);
       setCurrentTrack(topSongs[0]);
@@ -128,7 +337,6 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
       return;
     }
 
-    // Fall back to all tracks from albums
     setIsLoadingTracks(true);
     try {
       const tracks = await getAllArtistTracks();
@@ -148,11 +356,9 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
   const handleShuffle = async () => {
     let tracks: Track[] = [];
 
-    // Prefer top songs if available
     if (topSongs && topSongs.length > 0) {
       tracks = [...topSongs];
     } else {
-      // Fall back to all tracks from albums
       setIsLoadingTracks(true);
       try {
         tracks = await getAllArtistTracks();
@@ -166,7 +372,6 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
 
     if (tracks.length === 0) return;
 
-    // Fisher-Yates shuffle
     const shuffled = [...tracks];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -187,11 +392,9 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
     await trackPlayerService.play();
   };
 
-  // Handle opening songs modal - loads all album songs if no top songs
   const handleOpenSongsModal = async () => {
     setShowSongsModal(true);
 
-    // If no top songs and we haven't loaded album songs yet, load them
     const hasTopSongsAvailable = topSongs && topSongs.length > 0;
     if (!hasTopSongsAvailable && allAlbumSongs.length === 0 && !isLoadingAllSongs) {
       setIsLoadingAllSongs(true);
@@ -206,13 +409,11 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
     }
   };
 
-  // Get the songs to display in modal
   const getModalSongs = (): Track[] => {
     if (topSongs && topSongs.length > 0) return topSongs;
     return allAlbumSongs;
   };
 
-  // Handle track press in songs modal
   const handleModalTrackPress = async (track: Track, index: number) => {
     const songs = getModalSongs();
     if (songs.length === 0) return;
@@ -222,7 +423,6 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
     await trackPlayerService.play();
   };
 
-  // Handle play all from modal
   const handleModalPlayAll = async () => {
     const songs = getModalSongs();
     if (songs.length === 0) return;
@@ -233,7 +433,6 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  // Handle shuffle from modal
   const handleModalShuffle = async () => {
     const songs = getModalSongs();
     if (songs.length === 0) return;
@@ -248,6 +447,53 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
     setCurrentTrack(shuffled[0]);
     await trackPlayerService.play();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const renderHeaderBackground = () => {
+    if (backgroundStyle === 'solid') {
+      return null;
+    }
+
+    if (backgroundStyle === 'gradient' && coverArtUrl) {
+      const isDark = theme.mode !== 'light';
+      return (
+        <LinearGradient
+          colors={
+            isDark
+              ? [artistColors.primary + '50', artistColors.secondary + '70', theme.colors.background.primary]
+              : [artistColors.primary + '30', artistColors.secondary + '40', theme.colors.background.primary]
+          }
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+        />
+      );
+    }
+
+    if (backgroundStyle === 'blur' && coverArtUrl) {
+      const isDark = theme.mode !== 'light';
+      return (
+        <>
+          <Image
+            source={{ uri: coverArtUrl }}
+            style={StyleSheet.absoluteFill}
+            blurRadius={60}
+            resizeMode="cover"
+          />
+          <LinearGradient
+            colors={
+              isDark
+                ? ['transparent', 'rgba(0, 0, 0, 0.6)', theme.colors.background.primary]
+                : ['transparent', 'rgba(255, 255, 255, 0.6)', theme.colors.background.primary]
+            }
+            locations={[0, 0.6, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+        </>
+      );
+    }
+
+    return null;
   };
 
   if (isLoading) {
@@ -267,17 +513,14 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
   const hasTopSongs = topSongs && topSongs.length > 0;
   const hasSimilarArtists = artistInfo?.similarArtist && artistInfo.similarArtist.length > 0;
 
-  // Clean biography text
   const cleanedBiography = artistInfo?.biography ? cleanBiography(artistInfo.biography) : '';
 
-  // Debug logging
   console.log('Artist Detail - Top Songs:', topSongs?.length || 0);
   console.log('Artist Detail - All Album Songs:', allAlbumSongs.length);
   console.log('Artist Detail - Modal Songs:', getModalSongs().length);
 
   return (
     <View style={styles.container}>
-      {/* Back Button */}
       <TouchableOpacity
         style={styles.backButton}
         onPress={() => goBack()}
@@ -287,81 +530,65 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
       </TouchableOpacity>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Blurred background - scrolls with content */}
-        {coverArtUrl && (
-          <View style={styles.blurredBackground}>
-            <Image
-              source={{ uri: coverArtUrl }}
-              style={styles.blurredImage}
-              blurRadius={60}
+        <View style={styles.headerSection}>
+          {renderHeaderBackground()}
+          <View style={styles.header}>
+            <ArtistArtImage
+              uri={coverArtUrl}
+              style={styles.avatar}
             />
-            <LinearGradient
-              colors={['transparent', theme.colors.background.primary]}
-              locations={[0, 0.5]}
-              style={StyleSheet.absoluteFill}
-            />
-          </View>
-        )}
 
-        {/* Artist Header */}
-        <View style={styles.header}>
-          <ArtistArtImage
-            uri={coverArtUrl}
-            style={styles.avatar}
-          />
-
-          <Text style={styles.name} numberOfLines={2}>
-            {artist.name}
-          </Text>
-
-          {artist.albumCount !== undefined && (
-            <Text style={styles.albumCount}>
-              {artist.albumCount} {artist.albumCount === 1 ? 'album' : 'albums'}
+            <Text style={styles.name} numberOfLines={2}>
+              {artist.name}
             </Text>
-          )}
-        </View>
 
-        {/* Action Buttons */}
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={[styles.playButton, { backgroundColor: artistColors.primary }]}
-            onPress={handlePlayAll}
-            activeOpacity={0.8}
-            disabled={isLoadingTracks || (albums.length === 0 && !hasTopSongs)}
-          >
-            {isLoadingTracks ? (
-              <ActivityIndicator size="small" color={artistColors.textColor} />
-            ) : (
-              <>
-                <Play size={24} color={artistColors.textColor} fill={artistColors.textColor} />
-                <Text style={[styles.playButtonText, { color: artistColors.textColor }]}>Play</Text>
-              </>
+            {artist.albumCount !== undefined && (
+              <Text style={styles.albumCount}>
+                {artist.albumCount} {artist.albumCount === 1 ? 'album' : 'albums'}
+              </Text>
             )}
-          </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity
-            style={styles.shuffleButton}
-            onPress={handleShuffle}
-            activeOpacity={0.8}
-            disabled={isLoadingTracks || (albums.length === 0 && !hasTopSongs)}
-          >
-            <Shuffle size={20} color={theme.colors.text.primary} />
-            <Text style={styles.shuffleButtonText}>Shuffle</Text>
-          </TouchableOpacity>
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={[styles.playButton, { backgroundColor: artistColors.primary }]}
+              onPress={handlePlayAll}
+              activeOpacity={0.8}
+              disabled={isLoadingTracks || (albums.length === 0 && !hasTopSongs)}
+            >
+              {isLoadingTracks ? (
+                <ActivityIndicator size="small" color={artistColors.textColor} />
+              ) : (
+                <>
+                  <Play size={24} color={artistColors.textColor} fill={artistColors.textColor} />
+                  <Text style={[styles.playButtonText, { color: artistColors.textColor }]}>Play</Text>
+                </>
+              )}
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.iconButton}
-            activeOpacity={0.8}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setShowArtistMenu(true);
-            }}
-          >
-            <MoreVertical size={24} color={theme.colors.text.secondary} />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.shuffleButton}
+              onPress={handleShuffle}
+              activeOpacity={0.8}
+              disabled={isLoadingTracks || (albums.length === 0 && !hasTopSongs)}
+            >
+              <Shuffle size={20} color={theme.colors.text.primary} />
+              <Text style={styles.shuffleButtonText}>Shuffle</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.iconButton}
+              activeOpacity={0.8}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowArtistMenu(true);
+              }}
+            >
+              <MoreVertical size={24} color={theme.colors.text.secondary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Biography Section */}
         {cleanedBiography && (
           <View style={styles.biographySection}>
             <Text style={styles.biographyTitle}>About</Text>
@@ -400,7 +627,6 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
           </View>
         )}
 
-        {/* Songs Section - Top Songs or All Songs */}
         {(hasTopSongs || albums.length > 0) && (
           <View style={styles.topSongsSection}>
             <View style={styles.sectionHeader}>
@@ -446,7 +672,6 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
           </View>
         )}
 
-        {/* Albums Section */}
         <View style={styles.albumsSection}>
           <Text style={styles.sectionTitleWithPadding}>Albums</Text>
 
@@ -455,8 +680,10 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
               data={albums}
               numColumns={2}
               scrollEnabled={false}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => <ArtistAlbumItem album={item} />}
+              keyExtractor={(item: Album) => item.id}
+              renderItem={({ item }: { item: Album }) => (
+                <ArtistAlbumItem album={item} />
+              )}
               contentContainerStyle={styles.albumsList}
             />
           ) : (
@@ -466,7 +693,6 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
           )}
         </View>
 
-        {/* Similar Artists Section */}
         {hasSimilarArtists && (
           <View style={styles.similarArtistsSection}>
             <Text style={styles.sectionTitleWithPadding}>Similar Artists</Text>
@@ -475,7 +701,7 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.similarArtistsContent}
             >
-              {artistInfo.similarArtist!.map((similarArtist) => (
+              {artistInfo!.similarArtist!.map((similarArtist) => (
                 <View key={similarArtist.id} style={styles.similarArtistCard}>
                   <ArtistCard
                     artist={similarArtist}
@@ -490,11 +716,9 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
           </View>
         )}
 
-        {/* Bottom padding */}
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Track Menu */}
       <TrackMenu
         visible={trackMenuState.showTrackMenu}
         onClose={trackMenuState.closeTrackMenu}
@@ -505,14 +729,12 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
         onGoToArtist={trackMenuState.handleGoToArtist}
       />
 
-      {/* Song Info Modal */}
       <SongInfoModal
         visible={trackMenuState.showSongInfo}
         onClose={() => trackMenuState.setShowSongInfo(false)}
         track={trackMenuState.selectedTrack}
       />
 
-      {/* Add to Playlist Modal */}
       <AddToPlaylistModal
         visible={trackMenuState.showAddToPlaylist}
         onClose={() => trackMenuState.setShowAddToPlaylist(false)}
@@ -520,7 +742,6 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
         songTitle={trackMenuState.selectedTrack?.title}
       />
 
-      {/* Confirm Modal */}
       <ConfirmModal
         visible={trackMenuState.showConfirm}
         title={trackMenuState.confirmMessage.title}
@@ -528,17 +749,15 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
         onClose={() => trackMenuState.setShowConfirm(false)}
       />
 
-      {/* Artist Selection Modal */}
       <ArtistSelectionModal
         visible={trackMenuState.showArtistSelection}
         onClose={() => trackMenuState.setShowArtistSelection(false)}
         artists={trackMenuState.artistsToSelect}
-        onSelectArtist={(artistId) => {
+        onSelectArtist={(artistId: string) => {
           navigate({ name: 'artist-detail', params: { artistId } });
         }}
       />
 
-      {/* Artist Menu */}
       <ArtistMenu
         visible={showArtistMenu}
         onClose={() => setShowArtistMenu(false)}
@@ -546,7 +765,6 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
         coverArtUrl={coverArtUrl || undefined}
       />
 
-      {/* Artist Songs Modal */}
       <ArtistSongsModal
         visible={showSongsModal}
         onClose={() => setShowSongsModal(false)}
@@ -554,8 +772,8 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
         tracks={getModalSongs()}
         isLoading={isLoadingAllSongs}
         onTrackPress={handleModalTrackPress}
-        onTrackLongPress={(track) => trackMenuState.openTrackMenu(track)}
-        onTrackMenuPress={(track) => trackMenuState.openTrackMenu(track)}
+        onTrackLongPress={(track: Track) => trackMenuState.openTrackMenu(track)}
+        onTrackMenuPress={(track: Track) => trackMenuState.openTrackMenu(track)}
         onPlayAll={handleModalPlayAll}
         onShuffle={handleModalShuffle}
       />
@@ -563,11 +781,19 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
   );
 }
 
-// Helper component for album items with menu
 const ArtistAlbumItem: React.FC<{ album: Album }> = ({ album }) => {
+  const theme = useTheme();
   const { navigate } = useNavigationStore();
   const albumMenuState = useAlbumMenuState();
   const { data: coverArtUrl } = useCoverArt(album.coverArt, 300);
+
+  const styles = useMemo(() => StyleSheet.create({
+    albumContainer: {
+      flex: 1,
+      margin: theme.spacing.sm,
+      maxWidth: '50%',
+    },
+  }), [theme]);
 
   return (
     <>
@@ -593,234 +819,3 @@ const ArtistAlbumItem: React.FC<{ album: Album }> = ({ album }) => {
     </>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background.primary,
-  },
-  blurredBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 800,
-    zIndex: -1,
-  },
-  blurredImage: {
-    width: '100%',
-    height: '100%',
-  },
-  backButton: {
-    position: 'absolute',
-    top: 50,
-    left: theme.spacing.md,
-    zIndex: 10,
-    width: 40,
-    height: 40,
-    borderRadius: theme.borderRadius.round,
-    backgroundColor: theme.colors.background.card,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    padding: theme.spacing.lg,
-    alignItems: 'center',
-    paddingTop: 60,
-    gap: theme.spacing.sm,
-  },
-  avatar: {
-    width: 160,
-    height: 160,
-    borderRadius: theme.borderRadius.round,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginBottom: theme.spacing.md,
-  },
-  name: {
-    fontSize: theme.typography.fontSize.xxxl,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.text.primary,
-    textAlign: 'center',
-    letterSpacing: theme.typography.letterSpacing.tight,
-  },
-  albumCount: {
-    fontSize: theme.typography.fontSize.base,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.text.secondary,
-    textAlign: 'center',
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.lg,
-    gap: theme.spacing.sm,
-  },
-  playButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.accent,
-    height: 44,
-    borderRadius: theme.borderRadius.md,
-    gap: theme.spacing.sm,
-  },
-  playButtonText: {
-    fontSize: theme.typography.fontSize.base,
-    fontFamily: theme.typography.fontFamily.semibold,
-  },
-  shuffleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.background.card,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    height: 44,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    gap: theme.spacing.sm,
-  },
-  shuffleButtonText: {
-    fontSize: theme.typography.fontSize.base,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.text.primary,
-  },
-  iconButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.background.card,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-  },
-  topSongsSection: {
-    paddingTop: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-  },
-  seeAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-    backgroundColor: theme.colors.accent + '20',
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.borderRadius.round,
-    borderWidth: 1,
-    borderColor: theme.colors.accent + '40',
-  },
-  seeAllText: {
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.semibold,
-    color: theme.colors.accent,
-  },
-  topSongsList: {
-    paddingHorizontal: theme.spacing.sm,
-  },
-  noTopSongsHint: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-  },
-  noTopSongsText: {
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.text.muted,
-  },
-  albumsSection: {
-    paddingTop: theme.spacing.xl,
-  },
-  sectionTitle: {
-    fontSize: theme.typography.fontSize.xl,
-    fontFamily: theme.typography.fontFamily.semibold,
-    color: theme.colors.text.primary,
-  },
-  sectionTitleWithPadding: {
-    fontSize: theme.typography.fontSize.xl,
-    fontFamily: theme.typography.fontFamily.semibold,
-    color: theme.colors.text.primary,
-    paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-  },
-  albumsList: {
-    paddingHorizontal: theme.spacing.md,
-  },
-  albumContainer: {
-    flex: 1,
-    margin: theme.spacing.sm,
-    maxWidth: '50%',
-  },
-  emptyContainer: {
-    padding: theme.spacing.xl,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: theme.typography.fontSize.base,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.text.secondary,
-  },
-  similarArtistsSection: {
-    marginTop: theme.spacing.xl,
-    marginBottom: theme.spacing.md,
-  },
-  similarArtistsContent: {
-    paddingHorizontal: theme.spacing.lg,
-  },
-  similarArtistCard: {
-    marginRight: theme.spacing.md,
-  },
-  biographySection: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.lg,
-    gap: theme.spacing.sm,
-  },
-  biographyTitle: {
-    fontSize: theme.typography.fontSize.xl,
-    fontFamily: theme.typography.fontFamily.semibold,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
-  },
-  biographyText: {
-    fontSize: theme.typography.fontSize.base,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.text.secondary,
-    lineHeight: 22,
-  },
-  readMoreText: {
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.semibold,
-    color: theme.colors.accent,
-    marginTop: theme.spacing.xs,
-  },
-  lastFmButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-    backgroundColor: theme.colors.accent + '20',
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.accent + '40',
-    alignSelf: 'flex-start',
-    marginTop: theme.spacing.sm,
-  },
-  lastFmButtonText: {
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.semibold,
-    color: theme.colors.accent,
-  },
-});

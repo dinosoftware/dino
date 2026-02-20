@@ -3,7 +3,7 @@
  * Displays most frequently played albums
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
 import { RefreshCw } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -14,11 +14,13 @@ import { useNavigationStore } from '../../../stores/navigationStore';
 import { useServerStore } from '../../../stores/serverStore';
 import { useAlbumMenuState } from '../../../hooks/useAlbumMenuState';
 import { AlbumMenuWrapper } from '../../../components/Menus';
-import { theme } from '../../../config';
+import { useTheme } from '../../../hooks/useTheme';
+import { Theme } from '../../../config/theme';
 import { Album } from '../../../api/opensubsonic/types';
 import { HorizontalAlbumListSkeleton } from '../../../components/common';
 
 export const MostPlayedAlbums: React.FC = () => {
+  const theme = useTheme();
   const { currentServerId } = useServerStore();
   const { data: response, isLoading, refetch } = useQuery({
     queryKey: ['most-played-albums', currentServerId],
@@ -28,6 +30,7 @@ export const MostPlayedAlbums: React.FC = () => {
   });
 
   const albums = response?.albumList2?.album || [];
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   if (isLoading) {
     return <HorizontalAlbumListSkeleton />;
@@ -68,9 +71,12 @@ interface AlbumCardProps {
 }
 
 const AlbumCard: React.FC<AlbumCardProps> = ({ album }) => {
+  const theme = useTheme();
   const { data: coverArtUrl } = useCoverArt(album.coverArt, 300);
   const { navigate } = useNavigationStore();
   const albumMenuState = useAlbumMenuState();
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const handlePress = () => {
     navigate({ name: 'album-detail', params: { albumId: album.id } });
@@ -117,7 +123,7 @@ const AlbumCard: React.FC<AlbumCardProps> = ({ album }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   section: {
     marginBottom: theme.spacing.xl,
   },

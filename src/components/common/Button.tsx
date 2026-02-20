@@ -3,10 +3,10 @@
  * shadcn/ui-inspired button with consistent styling
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle, ActivityIndicator } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 
 type ButtonVariant = 'default' | 'primary' | 'secondary' | 'ghost' | 'destructive' | 'outline';
 type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
@@ -34,6 +34,28 @@ export const Button: React.FC<ButtonProps> = ({
   textStyle,
   fullWidth = false,
 }) => {
+  const theme = useTheme();
+
+  const styles = useMemo(() => StyleSheet.create({
+    button: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.borderRadius.md,
+      gap: theme.spacing.sm,
+    },
+    fullWidth: {
+      width: '100%',
+    },
+    disabled: {
+      opacity: 0.5,
+    },
+    text: {
+      fontFamily: theme.typography.fontFamily.medium,
+      textAlign: 'center',
+    },
+  }), [theme]);
+
   const handlePress = () => {
     if (disabled || loading) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -184,23 +206,3 @@ export const Button: React.FC<ButtonProps> = ({
     </TouchableOpacity>
   );
 };
-
-const styles = StyleSheet.create({
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.borderRadius.md,
-    gap: theme.spacing.sm,
-  },
-  fullWidth: {
-    width: '100%',
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-  text: {
-    fontFamily: theme.typography.fontFamily.medium,
-    textAlign: 'center',
-  },
-});

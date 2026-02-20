@@ -5,7 +5,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { Code, Heart, Info, X } from 'lucide-react-native';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import {
   Animated,
   Image,
@@ -18,7 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 import { APP_VERSION } from '../../config/constants';
 
 interface AppInfoSheetProps {
@@ -31,9 +31,38 @@ interface InfoItemProps {
   label: string;
   value: string;
   onPress?: () => void;
+  theme: ReturnType<typeof useTheme>;
 }
 
-const InfoItem: React.FC<InfoItemProps> = ({ icon, label, value, onPress }) => {
+const InfoItem: React.FC<InfoItemProps> = ({ icon, label, value, onPress, theme }) => {
+  const styles = useMemo(() => StyleSheet.create({
+    infoItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.md,
+    },
+    infoIcon: {
+      width: 32,
+      height: 32,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: theme.spacing.md,
+    },
+    infoContent: {
+      flex: 1,
+    },
+    infoLabel: {
+      fontSize: theme.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+      marginBottom: 2,
+    },
+    infoValue: {
+      fontSize: theme.typography.fontSize.md,
+      fontWeight: theme.typography.fontWeight.medium,
+      color: theme.colors.text.primary,
+    },
+  }), [theme]);
+
   const handlePress = () => {
     if (onPress) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -58,7 +87,80 @@ const InfoItem: React.FC<InfoItemProps> = ({ icon, label, value, onPress }) => {
 };
 
 export const AppInfoSheet: React.FC<AppInfoSheetProps> = ({ visible, onClose }) => {
+  const theme = useTheme();
   const translateY = useRef(new Animated.Value(0)).current;
+
+  const styles = useMemo(() => StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      backgroundColor: theme.colors.background.card,
+      borderTopLeftRadius: theme.borderRadius.xl,
+      borderTopRightRadius: theme.borderRadius.xl,
+      paddingBottom: theme.spacing.xl,
+    },
+    swipeIndicator: {
+      alignItems: 'center',
+      paddingVertical: theme.spacing.xs,
+    },
+    swipeHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: theme.colors.text.tertiary,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    title: {
+      fontSize: theme.typography.fontSize.xl,
+      fontWeight: theme.typography.fontWeight.semibold,
+      color: theme.colors.text.primary,
+    },
+    closeButton: {
+      width: 44,
+      height: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    content: {
+      paddingHorizontal: theme.spacing.lg,
+      paddingTop: theme.spacing.lg,
+    },
+    logoContainer: {
+      alignItems: 'center',
+      marginBottom: theme.spacing.xl,
+    },
+    appIcon: {
+      width: 80,
+      height: 80,
+      borderRadius: 20,
+      marginBottom: theme.spacing.md,
+    },
+    appName: {
+      fontSize: theme.typography.fontSize.xxl,
+      fontWeight: theme.typography.fontWeight.bold,
+      color: theme.colors.text.primary,
+    },
+    infoSection: {
+      marginBottom: theme.spacing.xl,
+    },
+    description: {
+      fontSize: theme.typography.fontSize.md,
+      color: theme.colors.text.secondary,
+      lineHeight: 22,
+      textAlign: 'center',
+    },
+  }), [theme]);
 
   useEffect(() => {
     if (visible) {
@@ -116,12 +218,10 @@ export const AppInfoSheet: React.FC<AppInfoSheetProps> = ({ visible, onClose }) 
             style={[styles.sheet, { transform: [{ translateY }] }]}
             {...panResponder.panHandlers}
           >
-            {/* Swipe Indicator */}
             <View style={styles.swipeIndicator}>
               <View style={styles.swipeHandle} />
             </View>
 
-            {/* Header */}
             <View style={styles.header}>
               <Text style={styles.title}>About</Text>
               <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -129,9 +229,7 @@ export const AppInfoSheet: React.FC<AppInfoSheetProps> = ({ visible, onClose }) 
               </TouchableOpacity>
             </View>
 
-            {/* Content */}
             <View style={styles.content}>
-              {/* App Icon/Logo */}
               <View style={styles.logoContainer}>
                 <Image
                   source={require('../../../assets/images/icon-circle.png')}
@@ -139,27 +237,28 @@ export const AppInfoSheet: React.FC<AppInfoSheetProps> = ({ visible, onClose }) 
                 />
                 <Text style={styles.appName}>Dino Music</Text>
               </View>
-              {/* Info Items */}
               <View style={styles.infoSection}>
                 <InfoItem
                   icon={<Info size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                   label="Version"
                   value={APP_VERSION}
+                  theme={theme}
                 />
                 <InfoItem
                   icon={<Heart size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                   label="Built with"
                   value="React Native & Expo"
+                  theme={theme}
                 />
                 <InfoItem
                   icon={<Code size={22} color={theme.colors.accent} strokeWidth={2} />}
                   label="Source Code"
                   value="View on GitHub"
                   onPress={handleSourceCode}
+                  theme={theme}
                 />
               </View>
 
-              {/* Description */}
               <Text style={styles.description}>
                 A beautiful OpenSubsonic music player with synchronized lyrics,
                 offline support, and modern design.
@@ -171,100 +270,3 @@ export const AppInfoSheet: React.FC<AppInfoSheetProps> = ({ visible, onClose }) 
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: theme.colors.background.card,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    paddingBottom: theme.spacing.xl,
-  },
-  swipeIndicator: {
-    alignItems: 'center',
-    paddingVertical: theme.spacing.xs,
-  },
-  swipeHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.text.tertiary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  title: {
-    fontSize: theme.typography.fontSize.xl,
-    fontWeight: theme.typography.fontWeight.semibold,
-    color: theme.colors.text.primary,
-  },
-  closeButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  content: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.lg,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: theme.spacing.xl,
-  },
-  appIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    marginBottom: theme.spacing.md,
-  },
-  appName: {
-    fontSize: theme.typography.fontSize.xxl,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text.primary,
-  },
-  infoSection: {
-    marginBottom: theme.spacing.xl,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.md,
-  },
-  infoIcon: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: theme.spacing.md,
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.text.secondary,
-    marginBottom: 2,
-  },
-  infoValue: {
-    fontSize: theme.typography.fontSize.md,
-    fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.text.primary,
-  },
-  description: {
-    fontSize: theme.typography.fontSize.md,
-    color: theme.colors.text.secondary,
-    lineHeight: 22,
-    textAlign: 'center',
-  },
-});

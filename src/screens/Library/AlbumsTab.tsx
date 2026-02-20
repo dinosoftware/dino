@@ -3,7 +3,7 @@
  * Grid view of all albums with sorting options
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, FlatList, StyleSheet, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { useAlbums, useCoverArt } from '../../hooks/api';
 import { AlbumCard } from '../../components/Cards';
@@ -12,7 +12,8 @@ import { EmptyState, ErrorView } from '../../components/common';
 import { AlbumCardSkeleton } from '../../components/Skeletons';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { useAlbumMenuState } from '../../hooks/useAlbumMenuState';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
+import { Theme } from '../../config/theme';
 import { Album } from '../../api/opensubsonic/types';
 
 type SortType = 'newest' | 'alphabeticalByName' | 'alphabeticalByArtist' | 'recent' | 'frequent' | 'random';
@@ -27,8 +28,10 @@ const sortOptions: { value: SortType; label: string }[] = [
 ];
 
 export const AlbumsTab: React.FC = () => {
+  const theme = useTheme();
   const [sortType, setSortType] = useState<SortType>('newest');
   const { data: albums, isLoading, error, refetch } = useAlbums(sortType, 100);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   if (isLoading) {
     return (
@@ -99,9 +102,12 @@ export const AlbumsTab: React.FC = () => {
 };
 
 const AlbumItem: React.FC<{ album: Album }> = ({ album }) => {
+  const theme = useTheme();
   const { data: coverArtUrl } = useCoverArt(album.coverArt, 300);
   const { navigate } = useNavigationStore();
   const albumMenuState = useAlbumMenuState();
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
     <>
@@ -128,7 +134,7 @@ const AlbumItem: React.FC<{ album: Album }> = ({ album }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
   },

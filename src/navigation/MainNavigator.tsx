@@ -23,7 +23,7 @@ import { OfflineBanner } from '../components/common';
 import { usePlayerStore } from '../stores';
 import { useNavigationStore } from '../stores/navigationStore';
 import { trackPlayerService } from '../services/player/TrackPlayerService';
-import { theme } from '../config';
+import { useTheme } from '../hooks/useTheme';
 
 const queryClient = new QueryClient();
 
@@ -42,6 +42,7 @@ const SettingsScreenComponent = ({ onLogout }: { onLogout: () => void }) => (
 );
 
 export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
+  const theme = useTheme();
   const { currentTrack } = usePlayerStore();
   const { currentScreen, navigate, goBack, canGoBack, showFullPlayer, setShowFullPlayer, isPlayerOverlayOpen, closePlayerOverlay } = useNavigationStore();
   
@@ -119,7 +120,7 @@ export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background.primary }]}>
       {/* Offline Banner */}
       <OfflineBanner />
       
@@ -134,7 +135,7 @@ export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
       )}
 
       {/* Bottom Tab Bar */}
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, { backgroundColor: theme.colors.background.secondary, borderTopColor: theme.colors.border }]}>
         <TouchableOpacity
           style={styles.tab}
           onPress={() => navigate({ name: 'home' })}
@@ -144,7 +145,7 @@ export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
             color={activeTab === 'home' ? theme.colors.accent : theme.colors.text.secondary}
             strokeWidth={2}
           />
-          <Text style={[styles.tabText, activeTab === 'home' && styles.tabTextActive]}>
+          <Text style={[styles.tabText, { color: theme.colors.text.secondary, fontFamily: theme.typography.fontFamily.medium }, activeTab === 'home' && { color: theme.colors.accent }]}>
             Home
           </Text>
         </TouchableOpacity>
@@ -158,7 +159,7 @@ export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
             color={activeTab === 'search' ? theme.colors.accent : theme.colors.text.secondary}
             strokeWidth={2}
           />
-          <Text style={[styles.tabText, activeTab === 'search' && styles.tabTextActive]}>
+          <Text style={[styles.tabText, { color: theme.colors.text.secondary, fontFamily: theme.typography.fontFamily.medium }, activeTab === 'search' && { color: theme.colors.accent }]}>
             Search
           </Text>
         </TouchableOpacity>
@@ -172,7 +173,7 @@ export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
             color={activeTab === 'library' ? theme.colors.accent : theme.colors.text.secondary}
             strokeWidth={2}
           />
-          <Text style={[styles.tabText, activeTab === 'library' && styles.tabTextActive]}>
+          <Text style={[styles.tabText, { color: theme.colors.text.secondary, fontFamily: theme.typography.fontFamily.medium }, activeTab === 'library' && { color: theme.colors.accent }]}>
             Library
           </Text>
         </TouchableOpacity>
@@ -186,7 +187,7 @@ export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
             color={activeTab === 'downloads' ? theme.colors.accent : theme.colors.text.secondary}
             strokeWidth={2}
           />
-          <Text style={[styles.tabText, activeTab === 'downloads' && styles.tabTextActive]}>
+          <Text style={[styles.tabText, { color: theme.colors.text.secondary, fontFamily: theme.typography.fontFamily.medium }, activeTab === 'downloads' && { color: theme.colors.accent }]}>
             Downloads
           </Text>
         </TouchableOpacity>
@@ -219,7 +220,6 @@ export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background.primary,
   },
   content: {
     flex: 1,
@@ -228,47 +228,26 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: theme.spacing.xl,
   },
   screenText: {
-    fontSize: theme.typography.fontSize.xxxl,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.md,
+    marginBottom: 8,
   },
-  subtitleText: {
-    fontSize: theme.typography.fontSize.lg,
-    color: theme.colors.text.secondary,
-  },
+  subtitleText: {},
   placeholderText: {
-    fontSize: theme.typography.fontSize.xxxl,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.md,
+    marginBottom: 8,
   },
   placeholderSubtext: {
-    fontSize: theme.typography.fontSize.lg,
-    color: theme.colors.text.secondary,
     textAlign: 'center',
   },
   logoutButton: {
-    marginTop: theme.spacing.xl,
-    backgroundColor: theme.colors.error,
-    paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
   },
-  logoutButtonText: {
-    color: theme.colors.text.primary,
-    fontSize: theme.typography.fontSize.lg,
-    fontWeight: theme.typography.fontWeight.semibold,
-  },
+  logoutButtonText: {},
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.background.secondary,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    paddingBottom: 20, // Extra padding for Android nav bar
+    paddingBottom: 20,
     paddingTop: 16,
   },
   tab: {
@@ -280,10 +259,5 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 10,
-    color: theme.colors.text.secondary,
-    fontFamily: theme.typography.fontFamily.medium,
-  },
-  tabTextActive: {
-    color: theme.colors.accent,
   },
 });

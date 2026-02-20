@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-02-20
+
+### Added
+- **Dynamic Theming System**: Three theme modes - Dark (Zinc-based), Light, and AMOLED (pure black)
+  - AMOLED theme uses #000000 for true black on OLED screens
+  - All 50+ components updated to use dynamic theming via `useTheme()` hook
+- **Background Styles**: Three background style options for player screens
+  - Solid: Pure theme background color
+  - Blur: Blurred cover art with gradient overlay
+  - Dynamic Color: Single solid color extracted from album art
+  - Settings available in Settings → Appearance
+- **Multiple Artists Display on Albums**: Album detail screen now shows all artists
+  - Displays artists as "Artist1, Artist2 & Artist3" format
+  - Each artist is clickable and navigates to their artist page
+- **Play Next with Empty Queue**: "Play Next" now works when queue is empty
+  - Creates new queue with the track and starts playing immediately
+- **Clear Completed Downloads**: Button to clear completed/failed downloads from active list
+  - Appears in Active Downloads section header when there are completed items
+- **Album/Playlist Menu Enhancements**: Added "Play Next" and "Add to Queue" options
+  - Available in album and playlist overflow menus
+  - Quick access to queue management from detail screens
+
+### Changed
+- **Queue Screen Gestures**: Completely reworked gesture handling
+  - Swipe down from header area to close (matches FullPlayer/Lyrics pattern)
+  - Fixed gesture conflicts with DraggableFlatList
+  - PanResponder only on header/swipe indicator, not entire screen
+- **Download Store Architecture**: Changed from Map to Record for proper reactivity
+  - Zustand now properly detects changes and triggers re-renders
+  - Progress updates now work correctly
+- **Download Metadata Updates**: Added `updateDownloadMeta` function
+  - Cover art and title now appear immediately when download starts
+  - Fixed first download item not showing cover art
+
+### Fixed
+- **Queue Screen Unresponsiveness**: Fixed severe lag with large queues
+  - Removed gesture handlers from list area
+  - Simplified QueueItemComponent handlers
+  - List now scrolls smoothly and responds to taps
+- **Queue Screen Swipe Down**: Fixed inability to close queue by swiping
+  - Restructured component hierarchy to match FullPlayer/Lyrics
+  - PanResponder now properly captures vertical swipes on header
+- **Swipe Handle Position**: Aligned with FullPlayer and Lyrics screens
+  - Consistent padding and styling across all overlay screens
+- **Download Progress Stuck at 0%**: Server may not send Content-Length header
+  - Progress now shows "Downloading..." when total size unknown
+  - Still tracks bytes downloaded for logging purposes
+- **Album Multiple Artists**: Added `artists` and `displayArtist` to Album interface
+  - API response now properly typed for multiple artists
+  - Album header displays all contributing artists
+
 ## [1.2.4] - 2026-02-19
 
 ### Added

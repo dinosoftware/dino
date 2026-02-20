@@ -3,12 +3,12 @@
  * Compact artist card for horizontal lists (similar artists, etc.)
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Artist } from '../../api/opensubsonic/types';
 import { ArtistArtImage } from '../common';
-import { theme } from '../../config';
+import { useTheme } from '../../hooks/useTheme';
 import { useCoverArt } from '../../hooks/api/useAlbums';
 
 interface ArtistCardProps {
@@ -24,8 +24,32 @@ export const ArtistCard: React.FC<ArtistCardProps> = ({
   onLongPress,
   width = 120,
 }) => {
+  const theme = useTheme();
   const { data: coverArtUrl } = useCoverArt(artist.coverArt, 200);
   const [scaleAnim] = useState(new Animated.Value(1));
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      alignItems: 'center',
+    },
+    imageContainer: {
+      borderRadius: 9999,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    image: {
+      width: '100%',
+      height: '100%',
+    },
+    name: {
+      marginTop: theme.spacing.sm,
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.medium,
+      color: theme.colors.text.primary,
+      textAlign: 'center',
+    },
+  }), [theme]);
 
   const handleLongPress = () => {
     if (onLongPress) {
@@ -79,26 +103,3 @@ export const ArtistCard: React.FC<ArtistCardProps> = ({
     </TouchableOpacity>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-  },
-  imageContainer: {
-    borderRadius: 9999,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  name: {
-    marginTop: theme.spacing.sm,
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.text.primary,
-    textAlign: 'center',
-  },
-});
