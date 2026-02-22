@@ -294,17 +294,21 @@ const PlayerBackground: React.FC<{
   const theme = useTheme();
   const backgroundStyle = useBackgroundStyle();
 
+  const baseBackgroundColor = theme.colors.background.primary;
+
   if (backgroundStyle === 'solid') {
     return (
-      <View style={{ flex: 1, backgroundColor: theme.colors.background.primary }}>
+      <View style={{ flex: 1, backgroundColor: baseBackgroundColor }}>
         {children}
       </View>
     );
   }
 
   if (backgroundStyle === 'gradient') {
+    const bgColor = albumColors.background || baseBackgroundColor;
     return (
-      <View style={{ flex: 1, backgroundColor: albumColors.background }}>
+      <View style={{ flex: 1, backgroundColor: baseBackgroundColor }}>
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: bgColor }]} />
         {children}
       </View>
     );
@@ -313,7 +317,7 @@ const PlayerBackground: React.FC<{
   if (backgroundStyle === 'blur' && coverArtUrl) {
     const isDark = theme.mode !== 'light';
     return (
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: baseBackgroundColor }}>
         <Image
           source={{ uri: coverArtUrl }}
           style={StyleSheet.absoluteFill}
@@ -327,7 +331,7 @@ const PlayerBackground: React.FC<{
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background.primary }}>
+    <View style={{ flex: 1, backgroundColor: baseBackgroundColor }}>
       {children}
     </View>
   );

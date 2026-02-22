@@ -184,18 +184,27 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
   }), [theme]);
 
   const renderBackground = () => {
+    const baseBackgroundColor = theme.colors.background.primary;
+
     if (backgroundStyle === 'solid') {
-      return <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.background.primary }]} />;
+      return <View style={[StyleSheet.absoluteFill, { backgroundColor: baseBackgroundColor }]} />;
     }
 
     if (backgroundStyle === 'gradient') {
-      return <View style={[StyleSheet.absoluteFill, { backgroundColor: albumColors.background }]} />;
+      const bgColor = albumColors.background || baseBackgroundColor;
+      return (
+        <>
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: baseBackgroundColor }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: bgColor }]} />
+        </>
+      );
     }
 
     if (backgroundStyle === 'blur' && coverArtUrl) {
       const isDark = theme.mode !== 'light';
       return (
         <>
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: baseBackgroundColor }]} />
           <Image
             source={{ uri: coverArtUrl }}
             style={StyleSheet.absoluteFill}
@@ -207,7 +216,7 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
       );
     }
 
-    return <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.background.primary }]} />;
+    return <View style={[StyleSheet.absoluteFill, { backgroundColor: baseBackgroundColor }]} />;
   };
 
   useEffect(() => {

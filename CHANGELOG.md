@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-02-21
+
+### Changed
+- **Queue Screen Reorder System**: Replaced broken DraggableFlatList with button-based reordering
+  - Long-press grip icon to enter reorder mode (shows up/down arrows)
+  - Tap arrows to move song up or down in queue
+  - Tap grip again to exit reorder mode
+  - More reliable than gesture-based drag that was freezing the entire screen
+
+### Fixed
+- **Queue Screen Freezing**: Fixed complete freeze after attempting to drag songs
+  - Removed DraggableFlatList which caused gesture conflicts
+  - List now always scrolls smoothly
+  - Swipe down to close always works
+- **Queue Position Alignment**: Fixed queue header position to match FullPlayer/Lyrics screens
+  - Consistent `paddingTop: theme.spacing.xxl` for swipe indicator
+  - Proper spacing across all overlay screens
+
 ## [1.2.5] - 2026-02-20
 
 ### Added

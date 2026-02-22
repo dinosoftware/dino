@@ -12,26 +12,26 @@ React Native/Expo mobile music streaming app for iOS/Android connecting to OpenS
 
 ```bash
 npm install              # Install dependencies
-npm run lint             # Run linter (optional)
+npm run lint             # Run ESLint
 ```
 
 **IMPORTANT:** 
 - Do NOT run build commands (`npm start`, `npm run android/ios`, `eas build`) after making changes
 - The user builds and tests the app themselves using EAS
-- No unit tests configured
+- No unit tests configured - verify changes via lint only
 
 ## File Structure
 
 ```
 src/
-  api/              # Axios client and OpenSubsonic endpoints
-  components/       # UI components (common/, Cards/, Menus/, Modals/, Player/, Skeletons/)
-  config/           # Theme (theme.ts) and constants
-  hooks/            # Custom hooks (api/ for React Query)
+  api/              # Axios client (client.ts) and OpenSubsonic endpoints (opensubsonic/)
+  components/       # UI components: common/, Cards/, Menus/, Modals/, Player/, Skeletons/
+  config/           # Theme (theme.ts), constants, environment
+  hooks/            # Custom hooks; api/ subfolder for React Query hooks
   navigation/       # React Navigation navigators
-  screens/          # Screen components by feature
-  services/         # Business logic (player, downloads, etc.)
-  stores/           # Zustand stores
+  screens/          # Screen components organized by feature
+  services/         # Business logic: player/, DownloadService, deeplink/
+  stores/           # Zustand stores (auth, player, queue, download, etc.)
   utils/            # Utility functions
 app/_layout.tsx     # Expo Router root layout
 ```
@@ -48,15 +48,17 @@ app/_layout.tsx     # Expo Router root layout
 
 ### Imports (order: React/RN → Third-party → Internal)
 ```typescript
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
+import { Download } from 'lucide-react-native';
 import { Button } from '../../components/common';
 import { theme } from '../../config';
+import { useDownloadStore } from '../../stores/downloadStore';
 ```
 
-Use relative paths (`../../`) instead of `@/` alias.
+- Use relative paths (`../../`) instead of `@/` alias
 
 ### Component Pattern
 ```typescript
@@ -66,15 +68,13 @@ interface ComponentProps {
 }
 
 export const Component: React.FC<ComponentProps> = ({ title, onPress }) => {
-  const [state, setState] = useState(false);
-  
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress?.();
   };
 
   return (
-    <TouchableOpacity onPress={handlePress}>
+    <TouchableOpacity onPress={handlePress} activeOpacity={0.7}>
       <Text style={styles.text}>{title}</Text>
     </TouchableOpacity>
   );
@@ -86,28 +86,58 @@ const styles = StyleSheet.create({
 ```
 
 ### TypeScript
-- Use `interface` for objects, `type` for unions
-- Avoid `any` - use `unknown` when needed
+- Use `interface` for object types, `type` for unions
+- Avoid `any` - use `unknown` when type is uncertain
 - Props interfaces: `[Name]Props`
-- Store hooks: `use[Name]Store`
-- API hooks: `use[Entity]` (e.g., `useAlbum`, `useAlbums`)
+- Store hooks: `use[Name]Store` (e.g., `usePlayerStore`, `useDownloadStore`)
+- API hooks: `use[Entity]` or `use[Entities]` (e.g., `useAlbum`, `useAlbums`)
 
 ### Theme (never hardcode colors/spacing)
 ```typescript
 import { theme } from '../../config';
 
-// Available: colors.*, spacing.*, borderRadius.*, typography.fontSize.*, typography.fontFamily.*
+// Available: colors, spacing, borderRadius, typography, shadows, animations, dimensions
 styles: {
   backgroundColor: theme.colors.background.primary,
-  padding: theme.spacing.lg,
+  padding: theme.spacing.md,
   fontSize: theme.typography.fontSize.base,
-  fontFamily: theme.typography.fontFamily.bold,
+  fontFamily: theme.typography.fontFamily.semibold,
+  borderRadius: theme.borderRadius.md,
+  ...theme.shadows.sm,
 }
 ```
 
-### Error Handling
+### React Query Pattern
 ```typescript
-// API calls
+export const useAlbum = (albumId: string) => {
+  return useQuery({
+    queryKey: ['album', albumId],
+    queryFn: async () => {
+      const response = await getAlbum(albumId);
+      return response.album;
+    },
+    enabled: !!albumId,
+    staleTime: 5 * 60 * 1000, // Optional: prevent refetch on mount
+  });
+};
+```
+
+### Zustand Stores
+```typescript
+interface PlayerStore {
+  currentTrack: Track | null;
+  setCurrentTrack: (track: Track | null) => void;
+}
+
+export const usePlayerStore = create<PlayerStore>((set, get) => ({
+  currentTrack: null,
+  setCurrentTrack: (track) => set({ currentTrack: track }),
+}));
+```
+
+### Error Handling & Logging
+```typescript
+// API calls with descriptive errors
 try {
   const response = await getAlbum(albumId);
   return response.album;
@@ -116,25 +146,9 @@ try {
   throw new Error('Failed to load album.');
 }
 
-// React Query - conditional fetching
-useQuery({
-  queryKey: ['album', albumId],
-  queryFn: () => getAlbum(albumId),
-  enabled: !!albumId,
-});
-```
-
-### Zustand Stores
-```typescript
-interface Store {
-  items: Item[];
-  setItems: (items: Item[]) => void;
-}
-
-export const useStore = create<Store>((set) => ({
-  items: [],
-  setItems: (items) => set({ items }),
-}));
+// Use tagged logging for debugging
+console.log('[API Client] Request:', endpoint);
+console.log('[PlayerService] State changed:', state);
 ```
 
 ### Barrel Exports
@@ -147,15 +161,17 @@ export * from './Avatar';
 import { Button, Avatar } from '../../components/common';
 ```
 
-### Logging
-```typescript
-console.log('[API Client] Request:', endpoint);
-console.error('[PlayerService] Error:', error);
-```
+### API Types
+- All OpenSubsonic response types in `src/api/opensubsonic/types.ts`
+- Response wrapper: `SubsonicResponse<T>` with `'subsonic-response'` key
+- Entity types: `Artist`, `Album`, `Track`, `Playlist`, `Lyrics`, etc.
 
 ## Key Notes
 
 - **Expo Go not supported** - must build dev client via EAS
-- **Strict TypeScript** - all types must be correct
+- **Strict TypeScript** - all types must be correct, no `any`
 - **Haptic feedback** - use `expo-haptics` on interactive elements
 - **Dark theme only** - Zinc-based palette, no light theme
+- **Lucide icons** - use `lucide-react-native` for icons
+- **Offline support** - DownloadStore tracks downloaded content
+- **Player architecture** - TrackPlayerService, QueueSyncManager, ScrobblingManager
