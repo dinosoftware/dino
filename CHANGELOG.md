@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.7] - 2026-02-22
+
+### Added
+- **Tablet/Folding Phone Support**: Proper layout handling for foldable devices
+  - Side-by-side layout on tablet landscape (cover art left, controls right)
+  - Phone layout on tablet portrait (vertical stack)
+  - Responsive artwork sizing for different screen sizes
+- **Cast Button Modal**: Shows "Coming Soon" message when tapping cast button
+- **Config Plugin for Android**: Custom plugin to add `smallestScreenSize|density` to android:configChanges
+  - Prevents activity recreation on foldable devices
+  - Fixes "linking configured in multiple places" error
+
+### Changed
+- **FullPlayer Layout**: Complete redesign for better responsiveness
+  - Controls now properly centered using `justifyContent: 'center'` with `gap`
+  - Removed absolute positioning from bottom controls
+  - Tablet layout only activates in landscape mode
+- **Queue Screen**: Now uses `useWindowDimensions` for responsive sizing
+- **Lyrics Screen**: Now uses `useWindowDimensions` for responsive sizing
+- **Hero Banner**: Now uses `useWindowDimensions` for proper card sizing on fold/unfold
+- **Deep Link Service**: Improved initialization to prevent multiple instances
+
+### Fixed
+- **Foldable Device Crash**: Fixed app crashing when folding/unfolding screen
+  - Added `smallestScreenSize|density` to android:configChanges via config plugin
+  - Components now properly handle dimension changes without crashing
+- **Queue Drag and Drop**: Fixed inability to reorder songs in queue
+  - Long press grip icon (≡) to drag and reorder tracks
+  - Swipe down to close only works on header area, not the list
+- **Search Page Skeleton Loading**: Fixed skeleton layout during loading
+  - Shows proper sections for albums, artists, and tracks
+  - Multiple skeleton items per section for realistic preview
+- **FullPlayer Controls Position**: Fixed shuffle/repeat icons being cut off on tablet portrait
+  - Controls now properly centered with appropriate spacing
+  - Tablet layout only used in landscape orientation
+
 ## [1.2.6] - 2026-02-21
 
 ### Changed

@@ -12,7 +12,7 @@ import {
   Image,
   Animated,
   PanResponder,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import DraggableFlatList, {
   RenderItemParams,
@@ -39,7 +39,6 @@ interface QueueScreenProps {
   onClose: () => void;
 }
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const ITEM_HEIGHT = 72;
 const ITEM_MARGIN = 8;
 
@@ -86,6 +85,8 @@ async function buildCoverArtUrls(
 export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
   const theme = useTheme();
   const backgroundStyle = useBackgroundStyle();
+  const { height: screenHeight } = useWindowDimensions();
+  
   const { queue, currentIndex, removeFromQueue, reorderQueue, clearQueue } = useQueueStore();
   const { currentTrack } = usePlayerStore();
   const { data: coverArtUrl } = useCoverArt(currentTrack?.coverArt, 500);
@@ -131,7 +132,7 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
     return () => { cancelled = true; };
   }, [queue, downloadedAlbums, downloadedPlaylists, downloadedTracks]);
 
-  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const translateY = useRef(new Animated.Value(screenHeight)).current;
 
   useEffect(() => {
     Animated.spring(translateY, {
@@ -144,11 +145,11 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
 
   const handleClose = useCallback(() => {
     Animated.timing(translateY, {
-      toValue: SCREEN_HEIGHT,
+      toValue: screenHeight,
       duration: 200,
       useNativeDriver: true,
     }).start(() => {
-      translateY.setValue(SCREEN_HEIGHT);
+      translateY.setValue(screenHeight);
       onClose();
     });
   }, [translateY, onClose]);
@@ -167,11 +168,11 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dy > 150) {
           Animated.timing(translateY, {
-            toValue: SCREEN_HEIGHT,
+            toValue: screenHeight,
             duration: 200,
             useNativeDriver: true,
           }).start(() => {
-            translateY.setValue(SCREEN_HEIGHT);
+            translateY.setValue(screenHeight);
             onClose();
           });
         } else {

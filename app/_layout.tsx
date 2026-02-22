@@ -6,7 +6,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { AppNavigator } from '../src/navigation/AppNavigator';
 import { useFonts } from '../src/hooks/useFonts';
 import { deepLinkService } from '../src/services/deeplink/DeepLinkService';
@@ -21,14 +21,26 @@ function ThemedStatusBar() {
 
 export default function RootLayout() {
   const fontsLoaded = useFonts();
+  const deepLinkInitialized = useRef(false);
 
   useEffect(() => {
     if (fontsLoaded) {
       SplashScreen.hideAsync();
       
-      deepLinkService.initialize();
+      // Only initialize deep links once
+      if (!deepLinkInitialized.current) {
+        deepLinkInitialized.current = true;
+        deepLinkService.initialize();
+      }
     }
   }, [fontsLoaded]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      deepLinkService.cleanup();
+    };
+  }, []);
 
   if (!fontsLoaded) {
     return null;

@@ -3,52 +3,61 @@ module.exports = {
     name: "Dino",
     slug: "dino",
     scheme: "dino",
-    version: "1.2.6",
-    orientation: "portrait",
-    icon: "./assets/images/icon-square.png", // Square icon as main app icon
-    userInterfaceStyle: "dark", // Force dark mode for Tidal-inspired design
+    version: "1.2.7",
+    orientation: "default",
+    icon: "./assets/images/icon-square.png",
+    userInterfaceStyle: "dark",
     splash: {
-      image: "./assets/images/icon-square.png", // Square with outline - more dramatic on launch
+      image: "./assets/images/icon-square.png",
       resizeMode: "contain",
       backgroundColor: "#000000"
     },
     newArchEnabled: false,
 
-    // App-specific configuration
     extra: {
-      defaultServers: [], // Empty for public releases - users add their own
-      allowAdditionalServers: true, // Always true for public releases
-      requireServerOnFirstLaunch: true, // Show server setup on first launch
+      defaultServers: [],
+      allowAdditionalServers: true,
+      requireServerOnFirstLaunch: true,
       eas: {
         projectId: "f8b0f895-17da-4d70-930d-b0a825a03593"
       },
     },
 
-    // iOS configuration
     ios: {
       supportsTablet: true,
       bundleIdentifier: "sonic.dino",
       infoPlist: {
-        UIBackgroundModes: ["audio"], // Enable background audio playback
-        // Allow HTTP connections for local development and testing
+        UIBackgroundModes: ["audio"],
         NSAppTransportSecurity: {
           NSAllowsArbitraryLoads: true,
           NSAllowsLocalNetworking: true,
         },
+        UILaunchStoryboardName: "SplashScreen",
+        UIRequiresFullScreen: false,
+        UISupportedInterfaceOrientations: [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
+        ],
+        "UISupportedInterfaceOrientations~ipad": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
+        ],
       }
     },
 
-    // Android configuration
     android: {
       adaptiveIcon: {
         backgroundColor: "#ffffff",
-        foregroundImage: "./assets/images/icon-square.png", // Transparent dino for adaptive icon
+        foregroundImage: "./assets/images/icon-square.png",
       },
       package: "sonic.dino",
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       usesCleartextTraffic: true,
-      // Deep linking intent filters
       intentFilters: [
         {
           action: "VIEW",
@@ -67,18 +76,17 @@ module.exports = {
       ]
     },
 
-    // Web configuration
     web: {
       output: "static",
       favicon: "./assets/images/icon-square.png"
     },
 
-    // Plugins
     plugins: [
+      "./plugins/withAndroidConfigChanges",
       [
         "expo-splash-screen",
         {
-          image: "./assets/images/icon-square.png", // Square with outline for splash
+          image: "./assets/images/icon-square.png",
           imageWidth: 200,
           resizeMode: "contain",
           backgroundColor: "#000000",
@@ -98,11 +106,6 @@ module.exports = {
           }
         }
       ],
-      // Note: react-native-reanimated/plugin is in babel.config.js
     ],
-
-    experiments: {
-      typedRoutes: true
-    }
   }
 };

@@ -8,12 +8,12 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   TouchableOpacity,
   Image,
   ScrollView,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  useWindowDimensions,
 } from 'react-native';
 import { Play, Shuffle } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
@@ -32,12 +32,12 @@ import { useTheme } from '../../../hooks/useTheme';
 import { Theme } from '../../../config/theme';
 import { Track } from '../../../api/opensubsonic/types';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_HEIGHT = 200;
 
 export const HeroBanner: React.FC = () => {
   const theme = useTheme();
-  const CARD_WIDTH = SCREEN_WIDTH - theme.spacing.lg * 2;
+  const { width: screenWidth } = useWindowDimensions();
+  const CARD_WIDTH = screenWidth - theme.spacing.lg * 2;
   const CARD_GAP = theme.spacing.md;
   const AUTO_SCROLL_INTERVAL = 5000;
   

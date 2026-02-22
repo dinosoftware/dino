@@ -11,19 +11,26 @@ import { useToastStore } from '../../stores/toastStore';
 
 class DeepLinkService {
   private isInitialized = false;
+  private subscription: { remove: () => void } | null = null;
 
   /**
    * Initialize deep link handling
    */
   async initialize() {
     if (this.isInitialized) {
-      console.log('[DeepLink] Already initialized');
+      console.log('[DeepLink] Already initialized, skipping');
       return;
     }
 
     console.log('[DeepLink] Initializing...');
 
     try {
+      // Clean up any existing subscription first
+      if (this.subscription) {
+        this.subscription.remove();
+        this.subscription = null;
+      }
+
       // Handle app opened from deep link (app was closed)
       const initialUrl = await Linking.getInitialURL();
       console.log('[DeepLink] Initial URL from getInitialURL:', initialUrl);
@@ -38,7 +45,7 @@ class DeepLinkService {
       }
 
       // Handle deep links while app is running
-      const subscription = Linking.addEventListener('url', (event) => {
+      this.subscription = Linking.addEventListener('url', (event) => {
         console.log('[DeepLink] URL event received:', event);
         if (event && event.url) {
           console.log('[DeepLink] Processing URL from event:', event.url);
@@ -50,14 +57,22 @@ class DeepLinkService {
 
       this.isInitialized = true;
       console.log('[DeepLink] Initialized successfully');
-
-      return () => {
-        subscription.remove();
-      };
     } catch (error) {
       console.error('[DeepLink] Initialization error:', error);
       this.isInitialized = true; // Mark as initialized anyway to prevent re-init
     }
+  }
+
+  /**
+   * Cleanup deep link service
+   */
+  cleanup() {
+    console.log('[DeepLink] Cleaning up...');
+    if (this.subscription) {
+      this.subscription.remove();
+      this.subscription = null;
+    }
+    this.isInitialized = false;
   }
 
   /**

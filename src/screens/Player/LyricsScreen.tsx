@@ -14,7 +14,7 @@ import {
   Animated,
   Image,
   PanResponder,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { Lock, Unlock } from 'lucide-react-native';
 import { useLyrics } from '../../hooks/useLyrics';
@@ -26,8 +26,6 @@ import { useSettingsStore, usePlayerStore } from '../../stores';
 import { useCoverArt } from '../../hooks/api';
 import { useAlbumColors } from '../../hooks/useAlbumColors';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 interface LyricsScreenProps {
   onClose: () => void;
 }
@@ -35,6 +33,8 @@ interface LyricsScreenProps {
 export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
   const theme = useTheme();
   const backgroundStyle = useBackgroundStyle();
+  const { height: screenHeight } = useWindowDimensions();
+  
   const { lyrics, seekToLine, toggleScrollLock } = useLyrics();
   const { currentTrack } = usePlayer();
   const { lyricsFontSize, showLyricsTimestamps } = useSettingsStore();
@@ -42,7 +42,7 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
   const scrollViewRef = useRef<ScrollView>(null);
   const { data: coverArtUrl } = useCoverArt(currentTrack?.coverArt, 500);
   const albumColors = useAlbumColors(coverArtUrl || undefined);
-  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const translateY = useRef(new Animated.Value(screenHeight)).current;
   const lineHeightsRef = useRef<Map<number, number>>(new Map());
 
   const fontSizes = LYRICS_FONT_SIZES[lyricsFontSize];
@@ -139,7 +139,7 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
     lyricsContainer: {
       paddingHorizontal: theme.spacing.xl,
       paddingTop: 50,
-      paddingBottom: SCREEN_HEIGHT,
+      paddingBottom: screenHeight,
     },
     lineContainer: {
       minHeight: 90,
@@ -230,11 +230,11 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
 
   const handleClose = useCallback(() => {
     Animated.timing(translateY, {
-      toValue: SCREEN_HEIGHT,
+      toValue: screenHeight,
       duration: 200,
       useNativeDriver: true,
     }).start(() => {
-      translateY.setValue(SCREEN_HEIGHT);
+      translateY.setValue(screenHeight);
       onClose();
     });
   }, [translateY, onClose]);
@@ -253,11 +253,11 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dy > 150) {
           Animated.timing(translateY, {
-            toValue: SCREEN_HEIGHT,
+            toValue: screenHeight,
             duration: 200,
             useNativeDriver: true,
           }).start(() => {
-            translateY.setValue(SCREEN_HEIGHT);
+            translateY.setValue(screenHeight);
             onClose();
           });
         } else {

@@ -182,9 +182,28 @@ export const SearchScreen: React.FC = () => {
           />
         ) : isLoading ? (
           <View style={styles.loadingContainer}>
-            <AlbumCardSkeleton />
-            <TrackRowSkeleton />
-            <ArtistRowSkeleton />
+            <View style={styles.section}>
+              <View style={styles.skeletonSectionTitle} />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.albumsScroll}>
+                {[1, 2, 3, 4].map((i) => (
+                  <View key={`album-${i}`} style={styles.albumSkeletonWrapper}>
+                    <AlbumCardSkeleton width={140} />
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+            <View style={styles.section}>
+              <View style={styles.skeletonSectionTitle} />
+              {[1, 2, 3].map((i) => (
+                <ArtistRowSkeleton key={`artist-${i}`} />
+              ))}
+            </View>
+            <View style={styles.section}>
+              <View style={styles.skeletonSectionTitle} />
+              {[1, 2, 3, 4, 5].map((i) => (
+                <TrackRowSkeleton key={`track-${i}`} showAlbumArt />
+              ))}
+            </View>
           </View>
         ) : !hasResults ? (
           <EmptyState
@@ -472,7 +491,18 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     flex: 1,
   },
   loadingContainer: {
-    padding: theme.spacing.lg,
+    flex: 1,
+  },
+  skeletonSectionTitle: {
+    height: 24,
+    width: 100,
+    backgroundColor: theme.colors.background.card,
+    borderRadius: theme.borderRadius.sm,
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+  },
+  albumSkeletonWrapper: {
+    marginRight: theme.spacing.md,
   },
   section: {
     marginBottom: theme.spacing.xl,
