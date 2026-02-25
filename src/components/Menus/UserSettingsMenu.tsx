@@ -3,9 +3,14 @@
  * Settings, app info, and user profile
  */
 
+import { trackPlayerService } from '@/src/services/player/TrackPlayerService';
+import { usePlayerStore } from '@/src/stores/playerStore';
+import { useQueueStore } from '@/src/stores/queueStore';
+import { useSettingsStore } from '@/src/stores/settingsStore';
 import * as Haptics from 'expo-haptics';
 import {
   Code,
+  Dices,
   Info,
   LogOut,
   RefreshCw,
@@ -13,7 +18,7 @@ import {
   Share2,
   X
 } from 'lucide-react-native';
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   Animated,
   Linking,
@@ -25,12 +30,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { getRandomSongs } from '../../api/opensubsonic/songs';
+import { startScan } from '../../api/opensubsonic/system';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuthStore } from '../../stores/authStore';
 import { useNavigationStore } from '../../stores/navigationStore';
-import { useUserStore } from '../../stores/userStore';
 import { useToastStore } from '../../stores/toastStore';
-import { startScan } from '../../api/opensubsonic/system';
+import { useUserStore } from '../../stores/userStore';
 import { Avatar } from '../common';
 
 interface UserSettingsMenuProps {
@@ -95,8 +101,10 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
   const user = useUserStore((state) => state.user);
   const { navigate } = useNavigationStore();
   const { showToast } = useToastStore();
-  
+
   const username = user?.username || auth?.username || 'User';
+  const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
+  const { setQueue } = useQueueStore();
 
   const styles = useMemo(() => StyleSheet.create({
     overlay: {
@@ -206,6 +214,25 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
     navigate({ name: 'settings' });
   };
 
+  const handlePlayRandomSongs = async () => {
+    try {
+      const resolvedCount = useSettingsStore.getState().instantMixSize ?? 50;
+      const response = await getRandomSongs(resolvedCount);
+      if (response.randomSongs.song.length === 0) {
+        showToast('No songs found for random play', 'error');
+        return;
+      }
+      setQueue(response.randomSongs.song, 0);
+      setCurrentTrack(response.randomSongs.song[0]);
+      await trackPlayerService.play();
+      showToast('Random songs started');
+      onClose();
+    } catch (error) {
+      console.error('Failed to start random songs:', error);
+      showToast('Failed to start random songs', 'error');
+    }
+  }
+
   const handleMyShares = () => {
     onClose();
     navigate({ name: 'shares' });
@@ -275,6 +302,12 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
                 icon={<Settings size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                 label="Settings"
                 onPress={handleSettings}
+                theme={theme}
+              />
+              <MenuItem
+                icon={<Dices size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Play Random Songs"
+                onPress={handlePlayRandomSongs}
                 theme={theme}
               />
               <MenuItem

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.8] - 2026-02-25
+
+### Added
+- **Play Random Songs**: A play random songs button on the UserMenu to play a set of random songs depending on your instant mix size settings.
+
 ## [1.2.7] - 2026-02-22
 
 ### Added

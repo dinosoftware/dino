@@ -42,8 +42,17 @@ interface FullPlayerProps {
 const createStyles = (theme: ReturnType<typeof useTheme>, screenWidth: number, screenHeight: number, isTablet: boolean) => {
   const isLandscape = screenWidth > screenHeight;
   const useTabletLayout = isTablet && isLandscape;
-  const maxArtworkSize = useTabletLayout ? 280 : (isTablet ? Math.min(screenWidth * 0.6, 300) : (isLandscape ? 160 : Math.min(screenWidth - theme.spacing.lg * 3, screenHeight * 0.32)));
-  const artworkSize = maxArtworkSize;
+  
+  // Detect tall phones (aspect ratio > 2.0) vs shorter screens (like Pixel Fold outer)
+  const aspectRatio = screenHeight / screenWidth;
+  const isTallPhone = !isTablet && aspectRatio > 2.0;
+  
+  // Phone: full width minus padding, max 380px
+  // Tablet portrait: 50% of width, max 280px
+  // Tablet landscape: fixed 280px
+  const phoneArtworkSize = Math.min(screenWidth - theme.spacing.lg * 2, 380);
+  const tabletArtworkSize = useTabletLayout ? 280 : Math.min(screenWidth * 0.5, 280);
+  const artworkSize = isTablet ? tabletArtworkSize : phoneArtworkSize;
 
   return StyleSheet.create({
     container: {
@@ -52,8 +61,8 @@ const createStyles = (theme: ReturnType<typeof useTheme>, screenWidth: number, s
     },
     swipeIndicator: {
       alignItems: 'center',
-      paddingTop: theme.spacing.xl,
-      paddingBottom: theme.spacing.xs,
+      paddingVertical: theme.spacing.sm,
+      paddingTop: theme.spacing.xxl,
     },
     swipeHandle: {
       width: 48,
@@ -65,7 +74,8 @@ const createStyles = (theme: ReturnType<typeof useTheme>, screenWidth: number, s
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingVertical: theme.spacing.sm,
+      paddingVertical: isTablet ? theme.spacing.sm : 0,
+      height: isTablet ? undefined : 44,
     },
     closeButton: {
       width: 44,
@@ -76,10 +86,15 @@ const createStyles = (theme: ReturnType<typeof useTheme>, screenWidth: number, s
     placeholder: {
       width: 44,
     },
+    contentWrapper: {
+      flex: 1,
+      justifyContent: isTablet ? 'center' : 'flex-start',
+      paddingTop: isTallPhone ? theme.spacing.lg : 0,
+    },
     artworkContainer: {
       alignItems: 'center',
-      justifyContent: 'center',
-      flex: 1,
+      marginTop: isTablet ? theme.spacing.lg : 0,
+      marginBottom: isTablet ? theme.spacing.lg : (isTallPhone ? theme.spacing.lg : theme.spacing.sm),
     },
     artwork: {
       width: artworkSize,
@@ -100,7 +115,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>, screenWidth: number, s
     infoRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: theme.spacing.md,
+      marginVertical: isTablet ? theme.spacing.md : theme.spacing.sm,
     },
     info: {
       flex: 1,
@@ -150,8 +165,8 @@ const createStyles = (theme: ReturnType<typeof useTheme>, screenWidth: number, s
       flexDirection: 'row',
       justifyContent: 'center',
       alignItems: 'center',
-      paddingVertical: theme.spacing.md,
-      gap: isTablet ? theme.spacing.lg : theme.spacing.lg,
+      paddingVertical: isTablet ? theme.spacing.md : theme.spacing.sm,
+      gap: theme.spacing.lg,
     },
     mainControlButton: {
       width: isTablet ? 60 : 56,
@@ -170,7 +185,14 @@ const createStyles = (theme: ReturnType<typeof useTheme>, screenWidth: number, s
       flexDirection: 'row',
       justifyContent: 'center',
       alignItems: 'center',
-      paddingVertical: theme.spacing.md,
+      paddingVertical: isTablet ? theme.spacing.md : theme.spacing.sm,
+      gap: theme.spacing.xxl,
+    },
+    bottomControlsFixed: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingBottom: theme.spacing.lg,
       gap: theme.spacing.xxl,
     },
     bottomButton: {
@@ -368,7 +390,10 @@ const PlayerBackground: React.FC<{
 export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
   const theme = useTheme();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const isTablet = screenWidth > 600 || screenHeight > 900;
+  // Tablet: wider screens (600px+) when in portrait
+  // This captures tablets and large foldables when unfolded
+  const minDimension = Math.min(screenWidth, screenHeight);
+  const isTablet = minDimension >= 600;
   const isLandscape = screenWidth > screenHeight;
   const useTabletLayout = isTablet && isLandscape;
   
@@ -548,83 +573,85 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
         <View style={styles.placeholder} />
       </View>
 
-      <View style={styles.artworkContainer}>
-        <Artwork uri={coverArtUrl || undefined} style={styles.artwork} />
-      </View>
+      <View style={styles.contentWrapper}>
+        <View style={styles.artworkContainer}>
+          <Artwork uri={coverArtUrl || undefined} style={styles.artwork} />
+        </View>
 
-      <View style={styles.infoRow}>
-        <TrackInfo track={currentTrack} onNavigate={handleNavigate} styles={styles} />
-        <View style={styles.topActions}>
-          <TouchableOpacity style={styles.topActionButton} onPress={handleMenuOpen}>
-            <MoreVertical size={24} color={albumColors.primary} strokeWidth={2} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.topActionButton} onPress={handleToggleFavorite}>
-            <Heart
-              size={24}
-              color={albumColors.primary}
-              strokeWidth={2}
-              fill={isFavorite ? albumColors.primary : 'transparent'}
-            />
-          </TouchableOpacity>
+        <View style={styles.infoRow}>
+          <TrackInfo track={currentTrack} onNavigate={handleNavigate} styles={styles} />
+          <View style={styles.topActions}>
+            <TouchableOpacity style={styles.topActionButton} onPress={handleMenuOpen}>
+              <MoreVertical size={24} color={albumColors.primary} strokeWidth={2} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.topActionButton} onPress={handleToggleFavorite}>
+              <Heart
+                size={24}
+                color={albumColors.primary}
+                strokeWidth={2}
+                fill={isFavorite ? albumColors.primary : 'transparent'}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <ProgressBar
+          position={progress.position}
+          duration={progress.duration}
+          buffered={progress.buffered}
+          onSeek={seekTo}
+          color={albumColors.primary}
+          qualityText={streamingInfo?.displayText}
+          qualityTextSimple={streamingInfo?.displayTextSimple}
+        />
+
+        <View style={styles.mainControls}>
+          <ControlButton onPress={toggleShuffle} styles={styles}>
+            {shuffleEnabled ? (
+              <Shuffle size={28} color={albumColors.primary} strokeWidth={2} />
+            ) : (
+              <ArrowRightLeft size={28} color={albumColors.primary} strokeWidth={2} />
+            )}
+          </ControlButton>
+
+          <ControlButton onPress={skipToPrevious} styles={styles}>
+            <SkipBack size={36} color={albumColors.primary} fill={albumColors.primary} />
+          </ControlButton>
+
+          <ControlButton
+            onPress={togglePlayPause}
+            style={[styles.playButton, { backgroundColor: albumColors.primary }]}
+            styles={styles}
+          >
+            {isPlaying ? (
+              <Pause size={40} color={albumColors.textColor} fill={albumColors.textColor} />
+            ) : (
+              <Play size={40} color={albumColors.textColor} fill={albumColors.textColor} />
+            )}
+          </ControlButton>
+
+          <ControlButton onPress={skipToNext} styles={styles}>
+            <SkipForward size={36} color={albumColors.primary} fill={albumColors.primary} />
+          </ControlButton>
+
+          <ControlButton onPress={cycleRepeatMode} styles={styles}>
+            {repeatMode === 'track' ? (
+              <Repeat1 size={28} color={albumColors.primary} strokeWidth={2} />
+            ) : repeatMode === 'queue' ? (
+              <Repeat size={28} color={albumColors.primary} strokeWidth={2} />
+            ) : (
+              <View style={styles.repeatOffContainer}>
+                <Repeat size={28} color={albumColors.primary} strokeWidth={2} />
+                <View style={styles.repeatOffSlash}>
+                  <View style={[styles.repeatOffLine, { backgroundColor: albumColors.primary }]} />
+                </View>
+              </View>
+            )}
+          </ControlButton>
         </View>
       </View>
 
-      <ProgressBar
-        position={progress.position}
-        duration={progress.duration}
-        buffered={progress.buffered}
-        onSeek={seekTo}
-        color={albumColors.primary}
-        qualityText={streamingInfo?.displayText}
-        qualityTextSimple={streamingInfo?.displayTextSimple}
-      />
-
-      <View style={styles.mainControls}>
-        <ControlButton onPress={toggleShuffle} styles={styles}>
-          {shuffleEnabled ? (
-            <Shuffle size={28} color={albumColors.primary} strokeWidth={2} />
-          ) : (
-            <ArrowRightLeft size={28} color={albumColors.primary} strokeWidth={2} />
-          )}
-        </ControlButton>
-
-        <ControlButton onPress={skipToPrevious} styles={styles}>
-          <SkipBack size={36} color={albumColors.primary} fill={albumColors.primary} />
-        </ControlButton>
-
-        <ControlButton
-          onPress={togglePlayPause}
-          style={[styles.playButton, { backgroundColor: albumColors.primary }]}
-          styles={styles}
-        >
-          {isPlaying ? (
-            <Pause size={40} color={albumColors.textColor} fill={albumColors.textColor} />
-          ) : (
-            <Play size={40} color={albumColors.textColor} fill={albumColors.textColor} />
-          )}
-        </ControlButton>
-
-        <ControlButton onPress={skipToNext} styles={styles}>
-          <SkipForward size={36} color={albumColors.primary} fill={albumColors.primary} />
-        </ControlButton>
-
-        <ControlButton onPress={cycleRepeatMode} styles={styles}>
-          {repeatMode === 'track' ? (
-            <Repeat1 size={28} color={albumColors.primary} strokeWidth={2} />
-          ) : repeatMode === 'queue' ? (
-            <Repeat size={28} color={albumColors.primary} strokeWidth={2} />
-          ) : (
-            <View style={styles.repeatOffContainer}>
-              <Repeat size={28} color={albumColors.primary} strokeWidth={2} />
-              <View style={styles.repeatOffSlash}>
-                <View style={[styles.repeatOffLine, { backgroundColor: albumColors.primary }]} />
-              </View>
-            </View>
-          )}
-        </ControlButton>
-      </View>
-
-      <View style={styles.bottomControls}>
+      <View style={styles.bottomControlsFixed}>
         <TouchableOpacity onPress={() => setShowLyrics(true)} style={styles.bottomButton}>
           <MicVocal size={24} color={albumColors.primary} strokeWidth={2} />
         </TouchableOpacity>
@@ -747,21 +774,21 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
               )}
             </ControlButton>
           </View>
-
-          <View style={styles.bottomControls}>
-            <TouchableOpacity onPress={() => setShowLyrics(true)} style={styles.bottomButton}>
-              <MicVocal size={24} color={albumColors.primary} strokeWidth={2} />
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => setShowCastModal(true)} style={styles.bottomButton}>
-              <Cast size={24} color={albumColors.primary} strokeWidth={2} />
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => setShowQueue(true)} style={styles.bottomButton}>
-              <ListMusic size={24} color={albumColors.primary} strokeWidth={2} />
-            </TouchableOpacity>
-          </View>
         </View>
+      </View>
+
+      <View style={styles.bottomControls}>
+        <TouchableOpacity onPress={() => setShowLyrics(true)} style={styles.bottomButton}>
+          <MicVocal size={24} color={albumColors.primary} strokeWidth={2} />
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => setShowCastModal(true)} style={styles.bottomButton}>
+          <Cast size={24} color={albumColors.primary} strokeWidth={2} />
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => setShowQueue(true)} style={styles.bottomButton}>
+          <ListMusic size={24} color={albumColors.primary} strokeWidth={2} />
+        </TouchableOpacity>
       </View>
     </>
   );
