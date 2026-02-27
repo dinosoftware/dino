@@ -7,10 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-02-27
+
+### Added
+- **Manual Queue Sync Buttons**: Save and load queue from server on demand
+  - Upload (Save) and Download (Load) buttons in Queue screen header
+  - "Get Server Queue" button in User Settings Menu
+  - Works even when auto-sync is disabled
+- **Responsive FullPlayer Layout**: Dynamic spacing for tall phone screens
+  - Extra space distributed across 3 areas: top, after artwork, after song info
+  - Slightly larger artwork on tall phones (400px vs 380px max)
+  - Progressive scaling based on screen aspect ratio
+
+### Fixed
+- **Play Queue Sync** (CRITICAL): Fixed server queue not loading on app start
+  - Removed immediate `syncToServer()` call that was overwriting server queue with stale local queue
+  - Server queue now properly loads on fresh app start when it's newer than local
+  - Fixed `savePlayQueue` sending numeric index instead of track ID in `current` parameter
+  - Fixed `getPlayQueue` to find track index by matching ID (server returns track ID, not index)
+  - Fixed `PlayQueue` type to use `string` for `current` field
+- **Album/Playlist Long-Press Menu**: Now matches three-dot menu options
+  - Added Play All, Shuffle, Play Next, and Add to Queue options
+  - Consistent behavior between long-press and overflow menus
+
+## [1.2.9] - 2026-02-26
+
+### Fixed
+- **Play Queue Sync**: Fixed savePlayQueue sending index instead of track ID
+  - Server now receives correct track ID in `current` parameter
+  - Fixed getPlayQueue to find track index by matching ID (server returns track ID, not numeric index)
+  - Fixed PlayQueue type to use `string` for `current` field
+
+### Known Issues
+- **Mini Player on Server Queue Load**: Loading server queue does not auto-start playback
+  - Queue is restored but user must press play to start
+  - This is intentional to prevent unexpected playback
+
 ## [1.2.8] - 2026-02-25
 
 ### Added
 - **Play Random Songs**: A play random songs button on the UserMenu to play a set of random songs depending on your instant mix size settings.
+- **Auto-Extend Queue**: New setting to automatically extend queue with similar songs when near the end
+  - Fetches similar songs using getSimilarSongs2 when 3 or fewer tracks remain
+  - Filters out tracks already in queue to avoid duplicates
+  - Respects repeat modes (doesn't extend when repeat queue/track is on)
+  - Off by default, toggle in Settings → Playback section
+
+### Changed
+- **PreCache System**: Changed from track ID to queue index for duplicate track handling
+  - Prevents confusion when duplicate tracks exist in queue
+  - Gapless playback correctly identifies buffered track by position
+
+### Fixed
+- **Duplicate Track Queue Handling**: Fixed multiple issues when duplicate tracks exist in queue
+  - Playing a duplicate track no longer jumps to wrong occurrence
+  - Queue navigation correctly identifies which instance is playing
+  - Queue screen keyExtractor uses `${id}-${index}` for unique React keys
+  - Queue sync searches nearby positions first when finding current track
+- **FullPlayer Loading Indicator**: Added buffering spinner to FullPlayer play button
+  - Previously only showed in MiniPlayer
+  - Now consistently shows loading state in both players
 
 ## [1.2.7] - 2026-02-22
 

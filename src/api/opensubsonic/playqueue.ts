@@ -11,12 +11,12 @@ import { GetPlayQueueResponse } from './types';
  */
 export const savePlayQueue = async (
   trackIds: string[],
-  currentIndex?: number,
+  currentTrackId?: string,
   position?: number
 ): Promise<void> => {
   await apiClient.request('savePlayQueue', {
     id: trackIds,
-    ...(currentIndex !== undefined && { current: currentIndex }),
+    ...(currentTrackId && { current: currentTrackId }),
     ...(position !== undefined && { position: Math.floor(position) }),
   });
 };

@@ -61,8 +61,7 @@ export const useAlbumColors = (imageUri?: string): AlbumColors => {
           });
         }
       })
-      .catch((error) => {
-        console.error('Failed to extract colors:', error);
+      .catch(() => {
         setColors(getDefaultColors());
       });
   }, [imageUri, theme]);

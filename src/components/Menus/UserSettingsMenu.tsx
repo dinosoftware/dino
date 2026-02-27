@@ -11,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 import {
   Code,
   Dices,
+  Download,
   Info,
   LogOut,
   RefreshCw,
@@ -32,6 +33,7 @@ import {
 } from 'react-native';
 import { getRandomSongs } from '../../api/opensubsonic/songs';
 import { startScan } from '../../api/opensubsonic/system';
+import { queueSyncManager } from '../../services/player/QueueSyncManager';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuthStore } from '../../stores/authStore';
 import { useNavigationStore } from '../../stores/navigationStore';
@@ -259,6 +261,25 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
     }
   };
 
+  const handleGetServerQueue = async () => {
+    try {
+      const loaded = await queueSyncManager.loadFromServer(true, true);
+      if (loaded) {
+        const { queue: newQueue, currentIndex: newIndex } = useQueueStore.getState();
+        if (newQueue.length > 0 && newIndex >= 0 && newIndex < newQueue.length) {
+          setCurrentTrack(newQueue[newIndex]);
+        }
+        showToast('Queue loaded from server');
+      } else {
+        showToast('No queue found on server');
+      }
+      onClose();
+    } catch (error) {
+      console.error('Failed to load server queue:', error);
+      showToast('Failed to load queue', 'error');
+    }
+  };
+
   const handleLogout = () => {
     onClose();
     onLogout();
@@ -314,6 +335,12 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
                 icon={<RefreshCw size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                 label="Scan Library"
                 onPress={handleScanLibrary}
+                theme={theme}
+              />
+              <MenuItem
+                icon={<Download size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Get Server Queue"
+                onPress={handleGetServerQueue}
                 theme={theme}
               />
               <MenuItem

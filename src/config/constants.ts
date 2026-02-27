@@ -107,6 +107,7 @@ export const DEFAULT_SETTINGS = {
   // Queue Sync
   autoSyncQueue: true,
   queueSyncInterval: 30000, // 30 seconds
+  autoExtendQueue: false, // Auto-extend queue with similar songs when near end
 
   // Scrobbling
   enableScrobbling: true,

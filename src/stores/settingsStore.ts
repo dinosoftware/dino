@@ -32,6 +32,7 @@ interface Settings {
   showLyricsTimestamps: boolean;
   autoSyncQueue: boolean;
   queueSyncInterval: number;
+  autoExtendQueue: boolean;
   enableScrobbling: boolean;
   scrobbleProgressInterval: number;
   includeShareMessage: boolean;

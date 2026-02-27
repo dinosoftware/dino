@@ -5,11 +5,14 @@
  */
 
 import React from 'react';
+import * as Haptics from 'expo-haptics';
 import { useAlbum, useCoverArt } from '../../hooks/api';
+import { useQueueStore } from '../../stores';
 import { AlbumMenu } from './AlbumMenu';
 import { AlbumInfoModal } from '../Modals/AlbumInfoModal';
 import { AddToPlaylistModal } from '../Modals/AddToPlaylistModal';
 import { Album } from '../../api/opensubsonic/types';
+import { useToastStore } from '../../stores/toastStore';
 
 interface AlbumMenuWrapperProps {
   visible: boolean;
@@ -33,6 +36,28 @@ export const AlbumMenuWrapper: React.FC<AlbumMenuWrapperProps> = ({
 }) => {
   const { data: albumDetails } = useAlbum(album?.id || '');
   const { data: coverArtUrl } = useCoverArt(album?.coverArt, 200);
+  const { addToQueue } = useQueueStore();
+  const { showToast } = useToastStore();
+
+  const handlePlayNext = () => {
+    if (!albumDetails?.song || albumDetails.song.length === 0) {
+      showToast('Album is empty', 'error');
+      return;
+    }
+    addToQueue(albumDetails.song, 'next');
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onClose();
+  };
+
+  const handleAddToQueue = () => {
+    if (!albumDetails?.song || albumDetails.song.length === 0) {
+      showToast('Album is empty', 'error');
+      return;
+    }
+    addToQueue(albumDetails.song, 'end');
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onClose();
+  };
 
   if (!album) return null;
 
@@ -45,6 +70,8 @@ export const AlbumMenuWrapper: React.FC<AlbumMenuWrapperProps> = ({
         coverArtUrl={coverArtUrl || undefined}
         onShowInfo={() => setShowAlbumInfo?.(true)}
         onAddToPlaylist={() => setShowAddToPlaylist?.(true)}
+        onPlayNext={handlePlayNext}
+        onAddToQueue={handleAddToQueue}
       />
 
       {/* Album Info Modal */}
@@ -62,7 +89,7 @@ export const AlbumMenuWrapper: React.FC<AlbumMenuWrapperProps> = ({
         <AddToPlaylistModal
           visible={showAddToPlaylist}
           onClose={() => setShowAddToPlaylist(false)}
-          songIds={albumDetails?.song?.map(s => s.id) || []}
+          songIds={albumDetails?.song?.map((s: { id: string }) => s.id) || []}
           songTitle={album.name}
         />
       )}

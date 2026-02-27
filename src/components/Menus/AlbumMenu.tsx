@@ -3,42 +3,42 @@
  * Quick Action Menu for album options
  */
 
-import React, { useRef, useEffect, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  Pressable,
-  PanResponder,
-  Animated,
-  Share,
-} from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { 
-  Heart, 
-  Download, 
-  Share2, 
-  PlayCircle, 
-  Shuffle,
+import {
+  Download,
+  Heart,
   Info,
-  ListPlus,
-  User,
-  X,
   ListMusic,
-  Play
+  ListPlus,
+  ListStart,
+  PlayCircle,
+  Share2,
+  Shuffle,
+  User,
+  X
 } from 'lucide-react-native';
-import { AlbumArtImage } from '../common';
-import { useTheme } from '../../hooks/useTheme';
-import { Album } from '../../api/opensubsonic/types';
+import React, { useEffect, useMemo, useRef } from 'react';
+import {
+  Animated,
+  Modal,
+  PanResponder,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { createShare } from '../../api/opensubsonic/share';
-import { useFavoritesStore } from '../../stores/favoritesStore';
-import { useSettingsStore } from '../../stores/settingsStore';
-import { useDownloadStore } from '../../stores/downloadStore';
-import { useToastStore } from '../../stores/toastStore';
-import { useNavigationStore } from '../../stores/navigationStore';
+import { Album } from '../../api/opensubsonic/types';
+import { useTheme } from '../../hooks/useTheme';
 import { downloadService } from '../../services/DownloadService';
+import { useDownloadStore } from '../../stores/downloadStore';
+import { useFavoritesStore } from '../../stores/favoritesStore';
+import { useNavigationStore } from '../../stores/navigationStore';
+import { useSettingsStore } from '../../stores/settingsStore';
+import { useToastStore } from '../../stores/toastStore';
+import { AlbumArtImage } from '../common';
 
 interface AlbumMenuProps {
   visible: boolean;
@@ -94,12 +94,12 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon, label, onPress, theme }) => {
   );
 };
 
-export const AlbumMenu: React.FC<AlbumMenuProps> = ({ 
-  visible, 
-  onClose, 
-  album, 
-  coverArtUrl, 
-  onShowInfo, 
+export const AlbumMenu: React.FC<AlbumMenuProps> = ({
+  visible,
+  onClose,
+  album,
+  coverArtUrl,
+  onShowInfo,
   onAddToPlaylist,
   onPlayNext,
   onAddToQueue,
@@ -214,7 +214,7 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({
 
   const handleAddToFavorites = async () => {
     const isStarred = isAlbumStarred(album.id);
-    
+
     try {
       await toggleAlbumStar(album.id, isStarred);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -229,9 +229,9 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({
 
   const handleDownload = async () => {
     if (!album) return;
-    
+
     const albumIsDownloaded = isAlbumDownloaded(album.id);
-    
+
     if (albumIsDownloaded) {
       try {
         await downloadService.deleteAlbum(album.id);
@@ -244,7 +244,7 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({
       }
       return;
     }
-    
+
     try {
       await downloadService.downloadAlbum(album);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -261,9 +261,9 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({
 
   const handleShare = async () => {
     if (!album) return;
-    
+
     const includeShareMessage = useSettingsStore.getState().includeShareMessage;
-    
+
     try {
       const description = album.artist ? `${album.name} by ${album.artist}` : album.name;
       const share = await createShare([album.id], description);
@@ -287,7 +287,7 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({
         url: share.url,
         title: `Share Album: ${album.name}`,
       });
-      
+
       showToast('Share link created');
     } catch (error) {
       console.error('Error sharing album:', error);
@@ -335,108 +335,108 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable onPress={(e) => e.stopPropagation()}>
-          <Animated.View 
+          <Animated.View
             style={[styles.menu, { transform: [{ translateY }] }]}
             {...panResponder.panHandlers}
           >
-          <View style={styles.swipeIndicator}>
-            <View style={styles.swipeHandle} />
-          </View>
-
-          <View style={styles.header}>
-            <AlbumArtImage
-              uri={coverArtUrl}
-              style={styles.coverArt}
-            />
-            <View style={styles.albumInfo}>
-              <Text style={styles.albumTitle} numberOfLines={1}>
-                {album.name}
-              </Text>
-              <Text style={styles.albumArtist} numberOfLines={1}>
-                {album.artist || 'Unknown Artist'}
-              </Text>
+            <View style={styles.swipeIndicator}>
+              <View style={styles.swipeHandle} />
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <X size={24} color={theme.colors.text.secondary} />
-            </TouchableOpacity>
-          </View>
 
-          <View style={styles.menuItems}>
-            <MenuItem
-              icon={<PlayCircle size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-              label="Play All"
-              onPress={handlePlayAll}
-              theme={theme}
-            />
-            <MenuItem
-              icon={<Shuffle size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-              label="Shuffle"
-              onPress={handleShuffle}
-              theme={theme}
-            />
-            {onPlayNext && (
+            <View style={styles.header}>
+              <AlbumArtImage
+                uri={coverArtUrl}
+                style={styles.coverArt}
+              />
+              <View style={styles.albumInfo}>
+                <Text style={styles.albumTitle} numberOfLines={1}>
+                  {album.name}
+                </Text>
+                <Text style={styles.albumArtist} numberOfLines={1}>
+                  {album.artist || 'Unknown Artist'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <X size={24} color={theme.colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.menuItems}>
               <MenuItem
-                icon={<Play size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-                label="Play Next"
-                onPress={() => { onClose(); onPlayNext(); }}
+                icon={<PlayCircle size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Play All"
+                onPress={handlePlayAll}
                 theme={theme}
               />
-            )}
-            {onAddToQueue && (
               <MenuItem
-                icon={<ListMusic size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-                label="Add to Queue"
-                onPress={() => { onClose(); onAddToQueue(); }}
+                icon={<Shuffle size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Shuffle"
+                onPress={handleShuffle}
                 theme={theme}
               />
-            )}
-            {album.artistId && (
-              <MenuItem
-                icon={<User size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-                label="Go to Artist"
-                onPress={handleGoToArtist}
-                theme={theme}
-              />
-            )}
-            <MenuItem
-              icon={
-                <Heart 
-                  size={22} 
-                  color={theme.colors.text.primary} 
-                  strokeWidth={2}
-                  fill={isAlbumStarred(album.id) ? theme.colors.text.primary : 'transparent'}
+              {onPlayNext && (
+                <MenuItem
+                  icon={<ListStart size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                  label="Play Next"
+                  onPress={() => { onClose(); onPlayNext(); }}
+                  theme={theme}
                 />
-              }
-              label={isAlbumStarred(album.id) ? "Remove from Favorites" : "Add to Favorites"}
-              onPress={handleAddToFavorites}
-              theme={theme}
-            />
-            <MenuItem
-              icon={<ListPlus size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-              label="Add to Playlist"
-              onPress={handleAddToPlaylist}
-              theme={theme}
-            />
-            <MenuItem
-              icon={<Download size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-              label={isAlbumDownloaded(album.id) ? "Remove Download" : "Download Album"}
-              onPress={handleDownload}
-              theme={theme}
-            />
-            <MenuItem
-              icon={<Share2 size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-              label="Share"
-              onPress={handleShare}
-              theme={theme}
-            />
-            <MenuItem
-              icon={<Info size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-              label="Album Info"
-              onPress={handleShowInfo}
-              theme={theme}
-            />
-          </View>
-        </Animated.View>
+              )}
+              {onAddToQueue && (
+                <MenuItem
+                  icon={<ListMusic size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                  label="Add to Queue"
+                  onPress={() => { onClose(); onAddToQueue(); }}
+                  theme={theme}
+                />
+              )}
+              {album.artistId && (
+                <MenuItem
+                  icon={<User size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                  label="Go to Artist"
+                  onPress={handleGoToArtist}
+                  theme={theme}
+                />
+              )}
+              <MenuItem
+                icon={
+                  <Heart
+                    size={22}
+                    color={theme.colors.text.primary}
+                    strokeWidth={2}
+                    fill={isAlbumStarred(album.id) ? theme.colors.text.primary : 'transparent'}
+                  />
+                }
+                label={isAlbumStarred(album.id) ? "Remove from Favorites" : "Add to Favorites"}
+                onPress={handleAddToFavorites}
+                theme={theme}
+              />
+              <MenuItem
+                icon={<ListPlus size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Add to Playlist"
+                onPress={handleAddToPlaylist}
+                theme={theme}
+              />
+              <MenuItem
+                icon={<Download size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label={isAlbumDownloaded(album.id) ? "Remove Download" : "Download Album"}
+                onPress={handleDownload}
+                theme={theme}
+              />
+              <MenuItem
+                icon={<Share2 size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Share"
+                onPress={handleShare}
+                theme={theme}
+              />
+              <MenuItem
+                icon={<Info size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Album Info"
+                onPress={handleShowInfo}
+                theme={theme}
+              />
+            </View>
+          </Animated.View>
         </Pressable>
       </Pressable>
     </Modal>

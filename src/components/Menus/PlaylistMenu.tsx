@@ -3,34 +3,35 @@
  * Quick Action Menu for playlist options
  */
 
-import React, { useRef, useEffect, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  Pressable,
-  PanResponder,
-  Animated,
-} from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { 
+import {
+  Download,
+  Edit3,
+  ListMusic,
+  ListStart,
   Play,
+  Share2,
   Shuffle,
   Trash2,
-  Edit3,
-  Share2,
-  Download,
   X,
-  ListMusic,
 } from 'lucide-react-native';
-import { AlbumArtImage } from '../common';
-import { useTheme } from '../../hooks/useTheme';
+import React, { useEffect, useMemo, useRef } from 'react';
+import {
+  Animated,
+  Modal,
+  PanResponder,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Playlist } from '../../api/opensubsonic/types';
+import { useTheme } from '../../hooks/useTheme';
+import { downloadService } from '../../services/DownloadService';
 import { useDownloadStore } from '../../stores/downloadStore';
 import { useToastStore } from '../../stores/toastStore';
-import { downloadService } from '../../services/DownloadService';
+import { AlbumArtImage } from '../common';
 
 interface PlaylistMenuProps {
   visible: boolean;
@@ -93,10 +94,10 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon, label, onPress, destructive, 
   );
 };
 
-export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({ 
-  visible, 
-  onClose, 
-  playlist, 
+export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
+  visible,
+  onClose,
+  playlist,
   coverArtUrl,
   onPlay,
   onShuffle,
@@ -214,9 +215,9 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
 
   const handleDownload = async () => {
     if (!playlist) return;
-    
+
     const playlistIsDownloaded = isPlaylistDownloaded(playlist.id);
-    
+
     if (playlistIsDownloaded) {
       try {
         await downloadService.deletePlaylist(playlist.id);
@@ -229,7 +230,7 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
       }
       return;
     }
-    
+
     try {
       await downloadService.downloadPlaylist(playlist);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -254,98 +255,98 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable onPress={(e) => e.stopPropagation()}>
-          <Animated.View 
+          <Animated.View
             style={[styles.menu, { transform: [{ translateY }] }]}
             {...panResponder.panHandlers}
           >
-          <View style={styles.swipeIndicator}>
-            <View style={styles.swipeHandle} />
-          </View>
-
-          <View style={styles.header}>
-            <AlbumArtImage
-              uri={coverArtUrl}
-              style={styles.coverArt}
-            />
-            <View style={styles.playlistInfo}>
-              <Text style={styles.playlistTitle} numberOfLines={1}>
-                {playlist.name}
-              </Text>
-              <Text style={styles.playlistDetails} numberOfLines={1}>
-                {playlist.songCount || 0} songs
-              </Text>
+            <View style={styles.swipeIndicator}>
+              <View style={styles.swipeHandle} />
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <X size={24} color={theme.colors.text.secondary} />
-            </TouchableOpacity>
-          </View>
 
-          <View style={styles.menuItems}>
-            {onPlay && (
+            <View style={styles.header}>
+              <AlbumArtImage
+                uri={coverArtUrl}
+                style={styles.coverArt}
+              />
+              <View style={styles.playlistInfo}>
+                <Text style={styles.playlistTitle} numberOfLines={1}>
+                  {playlist.name}
+                </Text>
+                <Text style={styles.playlistDetails} numberOfLines={1}>
+                  {playlist.songCount || 0} songs
+                </Text>
+              </View>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <X size={24} color={theme.colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.menuItems}>
+              {onPlay && (
+                <MenuItem
+                  icon={<Play size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                  label="Play All"
+                  onPress={onPlay}
+                  theme={theme}
+                />
+              )}
+              {onShuffle && (
+                <MenuItem
+                  icon={<Shuffle size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                  label="Shuffle"
+                  onPress={onShuffle}
+                  theme={theme}
+                />
+              )}
+              {onPlayNext && (
+                <MenuItem
+                  icon={<ListStart size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                  label="Play Next"
+                  onPress={() => { onClose(); onPlayNext(); }}
+                  theme={theme}
+                />
+              )}
+              {onAddToQueue && (
+                <MenuItem
+                  icon={<ListMusic size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                  label="Add to Queue"
+                  onPress={() => { onClose(); onAddToQueue(); }}
+                  theme={theme}
+                />
+              )}
+              {onEdit && (
+                <MenuItem
+                  icon={<Edit3 size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                  label="Edit Playlist"
+                  onPress={onEdit}
+                  theme={theme}
+                />
+              )}
               <MenuItem
-                icon={<Play size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-                label="Play All"
-                onPress={onPlay}
+                icon={<Download size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label={isPlaylistDownloaded(playlist.id) ? "Remove Download" : "Download Playlist"}
+                onPress={handleDownload}
                 theme={theme}
               />
-            )}
-            {onShuffle && (
-              <MenuItem
-                icon={<Shuffle size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-                label="Shuffle"
-                onPress={onShuffle}
-                theme={theme}
-              />
-            )}
-            {onPlayNext && (
-              <MenuItem
-                icon={<Play size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-                label="Play Next"
-                onPress={() => { onClose(); onPlayNext(); }}
-                theme={theme}
-              />
-            )}
-            {onAddToQueue && (
-              <MenuItem
-                icon={<ListMusic size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-                label="Add to Queue"
-                onPress={() => { onClose(); onAddToQueue(); }}
-                theme={theme}
-              />
-            )}
-            {onEdit && (
-              <MenuItem
-                icon={<Edit3 size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-                label="Edit Playlist"
-                onPress={onEdit}
-                theme={theme}
-              />
-            )}
-            <MenuItem
-              icon={<Download size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-              label={isPlaylistDownloaded(playlist.id) ? "Remove Download" : "Download Playlist"}
-              onPress={handleDownload}
-              theme={theme}
-            />
-            {onShare && (
-              <MenuItem
-                icon={<Share2 size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-                label="Share"
-                onPress={onShare}
-                theme={theme}
-              />
-            )}
-            {onDelete && (
-              <MenuItem
-                icon={<Trash2 size={22} color={theme.colors.error} strokeWidth={2} />}
-                label="Delete Playlist"
-                onPress={onDelete}
-                destructive
-                theme={theme}
-              />
-            )}
-          </View>
-        </Animated.View>
+              {onShare && (
+                <MenuItem
+                  icon={<Share2 size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                  label="Share"
+                  onPress={onShare}
+                  theme={theme}
+                />
+              )}
+              {onDelete && (
+                <MenuItem
+                  icon={<Trash2 size={22} color={theme.colors.error} strokeWidth={2} />}
+                  label="Delete Playlist"
+                  onPress={onDelete}
+                  destructive
+                  theme={theme}
+                />
+              )}
+            </View>
+          </Animated.View>
         </Pressable>
       </Pressable>
     </Modal>

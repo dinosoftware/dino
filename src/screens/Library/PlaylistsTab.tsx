@@ -9,6 +9,8 @@ import { Plus, Download } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { usePlaylists, useCoverArt } from '../../hooks/api';
 import { useNavigationStore } from '../../stores/navigationStore';
+import { useQueueStore, usePlayerStore } from '../../stores';
+import { trackPlayerService } from '../../services/player/TrackPlayerService';
 import { CreatePlaylistModal } from '../../components/Modals/CreatePlaylistModal';
 import { ConfirmModal } from '../../components/Modals/ConfirmModal';
 import { PlaylistMenu } from '../../components/Menus';
@@ -16,7 +18,7 @@ import { LoadingSpinner, EmptyState, ErrorView } from '../../components/common';
 import { useTheme } from '../../hooks/useTheme';
 import { Theme } from '../../config/theme';
 import { Playlist } from '../../api/opensubsonic/types';
-import { deletePlaylist } from '../../api/opensubsonic/playlists';
+import { deletePlaylist, getPlaylist } from '../../api/opensubsonic/playlists';
 import { createShare } from '../../api/opensubsonic/share';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useToastStore } from '../../stores/toastStore';
@@ -134,6 +136,71 @@ const PlaylistMenuWrapper: React.FC<{
   const { data: coverArtUrl } = useCoverArt(playlist.coverArt, 200);
   const [showConfirm, setShowConfirm] = useState(false);
   const { showToast } = useToastStore();
+  const { setQueue, addToQueue } = useQueueStore();
+  const { setCurrentTrack } = usePlayerStore();
+
+  const handlePlayAll = async () => {
+    try {
+      const response = await getPlaylist(playlist.id);
+      if (!response.playlist.entry || response.playlist.entry.length === 0) {
+        showToast('Playlist is empty', 'error');
+        return;
+      }
+      setQueue(response.playlist.entry, 0);
+      setCurrentTrack(response.playlist.entry[0]);
+      await trackPlayerService.play();
+      onClose();
+    } catch (error) {
+      showToast('Failed to load playlist', 'error');
+    }
+  };
+
+  const handleShuffle = async () => {
+    try {
+      const response = await getPlaylist(playlist.id);
+      if (!response.playlist.entry || response.playlist.entry.length === 0) {
+        showToast('Playlist is empty', 'error');
+        return;
+      }
+      const shuffled = [...response.playlist.entry].sort(() => Math.random() - 0.5);
+      setQueue(shuffled, 0);
+      setCurrentTrack(shuffled[0]);
+      await trackPlayerService.play();
+      onClose();
+    } catch (error) {
+      showToast('Failed to load playlist', 'error');
+    }
+  };
+
+  const handlePlayNext = async () => {
+    try {
+      const response = await getPlaylist(playlist.id);
+      if (!response.playlist.entry || response.playlist.entry.length === 0) {
+        showToast('Playlist is empty', 'error');
+        return;
+      }
+      addToQueue(response.playlist.entry, 'next');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      onClose();
+    } catch (error) {
+      showToast('Failed to load playlist', 'error');
+    }
+  };
+
+  const handleAddToQueue = async () => {
+    try {
+      const response = await getPlaylist(playlist.id);
+      if (!response.playlist.entry || response.playlist.entry.length === 0) {
+        showToast('Playlist is empty', 'error');
+        return;
+      }
+      addToQueue(response.playlist.entry, 'end');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      onClose();
+    } catch (error) {
+      showToast('Failed to load playlist', 'error');
+    }
+  };
 
   const handleDelete = async () => {
     try {
@@ -192,6 +259,10 @@ const PlaylistMenuWrapper: React.FC<{
         onClose={onClose}
         playlist={playlist}
         coverArtUrl={coverArtUrl || undefined}
+        onPlay={handlePlayAll}
+        onShuffle={handleShuffle}
+        onPlayNext={handlePlayNext}
+        onAddToQueue={handleAddToQueue}
         onShare={handleShare}
         onDelete={() => {
           onClose();

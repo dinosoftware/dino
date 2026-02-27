@@ -11,6 +11,9 @@ import TrackPlayer, {
   State
 } from 'react-native-track-player';
 import { getCoverArtUrl, getStreamUrl } from '../../api/opensubsonic/streaming';
+import { search3 } from '../../api/opensubsonic/search';
+import { getSimilarSongs2 } from '../../api/opensubsonic/radio';
+import { Track } from '../../api/opensubsonic/types';
 import { usePlayerStore, useQueueStore, useSettingsStore } from '../../stores';
 import { useDownloadStore } from '../../stores/downloadStore';
 import { setClearRestoredPositionCallback, setSyncQueueCallback, setClearPreloadedTracksCallback } from '../../stores/queueStore';
@@ -67,7 +70,7 @@ class TrackPlayerService {
 
   // Precache: pre-resolve the next track object so PlaybackQueueEnded can start it instantly
   precachedTrackObj: any = null;      // the fully-built RNTP track object
-  precachedTrackId: string | null = null; // which track ID is cached
+  precachedTrackIndex: number | null = null; // which queue index is cached (not ID - handles duplicates)
   precacheTriggerred = false;         // did we already trigger precache for the current song
 
   /**
@@ -171,17 +174,16 @@ class TrackPlayerService {
 
       // Load queue from server in background (non-blocking)
       // This allows app to start immediately even if server is unreachable
-      queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
-        if (usedServerQueue) {
-          console.log('[TrackPlayer] Loaded queue from server (background)');
-          const { queue, currentIndex } = useQueueStore.getState();
-          if (queue.length > 0 && currentIndex >= 0 && currentIndex < queue.length) {
-            // Set current track so mini player shows up
-            const currentTrack = queue[currentIndex];
-            usePlayerStore.getState().setCurrentTrack(currentTrack);
-            console.log('[TrackPlayer] Server queue ready:', queue.length, 'tracks, current track set');
-          }
-        } else {
+queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
+          if (usedServerQueue) {
+            console.log('[TrackPlayer] Loaded queue from server (background)');
+            const { queue, currentIndex } = useQueueStore.getState();
+            if (queue.length > 0 && currentIndex >= 0 && currentIndex < queue.length) {
+              const currentTrack = queue[currentIndex];
+              usePlayerStore.getState().setCurrentTrack(currentTrack);
+              console.log('[TrackPlayer] Server queue ready:', queue.length, 'tracks, current track set');
+            }
+          } else {
           console.log('[TrackPlayer] Using local queue');
           // If there's a local queue, make sure current track is set
           const { queue, currentIndex } = useQueueStore.getState();
@@ -271,6 +273,15 @@ class TrackPlayerService {
         const track = await TrackPlayer.getTrack(event.nextTrack);
         if (track) {
           const { queue, currentIndex, skipToTrack } = useQueueStore.getState();
+          const { currentTrack: storeCurrentTrack } = usePlayerStore.getState();
+          
+          // Check if this is the track we already set (manual selection via playTrack)
+          // In that case, trust the currentIndex in the store - don't search
+          if (storeCurrentTrack && storeCurrentTrack.id === track.id && queue[currentIndex]?.id === track.id) {
+            // The store is already correct - this was a manual track change
+            console.log('[TrackPlayer] PlaybackTrackChanged: manual selection, index already correct:', currentIndex);
+            return;
+          }
           
           // When gapless playback advances naturally, the next track should be at currentIndex + 1
           // Only search by ID if we detect something unexpected (like manual seek or queue modification)
@@ -286,9 +297,11 @@ class TrackPlayerService {
             trackData = expectedNextTrack;
             newIndex = expectedNextIndex;
           } else {
-            // Track doesn't match expected - find it in queue
-            trackData = queue.find(t => t.id === track.id);
-            newIndex = queue.findIndex(t => t.id === track.id);
+            // Track doesn't match expected - find it in queue AFTER current position
+            // This handles duplicate tracks correctly by searching forward from currentIndex
+            trackData = queue.slice(currentIndex + 1).find(t => t.id === track.id);
+            const localIndex = queue.slice(currentIndex + 1).findIndex(t => t.id === track.id);
+            newIndex = localIndex !== -1 ? currentIndex + 1 + localIndex : -1;
           }
           
           if (trackData && newIndex !== -1) {
@@ -398,7 +411,7 @@ class TrackPlayerService {
         usePlayerStore.getState().setCurrentTrack(nextTrack);
 
         // If the next track is already buffered in RNTP's queue, use native skip (gapless, no lag)
-        if (this.precachedTrackId === nextTrack.id) {
+        if (this.precachedTrackIndex === newIndex) {
           console.log('[TrackPlayer] PlaybackQueueEnded: native skip to buffered track:', nextTrack.title);
           this.invalidatePrecache();
           await TrackPlayer.skipToNext();
@@ -553,6 +566,11 @@ class TrackPlayerService {
     if (!settings || !settings.gaplessPlayback) return;
     if (repeatMode === 'track') return;
 
+    // Check if we need to extend the queue with similar songs
+    this.extendQueueIfNeeded().catch(err => {
+      console.error('[TrackPlayer] Queue extension failed:', err);
+    });
+
     const nextIndex = currentIndex + 1;
     const nextTrack = repeatMode === 'queue' && nextIndex >= queue.length
       ? queue[0]
@@ -560,8 +578,8 @@ class TrackPlayerService {
 
     if (!nextTrack) return;
 
-    // Already enqueued for this track
-    if (this.precachedTrackId === nextTrack.id) return;
+    // Already enqueued for this track index
+    if (this.precachedTrackIndex === nextIndex) return;
 
     try {
       console.log('[TrackPlayer] Enqueueing next track for gapless buffering:', nextTrack.title);
@@ -574,12 +592,12 @@ class TrackPlayerService {
       await TrackPlayer.add(trackObj);
 
       this.precachedTrackObj = trackObj;
-      this.precachedTrackId = nextTrack.id;
+      this.precachedTrackIndex = nextIndex;
       console.log('[TrackPlayer] Next track enqueued and buffering:', nextTrack.title);
     } catch (error) {
       console.error('[TrackPlayer] Failed to enqueue next track:', error);
       this.precachedTrackObj = null;
-      this.precachedTrackId = null;
+      this.precachedTrackIndex = null;
     }
   }
 
@@ -589,8 +607,56 @@ class TrackPlayerService {
    */
   invalidatePrecache() {
     this.precachedTrackObj = null;
-    this.precachedTrackId = null;
+    this.precachedTrackIndex = null;
     this.precacheTriggerred = false;
+  }
+
+  /**
+   * Extend queue with similar songs when near the end.
+   * Called when there are 3 or fewer tracks remaining (or only 1 track).
+   */
+  async extendQueueIfNeeded() {
+    const settings = useSettingsStore.getState();
+    if (!settings?.autoExtendQueue) return;
+
+    const { repeatMode } = usePlayerStore.getState();
+    if (repeatMode === 'queue' || repeatMode === 'track') return;
+
+    const { queue, currentIndex } = useQueueStore.getState();
+    const remainingTracks = queue.length - currentIndex - 1;
+
+    // Extend when 3 or fewer tracks remain, or when playing the only/last track
+    if (remainingTracks > 3 && queue.length > 1) return;
+
+    const currentTrack = queue[currentIndex];
+    if (!currentTrack) return;
+
+    console.log('[TrackPlayer] Auto-extending queue, remaining tracks:', remainingTracks);
+
+    try {
+      const response = await getSimilarSongs2(currentTrack.id, 20);
+      const similarSongs = response.similarSongs2?.song || [];
+
+      if (similarSongs.length === 0) {
+        console.log('[TrackPlayer] No similar songs found for queue extension');
+        return;
+      }
+
+      // Filter out tracks already in queue and the current track
+      const queueIds = new Set(queue.map(t => t.id));
+      const newTracks = similarSongs.filter(t => !queueIds.has(t.id));
+
+      if (newTracks.length === 0) {
+        console.log('[TrackPlayer] All similar songs already in queue');
+        return;
+      }
+
+      // Add new tracks to queue
+      useQueueStore.getState().addToQueue(newTracks);
+      console.log('[TrackPlayer] Extended queue with', newTracks.length, 'similar tracks');
+    } catch (error) {
+      console.error('[TrackPlayer] Failed to extend queue:', error);
+    }
   }
 
   /**
@@ -701,6 +767,9 @@ class TrackPlayerService {
       return;
     }
 
+    // Calculate expected next index BEFORE incrementing (for precache comparison)
+    const expectedNextIndex = currentIndex + 1;
+
     // Increment index first
     const hasNext = incrementIndex();
     if (!hasNext) {
@@ -721,7 +790,7 @@ class TrackPlayerService {
     usePlayerStore.getState().setCurrentTrack(nextTrack);
 
     // If the next track is already buffered in RNTP's queue, use native skip (gapless, no lag)
-    if (this.precachedTrackId === nextTrack.id) {
+    if (this.precachedTrackIndex === expectedNextIndex) {
       console.log('[TrackPlayer] skipToNext: native skip to buffered track:', nextTrack.title);
       this.invalidatePrecache();
       await TrackPlayer.skipToNext();
@@ -859,8 +928,38 @@ class TrackPlayerService {
       if (!trackAtCurrentIndex || trackAtCurrentIndex.id !== currentTrack.id) {
         console.warn('[TrackPlayer] Current track mismatch after queue modification');
         
-        // Search for the current track in the queue
-        const actualIndex = queue.findIndex(t => t.id === currentTrack.id);
+        // Search for the current track in the queue, starting from currentIndex
+        // This handles duplicate tracks by checking nearby positions first
+        let actualIndex = -1;
+        
+        // Check positions around currentIndex first (most likely after reorder)
+        const searchOrder = [
+          currentIndex,
+          currentIndex + 1,
+          currentIndex - 1,
+          currentIndex + 2,
+          currentIndex - 2,
+        ].filter(i => i >= 0 && i < queue.length);
+        
+        for (const idx of searchOrder) {
+          if (queue[idx].id === currentTrack.id) {
+            actualIndex = idx;
+            break;
+          }
+        }
+        
+        // If not found nearby, search forward from currentIndex (handles larger shifts)
+        if (actualIndex === -1) {
+          const localIndex = queue.slice(currentIndex).findIndex(t => t.id === currentTrack.id);
+          if (localIndex !== -1) {
+            actualIndex = currentIndex + localIndex;
+          }
+        }
+        
+        // Last resort: search from beginning
+        if (actualIndex === -1) {
+          actualIndex = queue.findIndex(t => t.id === currentTrack.id);
+        }
         
         if (actualIndex !== -1) {
           // Found it! Just update the index, don't restart playback

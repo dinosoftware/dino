@@ -11,13 +11,13 @@ import {
   Info,
   ListEnd,
   ListPlus,
-  PlaySquare,
+  ListStart,
   Radio,
   Share2,
   User,
   X,
 } from 'lucide-react-native';
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   Animated,
   Image,
@@ -33,16 +33,16 @@ import {
 import { getSimilarSongs2 } from '../../api/opensubsonic/radio';
 import { createShare } from '../../api/opensubsonic/share';
 import { Artist, Track } from '../../api/opensubsonic/types';
-import { useTheme } from '../../hooks/useTheme';
 import { useCoverArt } from '../../hooks/api';
-import { trackPlayerService } from '../../services/player/TrackPlayerService';
+import { useTheme } from '../../hooks/useTheme';
 import { downloadService } from '../../services/DownloadService';
+import { trackPlayerService } from '../../services/player/TrackPlayerService';
 import { useQueueStore } from '../../stores';
+import { useDownloadStore } from '../../stores/downloadStore';
 import { useFavoritesStore } from '../../stores/favoritesStore';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { useDownloadStore } from '../../stores/downloadStore';
 import { useToastStore } from '../../stores/toastStore';
 
 interface TrackMenuProps {
@@ -246,9 +246,9 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
 
   const handleDownload = async () => {
     if (!track) return;
-    
+
     const trackIsDownloaded = isTrackDownloaded(track.id);
-    
+
     if (trackIsDownloaded) {
       try {
         await downloadService.deleteTrack(track.id);
@@ -261,7 +261,7 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
       }
       return;
     }
-    
+
     try {
       await downloadService.downloadTrack(track);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -278,9 +278,9 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
 
   const handleShare = async () => {
     if (!track) return;
-    
+
     const includeShareMessage = useSettingsStore.getState().includeShareMessage;
-    
+
     try {
       const share = await createShare(
         [track.id],
@@ -296,7 +296,7 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
         url: share.url,
         title: `Share: ${track.title}`,
       });
-      
+
       showToast('Share link created');
     } catch (error) {
       console.error('Error sharing track:', error);
@@ -429,7 +429,7 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
                 onPress={handleStartRadio}
               />
               <MenuItem
-                icon={<PlaySquare size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                icon={<ListStart size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                 label="Play Next"
                 onPress={handlePlayNext}
               />

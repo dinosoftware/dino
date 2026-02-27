@@ -17,7 +17,7 @@ import {
 import DraggableFlatList, {
   RenderItemParams,
 } from 'react-native-draggable-flatlist';
-import { X, Trash2, GripVertical, Eraser, ListPlus, Music } from 'lucide-react-native';
+import { X, Trash2, GripVertical, Eraser, ListPlus, Music, Upload, Download } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useQueueStore, usePlayerStore } from '../../stores';
 import { useCoverArt } from '../../hooks/api/useAlbums';
@@ -34,6 +34,8 @@ import { useTheme, useBackgroundStyle } from '../../hooks/useTheme';
 import { useAlbumColors } from '../../hooks/useAlbumColors';
 import { Track } from '../../api/opensubsonic/types';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { queueSyncManager } from '../../services/player/QueueSyncManager';
+import { useToastStore } from '../../stores/toastStore';
 
 interface QueueScreenProps {
   onClose: () => void;
@@ -88,9 +90,10 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
   const { height: screenHeight } = useWindowDimensions();
   
   const { queue, currentIndex, removeFromQueue, reorderQueue, clearQueue } = useQueueStore();
-  const { currentTrack } = usePlayerStore();
+  const { currentTrack, setCurrentTrack } = usePlayerStore();
   const { data: coverArtUrl } = useCoverArt(currentTrack?.coverArt, 500);
-  const albumColors = useAlbumColors(coverArtUrl || undefined);
+  const albumColors = useAlbumColors(currentTrack?.coverArt);
+  const { showToast } = useToastStore();
   const trackMenuState = useTrackMenuState();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showSaveToPlaylist, setShowSaveToPlaylist] = useState(false);
@@ -205,6 +208,34 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   }, [reorderQueue]);
+
+  const handleSaveToServer = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await queueSyncManager.syncToServer(undefined, true);
+      showToast('Queue saved to server');
+    } catch (error) {
+      showToast('Failed to save queue', 'error');
+    }
+  }, [showToast]);
+
+  const handleLoadFromServer = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      const loaded = await queueSyncManager.loadFromServer(true, true);
+      if (loaded) {
+        const { queue: newQueue, currentIndex: newIndex } = useQueueStore.getState();
+        if (newQueue.length > 0 && newIndex >= 0 && newIndex < newQueue.length) {
+          setCurrentTrack(newQueue[newIndex]);
+        }
+        showToast('Queue loaded from server');
+      } else {
+        showToast('No queue found on server');
+      }
+    } catch (error) {
+      showToast('Failed to load queue', 'error');
+    }
+  }, [showToast, setCurrentTrack]);
 
   const renderBackground = () => {
     const base = theme.colors.background.primary;
@@ -475,17 +506,22 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
               style={styles.headerContainer}
               {...panResponder.panHandlers}
             >
-              <View style={styles.header}>
+<View style={styles.header}>
                 <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
                   <X size={20} color={theme.colors.text.primary} strokeWidth={2} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Queue</Text>
-                <TouchableOpacity
-                  onPress={() => setShowClearConfirm(true)}
-                  style={styles.closeButton}
-                >
-                  <Eraser size={20} color={theme.colors.text.primary} strokeWidth={2} />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: theme.spacing.xs }}>
+                  <TouchableOpacity onPress={handleSaveToServer} style={styles.closeButton}>
+                    <Upload size={18} color={theme.colors.accent} strokeWidth={2} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleLoadFromServer} style={styles.closeButton}>
+                    <Download size={18} color={theme.colors.accent} strokeWidth={2} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setShowClearConfirm(true)} style={styles.closeButton}>
+                    <Eraser size={18} color={theme.colors.text.primary} strokeWidth={2} />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <View style={styles.queueInfo}>
@@ -511,7 +547,7 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
               ref={flatListRef}
               data={queue}
               renderItem={renderItem}
-              keyExtractor={(item: Track) => item.id}
+              keyExtractor={(item: Track, index: number) => `${item.id}-${index}`}
               onDragEnd={handleDragEnd}
               extraData={currentIndex}
               getItemLayout={getItemLayout}

@@ -91,6 +91,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     showLyricsTimestamps,
     enableScrobbling,
     autoSyncQueue,
+    autoExtendQueue,
     gaplessPlayback,
     includeShareMessage,
     wifiOnlyDownloads,
@@ -954,6 +955,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                 onValueChange={(value) => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   updateSettings({ gaplessPlayback: value });
+                }}
+                trackColor={{
+                  false: 'rgba(120, 120, 128, 0.16)',
+                  true: theme.colors.accent
+                }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor="rgba(120, 120, 128, 0.16)"
+              />
+            </View>
+
+            <View style={[styles.settingItem, styles.borderTop]}>
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Auto-Extend Queue</Text>
+                <Text style={styles.settingDescription}>Add similar songs when queue is near end</Text>
+              </View>
+              <Switch
+                value={autoExtendQueue}
+                onValueChange={(value) => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  updateSettings({ autoExtendQueue: value });
                 }}
                 trackColor={{
                   false: 'rgba(120, 120, 128, 0.16)',

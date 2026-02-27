@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { ArrowRightLeft, Cast, ChevronDown, Heart, ListMusic, MicVocal, MoreVertical, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react-native';
 import React, { memo, useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Image,
@@ -43,14 +44,46 @@ const createStyles = (theme: ReturnType<typeof useTheme>, screenWidth: number, s
   const isLandscape = screenWidth > screenHeight;
   const useTabletLayout = isTablet && isLandscape;
   
-  // Detect tall phones (aspect ratio > 2.0) vs shorter screens (like Pixel Fold outer)
+  // Detect screen height category for responsive positioning
+  // Standard phone: aspect ratio ~1.78-1.95 (e.g., 16:9, 18:9)
+  // Tall phone: aspect ratio ~1.95-2.1 (e.g., 19.5:9, 20:9)
+  // Very tall phone: aspect ratio > 2.1 (e.g., 20.5:9, 21:9, 22:9+)
   const aspectRatio = screenHeight / screenWidth;
-  const isTallPhone = !isTablet && aspectRatio > 2.0;
   
-  // Phone: full width minus padding, max 380px
+  // Calculate extra spacing for tall screens - distribute in 3 parts:
+  // 1/3 top padding, 1/3 after artwork, 1/3 after song info
+  // Only applies to screens with aspect ratio > 2.0 (taller than 18:9)
+  let topPadding = 0;
+  let artworkMargin = theme.spacing.sm;
+  let infoMargin = theme.spacing.sm;
+  
+  if (!isTablet && aspectRatio > 2.0) {
+    // Only add extra spacing for tall phones (aspect ratio > 2.0)
+    // Calculate how much taller than 2.0 the screen is
+    const tallThreshold = 2.0;
+    const extraRatio = aspectRatio - tallThreshold;
+    
+    // Scale the extra space based on how much taller the screen is
+    // Using a smaller multiplier for more subtle adjustment
+    const extraSpace = Math.floor(screenHeight * extraRatio * 0.25);
+    
+    // Distribute into 3 parts
+    const spacingUnit = Math.floor(extraSpace / 3);
+    topPadding = spacingUnit;
+    artworkMargin = theme.spacing.sm + spacingUnit;
+    infoMargin = theme.spacing.sm + spacingUnit;
+  }
+  
+  // Phone: full width minus padding, max 380px (or slightly larger for tall screens)
   // Tablet portrait: 50% of width, max 280px
   // Tablet landscape: fixed 280px
-  const phoneArtworkSize = Math.min(screenWidth - theme.spacing.lg * 2, 380);
+  let phoneArtworkSize = Math.min(screenWidth - theme.spacing.lg * 2, 380);
+  
+  // Increase artwork size slightly for tall phones
+  if (!isTablet && aspectRatio > 2.0) {
+    phoneArtworkSize = Math.min(screenWidth - theme.spacing.lg * 2, 400);
+  }
+  
   const tabletArtworkSize = useTabletLayout ? 280 : Math.min(screenWidth * 0.5, 280);
   const artworkSize = isTablet ? tabletArtworkSize : phoneArtworkSize;
 
@@ -89,12 +122,12 @@ const createStyles = (theme: ReturnType<typeof useTheme>, screenWidth: number, s
     contentWrapper: {
       flex: 1,
       justifyContent: isTablet ? 'center' : 'flex-start',
-      paddingTop: isTallPhone ? theme.spacing.lg : 0,
+      paddingTop: topPadding,
     },
     artworkContainer: {
       alignItems: 'center',
       marginTop: isTablet ? theme.spacing.lg : 0,
-      marginBottom: isTablet ? theme.spacing.lg : (isTallPhone ? theme.spacing.lg : theme.spacing.sm),
+      marginBottom: isTablet ? theme.spacing.lg : artworkMargin,
     },
     artwork: {
       width: artworkSize,
@@ -115,7 +148,8 @@ const createStyles = (theme: ReturnType<typeof useTheme>, screenWidth: number, s
     infoRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginVertical: isTablet ? theme.spacing.md : theme.spacing.sm,
+      marginTop: isTablet ? theme.spacing.md : theme.spacing.sm,
+      marginBottom: isTablet ? theme.spacing.md : infoMargin,
     },
     info: {
       flex: 1,
@@ -148,8 +182,8 @@ const createStyles = (theme: ReturnType<typeof useTheme>, screenWidth: number, s
     },
     album: {
       fontSize: theme.typography.fontSize.sm,
-      fontFamily: theme.typography.fontFamily.regular,
-      color: theme.colors.text.muted,
+      fontFamily: theme.typography.fontFamily.medium,
+      color: theme.colors.text.secondary,
     },
     topActions: {
       flexDirection: 'row',
@@ -402,6 +436,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
   const {
     currentTrack,
     isPlaying,
+    playbackState,
     repeatMode,
     shuffleEnabled,
     togglePlayPause,
@@ -413,6 +448,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
   } = usePlayer();
 
   const progress = useProgress();
+  const isBuffering = playbackState === 'buffering';
   const streamingInfo = usePlayerStore((state) => state.streamingInfo);
   const { setPlayerOverlay, setCloseOverlayCallback } = useNavigationStore();
 
@@ -623,7 +659,9 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
             style={[styles.playButton, { backgroundColor: albumColors.primary }]}
             styles={styles}
           >
-            {isPlaying ? (
+            {isBuffering ? (
+              <ActivityIndicator size="large" color={albumColors.textColor} />
+            ) : isPlaying ? (
               <Pause size={40} color={albumColors.textColor} fill={albumColors.textColor} />
             ) : (
               <Play size={40} color={albumColors.textColor} fill={albumColors.textColor} />
@@ -748,7 +786,9 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
               style={[styles.playButton, { backgroundColor: albumColors.primary }]}
               styles={styles}
             >
-              {isPlaying ? (
+              {isBuffering ? (
+                <ActivityIndicator size="large" color={albumColors.textColor} />
+              ) : isPlaying ? (
                 <Pause size={40} color={albumColors.textColor} fill={albumColors.textColor} />
               ) : (
                 <Play size={40} color={albumColors.textColor} fill={albumColors.textColor} />

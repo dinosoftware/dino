@@ -119,7 +119,7 @@ export interface LyricsList {
 
 // Play Queue Types
 export interface PlayQueue {
-  current?: number;
+  current?: string;
   position?: number;
   username?: string;
   changed?: string;

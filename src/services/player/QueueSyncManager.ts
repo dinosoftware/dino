@@ -40,9 +40,10 @@ class QueueSyncManager {
     // Clear existing interval
     this.stop();
 
-    // Sync immediately on start
-    this.syncToServer();
-
+    // Don't sync immediately - wait for loadFromServer to complete first
+    // The caller (TrackPlayerService) will call loadFromServer() and then
+    // periodic sync will handle subsequent syncs
+    
     // Setup periodic sync
     this.syncInterval = setInterval(() => {
       this.syncToServer();
@@ -69,11 +70,13 @@ class QueueSyncManager {
   /**
    * Sync queue to server with current position
    * This is called by ScrobblingManager when updating playback progress
+   * @param currentPosition - Optional current playback position
+   * @param force - If true, bypass autoSyncQueue setting check
    */
-  async syncToServer(currentPosition?: number): Promise<void> {
+  async syncToServer(currentPosition?: number, force: boolean = false): Promise<void> {
     const { autoSyncQueue } = useSettingsStore.getState();
     
-    if (!autoSyncQueue) {
+    if (!force && !autoSyncQueue) {
       return;
     }
 
@@ -103,6 +106,9 @@ class QueueSyncManager {
       setServerSyncStatus('syncing');
       
       const trackIds = queue.map(track => track.id);
+      const currentTrackId = currentIndex >= 0 && currentIndex < queue.length 
+        ? queue[currentIndex]?.id 
+        : undefined;
       
       // Use provided position or get current playback position
       let position: number | undefined = currentPosition;
@@ -115,11 +121,11 @@ class QueueSyncManager {
 
       console.log('[QueueSync] Syncing to server:', {
         trackCount: trackIds.length,
-        currentIndex,
+        currentTrackId,
         position: position / 1000, // Log in seconds for readability
       });
 
-      await savePlayQueue(trackIds, currentIndex, position);
+      await savePlayQueue(trackIds, currentTrackId, position);
       
       markServerSynced();
       this.lastSyncTime = now;
@@ -150,11 +156,13 @@ class QueueSyncManager {
   /**
    * Load queue from server
    * Returns true if server queue was loaded, false if using local queue
+   * @param force - If true, bypass autoSyncQueue setting check
+   * @param forceUseServer - If true, always use server queue regardless of timestamps
    */
-  async loadFromServer(): Promise<boolean> {
+  async loadFromServer(force: boolean = false, forceUseServer: boolean = false): Promise<boolean> {
     const { autoSyncQueue } = useSettingsStore.getState();
     
-    if (!autoSyncQueue) {
+    if (!force && !autoSyncQueue) {
       console.log('[QueueSync] Auto-sync disabled, skipping server load');
       return false;
     }
@@ -164,6 +172,13 @@ class QueueSyncManager {
       
       const response = await getPlayQueue();
       const serverQueue = response.playQueue;
+      
+      console.log('[QueueSync] Server queue:', {
+        hasPlayQueue: !!serverQueue,
+        entryLength: serverQueue?.entry?.length,
+        changed: serverQueue?.changed,
+        current: serverQueue?.current,
+      });
 
       if (!serverQueue || !serverQueue.entry || serverQueue.entry.length === 0) {
         console.log('[QueueSync] No queue on server');
@@ -172,8 +187,9 @@ class QueueSyncManager {
 
       const { queue: localQueue, setQueue, markServerSynced } = useQueueStore.getState();
 
-      // Check if we should use server queue
-      const shouldUseServerQueue = this.shouldUseServerQueue(
+      // If forceUseServer is true, always use server queue
+      // Otherwise, check if we should use server queue based on timestamps
+      const shouldUseServerQueue = forceUseServer || this.shouldUseServerQueue(
         serverQueue,
         localQueue
       );
@@ -181,14 +197,21 @@ class QueueSyncManager {
       if (shouldUseServerQueue) {
         const positionSeconds = serverQueue.position ? serverQueue.position / 1000 : 0;
         
+        // Server returns current as track ID, not index - need to find the index
+        const currentTrackId = serverQueue.current;
+        const currentIndex = currentTrackId 
+          ? serverQueue.entry.findIndex(track => track.id === currentTrackId)
+          : 0;
+        
         console.log('[QueueSync] Using server queue:', {
           trackCount: serverQueue.entry.length,
-          currentIndex: serverQueue.current || 0,
+          currentIndex,
+          currentTrackId,
           position: positionSeconds,
         });
 
         // Load server queue using setQueueFromServer to preserve restoredPosition
-        useQueueStore.getState().setQueueFromServer(serverQueue.entry, serverQueue.current || 0);
+        useQueueStore.getState().setQueueFromServer(serverQueue.entry, currentIndex);
 
         // Store the position to restore after track is loaded
         if (serverQueue.position && positionSeconds > 0) {
@@ -236,9 +259,7 @@ class QueueSyncManager {
 
       // If server queue is significantly newer, prefer it
       if (serverTimestamp - localTimestamp > QUEUE_SYNC_CONFIG.CONFLICT_THRESHOLD) {
-        console.log('[QueueSync] Server queue is newer, suggesting switch');
-        // TODO: In future, show user prompt to choose
-        // For now, automatically use server queue if significantly newer
+        console.log('[QueueSync] Server queue is newer, using it');
         return true;
       }
     }
