@@ -29,7 +29,7 @@ import { SongInfoModal } from '../../components/Modals/SongInfoModal';
 import { AddToPlaylistModal } from '../../components/Modals/AddToPlaylistModal';
 import { ConfirmModal } from '../../components/Modals/ConfirmModal';
 import { useTrackMenuState } from '../../hooks/useTrackMenuState';
-import { trackPlayerService } from '../../services/player/TrackPlayerService';
+import { playerRouter } from '../../services/player/PlayerRouter';
 import { useTheme, useBackgroundStyle } from '../../hooks/useTheme';
 import { useAlbumColors } from '../../hooks/useAlbumColors';
 import { Track } from '../../api/opensubsonic/types';
@@ -199,7 +199,7 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
   }, [trackMenuState]);
 
   const handlePress = useCallback(async (index: number) => {
-    await trackPlayerService.playTrack(index);
+    await playerRouter.playTrack(index);
   }, []);
 
   const handleDragEnd = useCallback(({ from, to }: { data: Track[]; from: number; to: number }) => {
@@ -437,9 +437,14 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
       paddingTop: theme.spacing.md,
     },
     headerTitle: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      textAlign: 'center',
       fontSize: theme.typography.fontSize.lg,
       fontFamily: theme.typography.fontFamily.semibold,
       color: theme.colors.text.primary,
+      zIndex: -1,
     },
     closeButton: {
       width: 40,
@@ -450,6 +455,7 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
       backgroundColor: 'rgba(30, 30, 30, 0.8)',
       borderWidth: 1,
       borderColor: 'rgba(255, 255, 255, 0.1)',
+      zIndex: 1,
     },
     queueInfo: {
       paddingHorizontal: theme.spacing.lg,

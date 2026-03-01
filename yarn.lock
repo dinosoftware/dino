@@ -2567,7 +2567,7 @@ buffer-from@^1.0.0:
   resolved "https://registry.npmjs.org/buffer-from/-/buffer-from-1.1.2.tgz"
   integrity sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==
 
-buffer@^5.2.0, buffer@^5.4.3:
+buffer@^5.2.0, buffer@^5.4.3, buffer@^5.6.0:
   version "5.7.1"
   resolved "https://registry.npmjs.org/buffer/-/buffer-5.7.1.tgz"
   integrity sha512-EHcyIPBQ4BSGlvjB16k5KgAJ27CIsHY/2JBmCRReo48y9rQ3MaUzWX3KVlBa4U7MyX02HdVj0K7C3WaB3ju7FQ==
@@ -3566,7 +3566,7 @@ event-target-shim@^5.0.0, event-target-shim@^5.0.1:
   resolved "https://registry.npmjs.org/event-target-shim/-/event-target-shim-5.0.1.tgz"
   integrity sha512-i/2XbnSz/uxRCU6+NdVJgKWDTM427+MqYbkQzD321DuCQJUqOuJKIA0IM2+W2xtYHdKOmZ4dR6fExsd4SXL+WQ==
 
-events@^3.3.0:
+events@^3.1.0, events@^3.3.0:
   version "3.3.0"
   resolved "https://registry.npmjs.org/events/-/events-3.3.0.tgz"
   integrity sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==
@@ -3840,6 +3840,13 @@ fast-uri@^3.0.1:
   version "3.1.0"
   resolved "https://registry.npmjs.org/fast-uri/-/fast-uri-3.1.0.tgz"
   integrity sha512-iPeeDKJSWf4IEOasVVrknXpaBV0IApz/gp7S2bb7Z4Lljbl2MGJRqInZiUrQwV16cpzw/D3S5j5Julj/gT52AA==
+
+fast-xml-parser@^4.5.4:
+  version "4.5.4"
+  resolved "https://registry.npmjs.org/fast-xml-parser/-/fast-xml-parser-4.5.4.tgz"
+  integrity sha512-jE8ugADnYOBsu1uaoayVl1tVKAMNOXyjwvv2U6udEA2ORBhDooJDWoGxTkhd4Qn4yh59JVVt/pKXtjPwx9OguQ==
+  dependencies:
+    strnum "^1.0.5"
 
 fb-watchman@^2.0.0:
   version "2.0.2"
@@ -6001,6 +6008,11 @@ react-native-gesture-handler@>=2.0.0, react-native-gesture-handler@~2.24.0:
     hoist-non-react-statics "^3.3.0"
     invariant "^2.2.4"
 
+react-native-google-cast@^4.9.1:
+  version "4.9.1"
+  resolved "https://registry.npmjs.org/react-native-google-cast/-/react-native-google-cast-4.9.1.tgz"
+  integrity sha512-/HvIKAaWHtG6aTNCxrNrqA2ftWGkfH0M/2iN+28pdGUXpKmueb33mgL1m8D4zzwEODQMcmpfoCsym1IwDvugBQ==
+
 react-native-image-colors@^2.5.1:
   version "2.5.1"
   resolved "https://registry.npmjs.org/react-native-image-colors/-/react-native-image-colors-2.5.1.tgz"
@@ -6073,6 +6085,14 @@ react-native-track-player@^4.1.1-nightly-c46c8fb107e0de61d9b33c28e7228002077b4f2
   version "4.1.1-nightly-c46c8fb107e0de61d9b33c28e7228002077b4f20"
   resolved "https://registry.npmjs.org/react-native-track-player/-/react-native-track-player-4.1.1-nightly-c46c8fb107e0de61d9b33c28e7228002077b4f20.tgz"
   integrity sha512-/uU0xLETbTdmnWM2JGOoQ+qBg/LQFbWm0MlLXrw7Dum0Sim5xTwrlFYmL0OYDHUYzC3abYBR0FNezhMCjeze2w==
+
+react-native-udp@^4.1.7:
+  version "4.1.7"
+  resolved "https://registry.npmjs.org/react-native-udp/-/react-native-udp-4.1.7.tgz"
+  integrity sha512-NUE3zewu61NCdSsLlj+l0ad6qojcVEZPT4hVG/x6DU9U4iCzwtfZSASh9vm7teAcVzLkdD+cO3411LHshAi/wA==
+  dependencies:
+    buffer "^5.6.0"
+    events "^3.1.0"
 
 react-native-web@*, react-native-web@^0.20.0:
   version "0.20.0"
@@ -6834,6 +6854,11 @@ strip-json-comments@~2.0.1:
   version "2.0.1"
   resolved "https://registry.npmjs.org/strip-json-comments/-/strip-json-comments-2.0.1.tgz"
   integrity sha512-4gB8na07fecVVkOI6Rs4e7T6NOTki5EmL7TUduTs6bu3EdnSycntVJ4re8kgZA+wx9IueI2Y11bfbgwtzuE0KQ==
+
+strnum@^1.0.5:
+  version "1.1.2"
+  resolved "https://registry.npmjs.org/strnum/-/strnum-1.1.2.tgz"
+  integrity sha512-vrN+B7DBIoTTZjnPNewwhx6cBA/H+IS7rfW68n7XxC1y7uoiGQBxaKzqucGUgavX15dJgiGztLJ8vxuEzwqBdA==
 
 strtok3@^6.2.4:
   version "6.3.0"

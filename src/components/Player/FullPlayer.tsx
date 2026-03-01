@@ -30,8 +30,11 @@ import { QueueScreen } from '../../screens/Player/QueueScreen';
 import { useFavoritesStore } from '../../stores/favoritesStore';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { usePlayerStore } from '../../stores/playerStore';
+import { useRemotePlaybackStore } from '../../stores/remotePlaybackStore';
 import { AddToPlaylistModal } from '../Modals/AddToPlaylistModal';
+import { ArtistSelectionModal } from '../Modals/ArtistSelectionModal';
 import { ConfirmModal } from '../Modals/ConfirmModal';
+import { RemoteDevicesSheet } from '../Modals/RemoteDevicesSheet';
 import { SongInfoModal } from '../Modals/SongInfoModal';
 import { ProgressBar } from './ProgressBar';
 import { TrackMenu } from './TrackMenu';
@@ -450,6 +453,8 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
   const progress = useProgress();
   const isBuffering = playbackState === 'buffering';
   const streamingInfo = usePlayerStore((state) => state.streamingInfo);
+  const activePlayerType = useRemotePlaybackStore((state) => state.activePlayerType);
+  const isCasting = activePlayerType !== 'local';
   const { setPlayerOverlay, setCloseOverlayCallback } = useNavigationStore();
 
   const { data: coverArtUrl } = useCoverArt(currentTrack?.coverArt, 500);
@@ -695,7 +700,12 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => setShowCastModal(true)} style={styles.bottomButton}>
-          <Cast size={24} color={albumColors.primary} strokeWidth={2} />
+          <Cast 
+            size={24} 
+            color={albumColors.primary} 
+            fill={isCasting ? albumColors.primary : 'transparent'}
+            strokeWidth={2} 
+          />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => setShowQueue(true)} style={styles.bottomButton}>
@@ -823,7 +833,12 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => setShowCastModal(true)} style={styles.bottomButton}>
-          <Cast size={24} color={albumColors.primary} strokeWidth={2} />
+          <Cast 
+            size={24} 
+            color={albumColors.primary} 
+            fill={isCasting ? albumColors.primary : 'transparent'}
+            strokeWidth={2} 
+          />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => setShowQueue(true)} style={styles.bottomButton}>
@@ -849,6 +864,8 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
               onShowInfo={trackMenuState.handleShowInfo}
               onShowAddToPlaylist={trackMenuState.handleShowAddToPlaylist}
               onShowConfirm={trackMenuState.handleShowConfirm}
+              onGoToArtist={trackMenuState.handleGoToArtist}
+              onCloseAll={onClose}
             />
 
             <SongInfoModal
@@ -871,11 +888,18 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
               onClose={() => trackMenuState.setShowConfirm(false)}
             />
 
-            <ConfirmModal
+            <RemoteDevicesSheet
               visible={showCastModal}
-              title="Cast"
-              message="Cast feature is coming soon! Stay tuned for updates."
               onClose={() => setShowCastModal(false)}
+            />
+
+            <ArtistSelectionModal
+              visible={trackMenuState.showArtistSelection}
+              onClose={() => trackMenuState.setShowArtistSelection(false)}
+              artists={trackMenuState.artistsToSelect}
+              onSelectArtist={(artistId) => {
+                handleNavigate(() => useNavigationStore.getState().navigate({ name: 'artist-detail', params: { artistId } }));
+              }}
             />
           </PlayerBackground>
         </Animated.View>

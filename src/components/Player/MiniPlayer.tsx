@@ -3,14 +3,17 @@
  * TIDAL and shadcn/ui-inspired mini player with dynamic theming
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
-import { Play, Pause, SkipForward } from 'lucide-react-native';
+import { Play, Pause, SkipForward, Cast } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { usePlayer } from '../../hooks/usePlayer';
 import { useCoverArt } from '../../hooks/api';
 import { useAlbumColors } from '../../hooks/useAlbumColors';
 import { useTheme } from '../../hooks/useTheme';
+import { useRemotePlaybackStore } from '../../stores/remotePlaybackStore';
+import { RemoteDevicesSheet } from '../Modals/RemoteDevicesSheet';
+import { FEATURE_FLAGS } from '../../config/constants';
 
 interface MiniPlayerProps {
   onPress: () => void;
@@ -21,9 +24,12 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
   const { currentTrack, isPlaying, playbackState, togglePlayPause, skipToNext, progress } = usePlayer();
   const { data: coverArtUrl } = useCoverArt(currentTrack?.coverArt, 200);
   const albumColors = useAlbumColors(coverArtUrl || undefined);
+  const { activePlayerType } = useRemotePlaybackStore();
+  const [showDevicesSheet, setShowDevicesSheet] = useState(false);
   
   const isBuffering = playbackState === 'buffering';
   const progressPercentage = progress.duration > 0 ? (progress.position / progress.duration) * 100 : 0;
+  const isCasting = activePlayerType !== 'local';
 
   if (!currentTrack) {
     return null;
@@ -41,68 +47,94 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
     skipToNext();
   };
 
+  const handleCastPress = (e: any) => {
+    e.stopPropagation();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowDevicesSheet(true);
+  };
+
   return (
-    <TouchableOpacity
-      style={[styles.container, { backgroundColor: theme.colors.background.secondary, borderTopColor: theme.colors.border }]}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onPress();
-      }}
-      activeOpacity={0.95}
-    >
-      <View style={[styles.progressIndicator, { backgroundColor: theme.colors.background.muted }]}>
-        <View 
-          style={[
-            styles.progressFill, 
-            { 
-              backgroundColor: albumColors.primary,
-              width: `${Math.min(progressPercentage, 100)}%`
-            }
-          ]} 
-        />
-      </View>
+    <>
+      <TouchableOpacity
+        style={[styles.container, { backgroundColor: theme.colors.background.secondary, borderTopColor: theme.colors.border }]}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onPress();
+        }}
+        activeOpacity={0.95}
+      >
+        <View style={[styles.progressIndicator, { backgroundColor: theme.colors.background.muted }]}>
+          <View 
+            style={[
+              styles.progressFill, 
+              { 
+                backgroundColor: albumColors.primary,
+                width: `${Math.min(progressPercentage, 100)}%`
+              }
+            ]} 
+          />
+        </View>
 
-      <View style={styles.artworkContainer}>
-        {coverArtUrl ? (
-          <Image source={{ uri: coverArtUrl }} style={styles.artwork} />
-        ) : (
-          <View style={[styles.artwork, styles.placeholderArtwork, { backgroundColor: theme.colors.background.muted }]}>
-            <Text style={[styles.placeholderText, { color: theme.colors.text.muted }]}>♪</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.info}>
-        <Text style={[styles.title, { color: theme.colors.text.primary }]} numberOfLines={1}>
-          {currentTrack.title}
-        </Text>
-        <Text style={[styles.artist, { color: theme.colors.text.secondary }]} numberOfLines={1}>
-          {currentTrack.displayArtist || currentTrack.artist || 'Unknown Artist'}
-        </Text>
-      </View>
-
-      <View style={styles.controls}>
-        <TouchableOpacity
-          onPress={handlePlayPause}
-          style={[styles.controlButton, styles.playButton, { backgroundColor: albumColors.primary }]}
-        >
-          {isBuffering ? (
-            <ActivityIndicator size="small" color={albumColors.textColor} />
-          ) : isPlaying ? (
-            <Pause size={18} color={albumColors.textColor} fill={albumColors.textColor} />
+        <View style={styles.artworkContainer}>
+          {coverArtUrl ? (
+            <Image source={{ uri: coverArtUrl }} style={styles.artwork} />
           ) : (
-            <Play size={18} color={albumColors.textColor} fill={albumColors.textColor} strokeWidth={2} />
+            <View style={[styles.artwork, styles.placeholderArtwork, { backgroundColor: theme.colors.background.muted }]}>
+              <Text style={[styles.placeholderText, { color: theme.colors.text.muted }]}>♪</Text>
+            </View>
           )}
-        </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity
-          onPress={handleSkip}
-          style={styles.controlButton}
-        >
-          <SkipForward size={20} color={theme.colors.text.secondary} strokeWidth={2} />
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
+        <View style={styles.info}>
+          <Text style={[styles.title, { color: theme.colors.text.primary }]} numberOfLines={1}>
+            {currentTrack.title}
+          </Text>
+          <Text style={[styles.artist, { color: theme.colors.text.secondary }]} numberOfLines={1}>
+            {currentTrack.displayArtist || currentTrack.artist || 'Unknown Artist'}
+          </Text>
+        </View>
+
+        {FEATURE_FLAGS.ENABLE_CHROMECAST || FEATURE_FLAGS.ENABLE_UPNP ? (
+          <TouchableOpacity
+            onPress={handleCastPress}
+            style={styles.castButton}
+          >
+            <Cast 
+              size={20} 
+              color={isCasting ? albumColors.primary : theme.colors.text.secondary} 
+              fill={isCasting ? albumColors.primary : 'transparent'}
+            />
+          </TouchableOpacity>
+        ) : null}
+
+        <View style={styles.controls}>
+          <TouchableOpacity
+            onPress={handlePlayPause}
+            style={[styles.controlButton, styles.playButton, { backgroundColor: albumColors.primary }]}
+          >
+            {isBuffering ? (
+              <ActivityIndicator size="small" color={albumColors.textColor} />
+            ) : isPlaying ? (
+              <Pause size={18} color={albumColors.textColor} fill={albumColors.textColor} />
+            ) : (
+              <Play size={18} color={albumColors.textColor} fill={albumColors.textColor} strokeWidth={2} />
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleSkip}
+            style={styles.controlButton}
+          >
+            <SkipForward size={20} color={theme.colors.text.secondary} strokeWidth={2} />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+
+      <RemoteDevicesSheet
+        visible={showDevicesSheet}
+        onClose={() => setShowDevicesSheet(false)}
+      />
+    </>
   );
 };
 
@@ -157,6 +189,10 @@ const styles = StyleSheet.create({
   artist: {
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
+  },
+  castButton: {
+    padding: 8,
+    marginRight: 8,
   },
   controls: {
     flexDirection: 'row',

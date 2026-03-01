@@ -19,13 +19,12 @@ Dino is a premium mobile music streaming application for iOS and Android that co
 - Cross-device playback continuity (resume on another device)
 - Track/Album/Playlist Sharing
 - Downloads and Offline Playback (individual tracks, albums, playlists)
+- UPnP/DLNA & Chromecast support
 
 ## Planned Features (Not Yet Implemented)
 
-- Chromecast support
-- Google Assistant voice commands
 - Deep Linking shares with any [Dinosonic](https://github.com/sonicdino/dinosonic) servers
-- Android Auto integration
+- ~~Android Auto integration & Google Assistant voice commands~~ (Out of scope, React Native Track Player limitations)
 
 ## Technology Stack
 

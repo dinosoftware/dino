@@ -30,7 +30,7 @@ import {
   View,
 } from 'react-native';
 import { createShare } from '../../api/opensubsonic/share';
-import { Album } from '../../api/opensubsonic/types';
+import { Album, Artist } from '../../api/opensubsonic/types';
 import { useTheme } from '../../hooks/useTheme';
 import { downloadService } from '../../services/DownloadService';
 import { useDownloadStore } from '../../stores/downloadStore';
@@ -49,6 +49,7 @@ interface AlbumMenuProps {
   onAddToPlaylist: () => void;
   onPlayNext?: () => void;
   onAddToQueue?: () => void;
+  onGoToArtist?: (artists: Artist[]) => void;
 }
 
 interface MenuItemProps {
@@ -103,6 +104,7 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({
   onAddToPlaylist,
   onPlayNext,
   onAddToQueue,
+  onGoToArtist,
 }) => {
   const theme = useTheme();
   const translateY = useRef(new Animated.Value(0)).current;
@@ -317,10 +319,25 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({
   };
 
   const handleGoToArtist = () => {
-    if (album?.artistId) {
+    if (!album) {
+      onClose();
+      return;
+    }
+
+    if (album.artists && album.artists.length > 1) {
+      onClose();
+      setTimeout(() => {
+        onGoToArtist?.(album.artists!);
+      }, 100);
+    } else if (album.artistId) {
       onClose();
       setTimeout(() => {
         navigate({ name: 'artist-detail', params: { artistId: album.artistId! } });
+      }, 100);
+    } else if (album.artists && album.artists.length === 1) {
+      onClose();
+      setTimeout(() => {
+        navigate({ name: 'artist-detail', params: { artistId: album.artists![0].id } });
       }, 100);
     }
   };
@@ -390,7 +407,7 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({
                   theme={theme}
                 />
               )}
-              {album.artistId && (
+              {(album.artistId || (album.artists && album.artists.length > 0)) && (
                 <MenuItem
                   icon={<User size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                   label="Go to Artist"

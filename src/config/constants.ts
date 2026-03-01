@@ -98,6 +98,12 @@ export const DEFAULT_SETTINGS = {
 
   // Chromecast
   autoCastOnConnect: false,
+  castQuality: '0' as string,
+  castFormat: 'original' as string,
+
+  // UPNP/DLNA
+  upnpQuality: '0' as string,
+  upnpFormat: 'original' as string,
 
   // Lyrics
   lyricsFontSize: 'medium' as 'small' | 'medium' | 'large',
@@ -216,7 +222,8 @@ export const LYRICS_SYNC_CONFIG = {
 
 // Feature Flags
 export const FEATURE_FLAGS = {
-  ENABLE_CHROMECAST: false, // Disable for MVP
+  ENABLE_CHROMECAST: true,
+  ENABLE_UPNP: true,
   ENABLE_ANDROID_AUTO: false, // Disable for MVP
   ENABLE_VOICE_COMMANDS: false, // Disable for MVP
   ENABLE_DEEP_LINKING: false, // Disable for MVP

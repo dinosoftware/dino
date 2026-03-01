@@ -27,6 +27,10 @@ interface Settings {
   storageLimit: number;
   streamCacheSize: number;
   autoCastOnConnect: boolean;
+  castQuality: string;
+  castFormat: string;
+  upnpQuality: string;
+  upnpFormat: string;
   lyricsFontSize: LyricsFontSize;
   autoScrollLyrics: boolean;
   showLyricsTimestamps: boolean;

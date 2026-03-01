@@ -3,7 +3,7 @@ module.exports = {
     name: "Dino",
     slug: "dino",
     scheme: "dino",
-    version: "1.3.0",
+    version: "2.0.0",
     orientation: "default",
     icon: "./assets/images/icon-square.png",
     userInterfaceStyle: "dark",
@@ -32,6 +32,8 @@ module.exports = {
           NSAllowsArbitraryLoads: true,
           NSAllowsLocalNetworking: true,
         },
+        NSBonjourServices: ["_googlecast._tcp"],
+        NSLocalNetworkUsageDescription: "Dino needs local network access to discover and stream to Cast and UPNP devices.",
         UILaunchStoryboardName: "SplashScreen",
         UIRequiresFullScreen: false,
         UISupportedInterfaceOrientations: [
@@ -58,6 +60,11 @@ module.exports = {
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       usesCleartextTraffic: true,
+      permissions: [
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.CHANGE_WIFI_MULTICAST_STATE",
+        "android.permission.INTERNET",
+      ],
       intentFilters: [
         {
           action: "VIEW",
@@ -83,6 +90,7 @@ module.exports = {
 
     plugins: [
       "./plugins/withAndroidConfigChanges",
+      "./plugins/googleCastFix",
       [
         "expo-splash-screen",
         {
@@ -104,6 +112,12 @@ module.exports = {
           ios: {
             useFrameworks: "static"
           }
+        }
+      ],
+      [
+        "react-native-google-cast",
+        {
+          receiverAppId: "CC1AD845",
         }
       ],
     ],

@@ -12,3 +12,4 @@ export * from './downloadStore';
 export * from './offlineStore';
 export * from './radioStore';
 export * from './userStore';
+export * from './remotePlaybackStore';

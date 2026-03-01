@@ -3,7 +3,7 @@
  * Modal to select which artist to navigate to when a track has multiple artists
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,12 @@ import {
   TouchableOpacity,
   FlatList,
   Image,
+  Pressable,
+  PanResponder,
+  Animated,
 } from 'react-native';
 import { X, User, ChevronRight } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { Artist } from '../../api/opensubsonic/types';
 import { useTheme } from '../../hooks/useTheme';
 import { useArtist, useCoverArt } from '../../hooks/api';
@@ -104,6 +108,7 @@ export const ArtistSelectionModal: React.FC<ArtistSelectionModalProps> = ({
   onSelectArtist,
 }) => {
   const theme = useTheme();
+  const translateY = useRef(new Animated.Value(0)).current;
 
   const styles = useMemo(() => StyleSheet.create({
     overlay: {
@@ -118,12 +123,22 @@ export const ArtistSelectionModal: React.FC<ArtistSelectionModalProps> = ({
       maxHeight: '60%',
       paddingBottom: theme.spacing.xl,
     },
+    swipeIndicator: {
+      alignItems: 'center',
+      paddingVertical: theme.spacing.xs,
+    },
+    swipeHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: theme.colors.text.tertiary,
+    },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: theme.spacing.lg,
-      paddingTop: theme.spacing.lg,
+      paddingTop: theme.spacing.md,
       paddingBottom: theme.spacing.md,
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
@@ -141,6 +156,48 @@ export const ArtistSelectionModal: React.FC<ArtistSelectionModalProps> = ({
     },
   }), [theme]);
 
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return gestureState.dy > 5;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          translateY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 100) {
+          Animated.timing(translateY, {
+            toValue: 500,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            translateY.setValue(0);
+            onClose();
+          });
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  const handleBackdropPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onClose();
+  };
+
+  const handleArtistSelect = (artistId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onSelectArtist(artistId);
+    onClose();
+  };
+
   return (
     <Modal
       visible={visible}
@@ -149,8 +206,15 @@ export const ArtistSelectionModal: React.FC<ArtistSelectionModalProps> = ({
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.modal}>
+      <Pressable style={styles.overlay} onPress={handleBackdropPress}>
+        <Animated.View
+          style={[styles.modal, { transform: [{ translateY }] }]}
+          {...panResponder.panHandlers}
+        >
+          <View style={styles.swipeIndicator}>
+            <View style={styles.swipeHandle} />
+          </View>
+
           <View style={styles.header}>
             <Text style={styles.title}>Select Artist</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -162,20 +226,17 @@ export const ArtistSelectionModal: React.FC<ArtistSelectionModalProps> = ({
             data={artists}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
-              <ArtistItem
-                artist={item}
-                onPress={() => {
-                  onSelectArtist(item.id);
-                  onClose();
-                }}
-                theme={theme}
-              />
-            )}
-            style={styles.list}
-            showsVerticalScrollIndicator={false}
-          />
-        </View>
-      </View>
-    </Modal>
-  );
-};
+                <ArtistItem
+                  artist={item}
+                  onPress={() => handleArtistSelect(item.id)}
+                  theme={theme}
+                />
+              )}
+              style={styles.list}
+              showsVerticalScrollIndicator={false}
+            />
+          </Animated.View>
+        </Pressable>
+      </Modal>
+    );
+  };

@@ -19,6 +19,7 @@ import { useDownloadStore } from '../../stores/downloadStore';
 import { setClearRestoredPositionCallback, setSyncQueueCallback, setClearPreloadedTracksCallback } from '../../stores/queueStore';
 import { queueSyncManager } from './QueueSyncManager';
 import { scrobblingManager } from './ScrobblingManager';
+import { useRemotePlaybackStore } from '../../stores/remotePlaybackStore';
 
 // Playback service function (replaces PlaybackService.ts to avoid circular dependency)
 async function PlaybackService() {
@@ -67,6 +68,10 @@ class TrackPlayerService {
   networkCheckInterval: ReturnType<typeof setInterval> | null = null;
   lastNetworkType: 'wifi' | 'mobile' | 'unknown' = 'unknown';
   isSyncingQueue = false;
+
+  private isLocalPlayerActive(): boolean {
+    return useRemotePlaybackStore.getState().activePlayerType === 'local';
+  }
 
   // Precache: pre-resolve the next track object so PlaybackQueueEnded can start it instantly
   precachedTrackObj: any = null;      // the fully-built RNTP track object
@@ -207,6 +212,8 @@ queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
    */
   setupEventListeners() {
     TrackPlayer.addEventListener(Event.PlaybackState, async (event) => {
+      if (!this.isLocalPlayerActive()) return;
+
       const { setPlaybackState } = usePlayerStore.getState();
 
       switch (event.state) {
@@ -232,6 +239,8 @@ queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
     });
 
     TrackPlayer.addEventListener(Event.PlaybackProgressUpdated, async (event) => {
+      if (!this.isLocalPlayerActive()) return;
+
       const { setProgress, setBufferedProgress } = usePlayerStore.getState();
       setProgress(event.position, event.duration);
       setBufferedProgress(event.buffered);
@@ -250,6 +259,8 @@ queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
     });
 
     TrackPlayer.addEventListener(Event.PlaybackTrackChanged, async (event) => {
+      if (!this.isLocalPlayerActive()) return;
+
       // When TrackPlayer.add() buffers the next track, ExoPlayer fires a media transition
       // which RNTP surfaces as PlaybackTrackChanged with track=null, nextTrack=1.
       // This is NOT a real playback change - ignore it to prevent invalidatePrecache()
@@ -369,6 +380,8 @@ queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
     });
 
     TrackPlayer.addEventListener(Event.PlaybackQueueEnded, async () => {
+      if (!this.isLocalPlayerActive()) return;
+
       // RNTP queue is always exactly 1 track, so PlaybackQueueEnded means the
       // current track truly finished. No false-positive from remove() anymore.
       const { repeatMode, currentTrack, progress } = usePlayerStore.getState();
@@ -663,6 +676,12 @@ queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
    * Play a track
    */
   async play() {
+    // Don't play if we're not the active player (e.g., casting)
+    if (!this.isLocalPlayerActive()) {
+      console.log('[TrackPlayer] Skipping play - not active player');
+      return;
+    }
+
     const { currentTrack } = usePlayerStore.getState();
 
     if (!currentTrack) {
@@ -882,6 +901,9 @@ queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
     if (!track) return;
     skipToTrack(index);
     usePlayerStore.getState().setCurrentTrack(track);
+    
+    // If not local player, the play() call will be a no-op
+    // The remote player services listen to currentTrack changes
     await this.play();
   }
 
@@ -1278,6 +1300,24 @@ queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
       // Restore playback state on error
       usePlayerStore.getState().setPlaybackState(playbackState);
     }
+  }
+
+  async stop() {
+    await TrackPlayer.stop();
+    usePlayerStore.getState().setPlaybackState('stopped');
+  }
+
+  async getVolume(): Promise<number> {
+    return usePlayerStore.getState().volume;
+  }
+
+  async saveState(): Promise<{ position: number; isPlaying: boolean }> {
+    const position = await TrackPlayer.getPosition();
+    const state = await TrackPlayer.getState();
+    return {
+      position,
+      isPlaying: state === State.Playing,
+    };
   }
 
   async destroy() {

@@ -1,7 +1,7 @@
 {
   "name": "dino",
   "main": "expo-router/entry",
-  "version": "1.3.0",
+  "version": "2.0.0",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -43,6 +43,7 @@
     "expo-symbols": "~0.4.5",
     "expo-system-ui": "~5.0.11",
     "expo-web-browser": "~14.2.0",
+    "fast-xml-parser": "^4.5.4",
     "lucide-react-native": "^0.562.0",
     "query-string": "^9.3.1",
     "react": "19.0.0",
@@ -50,6 +51,7 @@
     "react-native": "0.79.6",
     "react-native-draggable-flatlist": "^4.0.3",
     "react-native-gesture-handler": "~2.24.0",
+    "react-native-google-cast": "^4.9.1",
     "react-native-image-colors": "^2.5.1",
     "react-native-mmkv": "^4.1.1",
     "react-native-nitro-modules": "^0.33.2",
@@ -58,6 +60,7 @@
     "react-native-screens": "~4.11.1",
     "react-native-svg": "15.11.2",
     "react-native-track-player": "^4.1.1-nightly-c46c8fb107e0de61d9b33c28e7228002077b4f20",
+    "react-native-udp": "^4.1.7",
     "react-native-web": "^0.20.0",
     "zustand": "^5.0.10"
   },

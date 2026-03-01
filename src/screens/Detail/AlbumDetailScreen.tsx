@@ -46,6 +46,8 @@ export default function AlbumDetailScreen({ albumId }: AlbumDetailScreenProps) {
   const [showAlbumMenu, setShowAlbumMenu] = useState(false);
   const [showAlbumInfo, setShowAlbumInfo] = useState(false);
   const [showAlbumAddToPlaylist, setShowAlbumAddToPlaylist] = useState(false);
+  const [showAlbumArtistSelection, setShowAlbumArtistSelection] = useState(false);
+  const [albumArtistsToSelect, setAlbumArtistsToSelect] = useState<Artist[]>([]);
 
   const trackMenuState = useTrackMenuState();
 
@@ -470,6 +472,10 @@ export default function AlbumDetailScreen({ albumId }: AlbumDetailScreenProps) {
         onAddToPlaylist={() => setShowAlbumAddToPlaylist(true)}
         onPlayNext={handlePlayNext}
         onAddToQueue={handleAddToQueue}
+        onGoToArtist={(artists) => {
+          setAlbumArtistsToSelect(artists);
+          setShowAlbumArtistSelection(true);
+        }}
       />
 
       <AddToPlaylistModal
@@ -484,6 +490,15 @@ export default function AlbumDetailScreen({ albumId }: AlbumDetailScreenProps) {
         onClose={() => setShowAlbumInfo(false)}
         album={album || null}
         coverArtUrl={coverArtUrl || undefined}
+      />
+
+      <ArtistSelectionModal
+        visible={showAlbumArtistSelection}
+        onClose={() => setShowAlbumArtistSelection(false)}
+        artists={albumArtistsToSelect}
+        onSelectArtist={(artistId) => {
+          navigate({ name: 'artist-detail', params: { artistId } });
+        }}
       />
     </View>
   );

@@ -5,12 +5,10 @@
  */
 
 import { useCallback } from 'react';
-import { trackPlayerService } from '../services/player/TrackPlayerService';
+import { playerRouter } from '../services/player/PlayerRouter';
 import { usePlayerStore } from '../stores';
 
 export const usePlayer = () => {
-  // Use selectors to only subscribe to specific fields
-  // This prevents re-renders when other fields change
   const currentTrack = usePlayerStore((state) => state.currentTrack);
   const playbackState = usePlayerStore((state) => state.playbackState);
   const progress = usePlayerStore((state) => state.progress);
@@ -19,31 +17,31 @@ export const usePlayer = () => {
   const volume = usePlayerStore((state) => state.volume);
 
   const play = useCallback(async () => {
-    await trackPlayerService.play();
+    await playerRouter.play();
   }, []);
 
   const pause = useCallback(async () => {
-    await trackPlayerService.pause();
+    await playerRouter.pause();
   }, []);
 
   const togglePlayPause = useCallback(async () => {
-    await trackPlayerService.togglePlayPause();
+    await playerRouter.togglePlayPause();
   }, []);
 
   const skipToNext = useCallback(async () => {
-    await trackPlayerService.skipToNext();
+    await playerRouter.skipToNext();
   }, []);
 
   const skipToPrevious = useCallback(async () => {
-    await trackPlayerService.skipToPrevious();
+    await playerRouter.skipToPrevious();
   }, []);
 
   const seekTo = useCallback(async (positionSeconds: number) => {
-    await trackPlayerService.seekTo(positionSeconds);
+    await playerRouter.seekTo(positionSeconds);
   }, []);
 
   const setVolume = useCallback(async (vol: number) => {
-    await trackPlayerService.setVolume(vol);
+    await playerRouter.setVolume(vol);
   }, []);
 
   const toggleShuffle = useCallback(() => {
@@ -55,7 +53,6 @@ export const usePlayer = () => {
   }, []);
 
   return {
-    // State
     currentTrack,
     playbackState,
     progress,
@@ -64,7 +61,6 @@ export const usePlayer = () => {
     volume,
     isPlaying: playbackState === 'playing',
     
-    // Actions
     play,
     pause,
     togglePlayPause,

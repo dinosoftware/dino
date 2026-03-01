@@ -6,3 +6,5 @@
 export { trackPlayerService } from './TrackPlayerService';
 export { queueSyncManager } from './QueueSyncManager';
 export { scrobblingManager } from './ScrobblingManager';
+export { playerRouter } from './PlayerRouter';
+export type { PlayerService } from './types';

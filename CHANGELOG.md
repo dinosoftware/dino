@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-03-01
+
+### Added
+- **Chromecast Support**: Stream music to Google Cast devices (Chromecast, Android TV, Cast-enabled speakers)
+  - Cast button in MiniPlayer and FullPlayer
+  - Device discovery and connection via bottom sheet modal
+  - Album art, track info, and progress bar on TV screen
+  - Full playback control (play/pause, seek, skip, previous)
+  - Auto-advances to next track when song ends
+  - Supports repeat track and repeat queue modes
+  - Seamless transfer of playback position when connecting/disconnecting
+- **UPNP/DLNA Support**: Stream music to UPNP/DLNA compatible devices (speakers, TVs, receivers)
+  - SSDP device discovery over local network
+  - SOAP-based media control
+  - Auto-advance on track end with wasPlaying state tracking
+  - Same seamless playback transfer as Chromecast
+- **Remote Devices Sheet**: Unified bottom sheet for all cast devices
+  - Shows "This device" (local playback) at top
+  - Separate sections for Chromecast and UPNP/DLNA devices
+  - Refresh button to rescan for devices
+  - Visual indicator for currently selected device
+  - Connection status and error handling
+- **Player Router Architecture**: New abstraction layer for multi-player support
+  - Routes playback commands to active player (local, Chromecast, or UPNP)
+  - PlayerService interface for consistent player API
+  - Automatic state transfer between players
+- **Cast Indicator**: Visual indicator on MiniPlayer and FullPlayer when casting
+  - Uses album color for indicator
+  - Shows which device is receiving audio
+
+### Changed
+- **Queue Screen Header**: Fixed close button not working due to z-index issue with absolute positioned title
+  - Title now has `zIndex: -1`, buttons have `zIndex: 1`
+
+### Technical
+- Added `react-native-google-cast@4.9.1` for Chromecast support
+- Added `react-native-udp@4.1.7` for UPNP discovery
+- Added `fast-xml-parser@4.4.1` for UPNP SOAP parsing
+- Created `CastPlayerService` implementing PlayerService interface
+- Created `UpnpPlayerService` implementing PlayerService interface
+- Created `UpnpController` for SOAP request handling
+- Created `UpnpDiscovery` for SSDP device discovery
+- Created `PlayerRouter` for player delegation
+- Added `remotePlaybackStore` for device state management
+- Added custom Gradle plugin (`googleCastFix.js`) to force compatible Play Services Cast version
+- Added Android permissions: `ACCESS_WIFI_STATE`, `CHANGE_WIFI_MULTICAST_STATE`
+- Added iOS `NSBonjourServices` and `NSLocalNetworkUsageDescription` for Cast discovery
+
+## [1.3.1] - 2026-02-28
+
+### Added
+- **Artist Selection Modal**: When a track has multiple artists, "Go to Artist" now shows a selection modal
+  - Works in TrackMenu (from FullPlayer, AlbumDetailScreen, PlaylistDetailScreen, etc.)
+  - Works in AlbumMenu for albums with multiple artists
+  - Shows artist avatar, name, and album count
+  - Swipe down or tap outside to dismiss
+
+### Changed
+- **Queue Screen Header**: "Queue" title now centered on screen (not affected by buttons)
+  - Uses absolute positioning for true center alignment
+
 ## [1.3.0] - 2026-02-27
 
 ### Added
