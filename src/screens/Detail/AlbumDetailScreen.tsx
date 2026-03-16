@@ -408,6 +408,7 @@ export default function AlbumDetailScreen({ albumId }: AlbumDetailScreenProps) {
                 }}
                 showArtwork={false}
                 showMenu={true}
+                showTrackNumber={true}
                 onMenuPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   trackMenuState.openTrackMenu(track);

@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AlbumsTab } from './AlbumsTab';
 import { ArtistsTab } from './ArtistsTab';
@@ -65,7 +65,13 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ onLogout }) => {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Library</Text>
+          <View style={styles.branding}>
+            <Image
+              source={require('../../../assets/images/icon-circle.png')}
+              style={styles.logo}
+            />
+            <Text style={styles.brandText}>Dino</Text>
+          </View>
           <TouchableOpacity 
             style={styles.profileButton}
             onPress={() => setShowUserMenu(true)}
@@ -160,8 +166,17 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     padding: theme.spacing.lg,
     paddingTop: theme.spacing.xxl,
   },
-  title: {
-    fontSize: theme.typography.fontSize.huge,
+  branding: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  logo: {
+    width: 36,
+    height: 36,
+  },
+  brandText: {
+    fontSize: theme.typography.fontSize.xl,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.text.primary,
   },

@@ -1,4 +1,4 @@
-/**
+ /**
  * Dino Music App - UPNP Player Service
  * Implements PlayerService for UPNP/DLNA devices
  */
@@ -10,6 +10,7 @@ import { usePlayerStore } from '../../stores/playerStore';
 import { useQueueStore } from '../../stores/queueStore';
 import { useRemotePlaybackStore, RemoteDevice } from '../../stores/remotePlaybackStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { getTrackArtistString } from '../../utils/artistUtils';
 
 let previousTrackId: string | null = null;
 
@@ -128,7 +129,7 @@ class UpnpPlayerService implements PlayerService {
     console.log('[UpnpPlayer] Loading track on device:', this.device.name);
     const loaded = await upnpController.load(this.device, streamUrl, {
       title: currentTrack.title,
-      artist: currentTrack.artist || 'Unknown Artist',
+      artist: getTrackArtistString(currentTrack),
       album: currentTrack.album || 'Unknown Album',
       coverUrl: coverArtUrl,
     });
@@ -246,3 +247,4 @@ class UpnpPlayerService implements PlayerService {
 }
 
 export const upnpPlayerService = new UpnpPlayerService();
+

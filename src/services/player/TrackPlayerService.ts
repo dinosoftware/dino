@@ -20,6 +20,7 @@ import { setClearRestoredPositionCallback, setSyncQueueCallback, setClearPreload
 import { queueSyncManager } from './QueueSyncManager';
 import { scrobblingManager } from './ScrobblingManager';
 import { useRemotePlaybackStore } from '../../stores/remotePlaybackStore';
+import { getTrackArtistString } from '../../utils/artistUtils';
 
 // Playback service function (replaces PlaybackService.ts to avoid circular dependency)
 async function PlaybackService() {
@@ -559,7 +560,7 @@ queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
       id: track.id,
       url,
       title: track.title,
-      artist: track.artist || 'Unknown Artist',
+      artist: getTrackArtistString(track),
       album: track.album || 'Unknown Album',
       artwork: coverArtUrl,
       duration: track.duration,
@@ -1279,7 +1280,7 @@ queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
         id: currentTrack.id,
         url: streamUrl,
         title: currentTrack.title,
-        artist: currentTrack.artist || 'Unknown Artist',
+        artist: getTrackArtistString(currentTrack),
         artwork: coverArtUrl,
         duration: currentTrack.duration,
       });

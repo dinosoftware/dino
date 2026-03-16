@@ -1,4 +1,4 @@
-/**
+ /**
  * Dino Music App - Cast Player Service
  * Implements PlayerService for Google Cast
  */
@@ -10,6 +10,7 @@ import { usePlayerStore } from '../../stores/playerStore';
 import { useQueueStore } from '../../stores/queueStore';
 import { useRemotePlaybackStore, RemoteDevice } from '../../stores/remotePlaybackStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { getTrackArtistString } from '../../utils/artistUtils';
 
 class CastPlayerService implements PlayerService {
   isInitialized = false;
@@ -253,7 +254,7 @@ class CastPlayerService implements PlayerService {
         metadata: {
           type: 'musicTrack',
           title: currentTrack.title,
-          artist: currentTrack.artist || 'Unknown Artist',
+          artist: getTrackArtistString(currentTrack),
           albumName: currentTrack.album || 'Unknown Album',
           images: coverArtUrl ? [
             { url: coverArtUrl, width: 1024, height: 1024 },
