@@ -28,6 +28,7 @@ import { useTrackMenuState } from '../../hooks/useTrackMenuState';
 import { LyricsScreen } from '../../screens/Player/LyricsScreen';
 import { QueueScreen } from '../../screens/Player/QueueScreen';
 import { useFavoritesStore } from '../../stores/favoritesStore';
+import { MarqueeText } from '../common/MarqueeText';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useRemotePlaybackStore } from '../../stores/remotePlaybackStore';
@@ -53,29 +54,23 @@ const createStyles = (theme: ReturnType<typeof useTheme>, screenWidth: number, s
   // Very tall phone: aspect ratio > 2.1 (e.g., 20.5:9, 21:9, 22:9+)
   const aspectRatio = screenHeight / screenWidth;
   
-  // Calculate extra spacing for tall screens - distribute in 3 parts:
-  // 1/3 top padding, 1/3 after artwork, 1/3 after song info
-  // Only applies to screens with aspect ratio > 2.0 (taller than 18:9)
-  let topPadding = 0;
-  let artworkMargin = theme.spacing.sm;
-  let infoMargin = theme.spacing.sm;
-  
-  if (!isTablet && aspectRatio > 2.0) {
-    // Only add extra spacing for tall phones (aspect ratio > 2.0)
-    // Calculate how much taller than 2.0 the screen is
-    const tallThreshold = 2.0;
-    const extraRatio = aspectRatio - tallThreshold;
-    
-    // Scale the extra space based on how much taller the screen is
-    // Using a smaller multiplier for more subtle adjustment
-    const extraSpace = Math.floor(screenHeight * extraRatio * 0.25);
-    
-    // Distribute into 3 parts
-    const spacingUnit = Math.floor(extraSpace / 3);
-    topPadding = spacingUnit;
-    artworkMargin = theme.spacing.sm + spacingUnit;
-    infoMargin = theme.spacing.sm + spacingUnit;
-  }
+  // Calculate extra spacing for tall screens - AFTER artwork
+  // Only applies to screens with aspect ratio > 2.1
+  let infoMarginTop = 0;
+  let artworkMarginTop = 0;
+
+    if (!isTablet && aspectRatio > 2.1) {
+      const tallThreshold = 2.1;
+      const extraRatio = aspectRatio - tallThreshold;
+      
+      // Scale the extra space based on how much taller the screen is, half the original
+      const extraSpace = Math.floor(screenHeight * extraRatio * 0.275);
+      
+      // Put extra space before artwork (as margin on artwork container)
+      artworkMarginTop = extraSpace;
+      // Put extra space after artwork (as margin on info section)
+      infoMarginTop = extraSpace;
+    }
   
   // Phone: full width minus padding, max 380px (or slightly larger for tall screens)
   // Tablet portrait: 50% of width, max 280px
@@ -83,7 +78,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>, screenWidth: number, s
   let phoneArtworkSize = Math.min(screenWidth - theme.spacing.lg * 2, 380);
   
   // Increase artwork size slightly for tall phones
-  if (!isTablet && aspectRatio > 2.0) {
+  if (!isTablet && aspectRatio > 2.1) {
     phoneArtworkSize = Math.min(screenWidth - theme.spacing.lg * 2, 400);
   }
   
@@ -125,12 +120,11 @@ const createStyles = (theme: ReturnType<typeof useTheme>, screenWidth: number, s
     contentWrapper: {
       flex: 1,
       justifyContent: isTablet ? 'center' : 'flex-start',
-      paddingTop: topPadding,
     },
     artworkContainer: {
       alignItems: 'center',
-      marginTop: isTablet ? theme.spacing.lg : 0,
-      marginBottom: isTablet ? theme.spacing.lg : artworkMargin,
+      marginTop: isTablet ? theme.spacing.lg : artworkMarginTop,
+      marginBottom: isTablet ? theme.spacing.lg : theme.spacing.sm,
     },
     artwork: {
       width: artworkSize,
@@ -151,8 +145,8 @@ const createStyles = (theme: ReturnType<typeof useTheme>, screenWidth: number, s
     infoRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginTop: isTablet ? theme.spacing.md : theme.spacing.sm,
-      marginBottom: isTablet ? theme.spacing.md : infoMargin,
+      marginTop: isTablet ? theme.spacing.md : (theme.spacing.sm + infoMarginTop),
+      marginBottom: isTablet ? theme.spacing.md : theme.spacing.sm,
     },
     info: {
       flex: 1,
@@ -317,46 +311,22 @@ const TrackInfo = memo<{ track: Track; onNavigate: (action?: () => void) => void
   }, [track.albumId, navigate, currentScreen, onNavigate]);
 
   const displayArtist = track.displayArtist || track.artist || 'Unknown Artist';
-  const hasMultipleArtists = track.artists && track.artists.length > 1;
 
   return (
     <View style={styles.info}>
-      <Text style={styles.title} numberOfLines={2}>
+      <MarqueeText style={styles.title}>
         {track.title}
-      </Text>
-
-      {hasMultipleArtists && track.artists ? (
-        <View style={styles.artistsContainer}>
-          {track.artists.map((artist, index) => {
-            const isLast = index === track.artists!.length - 1;
-            const isSecondToLast = index === track.artists!.length - 2;
-            return (
-              <React.Fragment key={artist.id}>
-                <TouchableOpacity onPress={() => handleArtistPress(artist.id)}>
-                  <Text style={styles.artistLink}>{artist.name}</Text>
-                </TouchableOpacity>
-                {!isLast && (
-                  <Text style={styles.artistSeparator}>
-                    {isSecondToLast ? ' & ' : ', '}
-                  </Text>
-                )}
-              </React.Fragment>
-            );
-          })}
-        </View>
-      ) : (
-        <TouchableOpacity onPress={() => handleArtistPress(track.artistId)}>
-          <Text style={styles.artist} numberOfLines={1}>
-            {displayArtist}
-          </Text>
-        </TouchableOpacity>
-      )}
-
+      </MarqueeText>
+      <TouchableOpacity onPress={() => handleArtistPress(track.artistId)}>
+        <MarqueeText style={styles.artist}>
+          {displayArtist}
+        </MarqueeText>
+      </TouchableOpacity>
       {track.album && (
         <TouchableOpacity onPress={handleAlbumPress}>
-          <Text style={styles.album} numberOfLines={1}>
+          <MarqueeText style={styles.album}>
             {track.album}
-          </Text>
+          </MarqueeText>
         </TouchableOpacity>
       )}
     </View>

@@ -110,11 +110,35 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
 
   // Queue Actions
   setQueue: (queue, currentIndex = 0) => {
-    set({
-      queue,
-      currentIndex,
-      originalQueue: queue,
-    });
+    const { shuffleEnabled } = usePlayerStore.getState();
+    
+    if (shuffleEnabled) {
+      // Shuffle is enabled - shuffle the new queue
+      const currentTrack = queue[currentIndex];
+      const before = queue.slice(0, currentIndex);
+      const after = queue.slice(currentIndex + 1);
+      const toShuffle = [...before, ...after];
+      
+      // Fisher-Yates shuffle
+      for (let i = toShuffle.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [toShuffle[i], toShuffle[j]] = [toShuffle[j], toShuffle[i]];
+      }
+      
+      const shuffledQueue = currentTrack ? [currentTrack, ...toShuffle] : toShuffle;
+      
+      set({
+        queue: shuffledQueue,
+        currentIndex: currentTrack ? 0 : -1,
+        originalQueue: queue,
+      });
+    } else {
+      set({
+        queue,
+        currentIndex,
+        originalQueue: queue,
+      });
+    }
     
     // CRITICAL: Clear restored position when user starts a new queue
     // This prevents server position from being applied to new queues
@@ -126,11 +150,34 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
 
   // Internal method for loading from server - doesn't clear restoredPosition
   setQueueFromServer: (queue, currentIndex = 0) => {
-    set({
-      queue,
-      currentIndex,
-      originalQueue: queue,
-    });
+    const { shuffleEnabled } = usePlayerStore.getState();
+    
+    if (shuffleEnabled) {
+      // Shuffle is enabled - shuffle the queue from server too
+      const currentTrack = queue[currentIndex];
+      const before = queue.slice(0, currentIndex);
+      const after = queue.slice(currentIndex + 1);
+      const toShuffle = [...before, ...after];
+      
+      for (let i = toShuffle.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [toShuffle[i], toShuffle[j]] = [toShuffle[j], toShuffle[i]];
+      }
+      
+      const shuffledQueue = currentTrack ? [currentTrack, ...toShuffle] : toShuffle;
+      
+      set({
+        queue: shuffledQueue,
+        currentIndex: currentTrack ? 0 : -1,
+        originalQueue: queue,
+      });
+    } else {
+      set({
+        queue,
+        currentIndex,
+        originalQueue: queue,
+      });
+    }
     
     // DON'T clear restoredPosition - server is restoring playback state
     

@@ -3,16 +3,23 @@
  * Renders all active toasts
  */
 
-import React from 'react';
+import React, { memo, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Toast } from './Toast';
 import { useToastStore } from '../../stores/toastStore';
 
-export const ToastContainer: React.FC = () => {
-  const { toasts, hideToast } = useToastStore();
+const ToastContainerInner: React.FC = () => {
+  const currentToast = useToastStore((state) => {
+    const toasts = state.toasts;
+    return toasts[toasts.length - 1] || null;
+  });
+  const hideToast = useToastStore((state) => state.hideToast);
 
-  // Only show the most recent toast
-  const currentToast = toasts[toasts.length - 1];
+  const handleHide = useCallback(() => {
+    if (currentToast) {
+      hideToast(currentToast.id);
+    }
+  }, [currentToast, hideToast]);
 
   if (!currentToast) return null;
 
@@ -23,11 +30,13 @@ export const ToastContainer: React.FC = () => {
         type={currentToast.type}
         visible={true}
         duration={currentToast.duration}
-        onHide={() => hideToast(currentToast.id)}
+        onHide={handleHide}
       />
     </View>
   );
 };
+
+export const ToastContainer = memo(ToastContainerInner);
 
 const styles = StyleSheet.create({
   container: {

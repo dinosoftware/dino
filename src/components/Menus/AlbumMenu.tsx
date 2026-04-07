@@ -109,7 +109,7 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({
   const theme = useTheme();
   const translateY = useRef(new Animated.Value(0)).current;
   const { isAlbumStarred, toggleAlbumStar } = useFavoritesStore();
-  const { isAlbumDownloaded } = useDownloadStore();
+  const isAlbumDownloaded = useDownloadStore((state) => !!state.downloadedAlbums[album?.id || '']);
   const { showToast } = useToastStore();
   const { navigate } = useNavigationStore();
 
@@ -232,9 +232,7 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({
   const handleDownload = async () => {
     if (!album) return;
 
-    const albumIsDownloaded = isAlbumDownloaded(album.id);
-
-    if (albumIsDownloaded) {
+    if (isAlbumDownloaded) {
       try {
         await downloadService.deleteAlbum(album.id);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -436,7 +434,7 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({
               />
               <MenuItem
                 icon={<Download size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-                label={isAlbumDownloaded(album.id) ? "Remove Download" : "Download Album"}
+                label={isAlbumDownloaded ? "Remove Download" : "Download Album"}
                 onPress={handleDownload}
                 theme={theme}
               />

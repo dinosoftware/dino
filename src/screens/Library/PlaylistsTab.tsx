@@ -288,8 +288,7 @@ const PlaylistItem: React.FC<{ playlist: Playlist; onLongPress: () => void }> = 
   const theme = useTheme();
   const { data: coverArtUrl } = useCoverArt(playlist.coverArt, 200);
   const { navigate } = useNavigationStore();
-  const { isPlaylistDownloaded } = useDownloadStore();
-  const isDownloaded = isPlaylistDownloaded(playlist.id);
+  const isDownloaded = useDownloadStore((state) => !!state.downloadedPlaylists[playlist.id]);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
   

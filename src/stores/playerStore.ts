@@ -4,7 +4,9 @@
  */
 
 import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Track, LyricLine } from '../api/opensubsonic/types';
+import { STORAGE_KEYS } from '../config/constants';
 
 export type PlaybackState = 'playing' | 'paused' | 'stopped' | 'buffering';
 export type RepeatMode = 'off' | 'track' | 'queue';
@@ -72,6 +74,10 @@ interface PlayerStore {
   toggleLyricsScrollLock: () => void;
   setLyricsScrollLock: (locked: boolean) => void;
   setLyricsLoading: (isLoading: boolean, trackId?: string) => void;
+  
+  // Persistence
+  loadFromStorage: () => Promise<void>;
+  saveToStorage: () => void;
 }
 
 export const usePlayerStore = create<PlayerStore>((set, get) => ({
@@ -129,8 +135,10 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   toggleShuffle: () => {
     const wasShuffled = usePlayerStore.getState().shuffleEnabled;
     set((state) => ({ shuffleEnabled: !state.shuffleEnabled }));
+    get().saveToStorage();
     
     // Actually shuffle or unshuffle the queue
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { shuffleQueue, unshuffleQueue } = require('./queueStore').useQueueStore.getState();
     if (!wasShuffled) {
       // Turning shuffle ON - shuffle the queue
@@ -143,6 +151,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
   setRepeatMode: (mode) => {
     set({ repeatMode: mode });
+    get().saveToStorage();
   },
 
   cycleRepeatMode: () => {
@@ -152,6 +161,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       const nextIndex = (currentIndex + 1) % modes.length;
       return { repeatMode: modes[nextIndex] };
     });
+    get().saveToStorage();
   },
 
   setVolume: (volume) => {
@@ -211,5 +221,34 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         trackId: trackId || null,
       },
     });
+  },
+
+  // Persistence
+  saveToStorage: () => {
+    const state = get();
+    AsyncStorage.setItem(STORAGE_KEYS.SHUFFLE_ENABLED, JSON.stringify(state.shuffleEnabled));
+    AsyncStorage.setItem(STORAGE_KEYS.REPEAT_MODE, state.repeatMode);
+  },
+
+  loadFromStorage: async () => {
+    try {
+      const [shuffleStr, repeatMode] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEYS.SHUFFLE_ENABLED),
+        AsyncStorage.getItem(STORAGE_KEYS.REPEAT_MODE),
+      ]);
+
+      const shuffleEnabled = shuffleStr === 'true';
+      const validRepeatModes: RepeatMode[] = ['off', 'queue', 'track'];
+      const validRepeatMode = repeatMode && validRepeatModes.includes(repeatMode as RepeatMode) 
+        ? repeatMode as RepeatMode 
+        : 'off';
+
+      set({ 
+        shuffleEnabled, 
+        repeatMode: validRepeatMode,
+      });
+    } catch (error) {
+      console.error('[PlayerStore] Failed to load from storage:', error);
+    }
   },
 }));

@@ -496,6 +496,34 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
     return null;
   };
 
+  const albums = artist?.album || [];
+  const hasTopSongs = topSongs && topSongs.length > 0;
+  const hasSimilarArtists = artistInfo?.similarArtist && artistInfo.similarArtist.length > 0;
+  const cleanedBiography = artistInfo?.biography ? cleanBiography(artistInfo.biography) : '';
+
+  const { realAlbums, singlesAndEPs } = useMemo(() => {
+    const realAlbums: Album[] = [];
+    const singlesAndEPs: Album[] = [];
+
+    for (const album of albums) {
+      const types = album.releaseTypes;
+      const isSingleOrEP = types
+        ? types.some((t: string) => {
+            const lower = t.toLowerCase();
+            return lower === 'single' || lower === 'ep';
+          })
+        : false;
+
+      if (isSingleOrEP) {
+        singlesAndEPs.push(album);
+      } else {
+        realAlbums.push(album);
+      }
+    }
+
+    return { realAlbums, singlesAndEPs };
+  }, [albums]);
+
   if (isLoading) {
     return <ArtistDetailSkeleton />;
   }
@@ -508,16 +536,6 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
       />
     );
   }
-
-  const albums = artist.album || [];
-  const hasTopSongs = topSongs && topSongs.length > 0;
-  const hasSimilarArtists = artistInfo?.similarArtist && artistInfo.similarArtist.length > 0;
-
-  const cleanedBiography = artistInfo?.biography ? cleanBiography(artistInfo.biography) : '';
-
-  console.log('Artist Detail - Top Songs:', topSongs?.length || 0);
-  console.log('Artist Detail - All Album Songs:', allAlbumSongs.length);
-  console.log('Artist Detail - Modal Songs:', getModalSongs().length);
 
   return (
     <View style={styles.container}>
@@ -673,20 +691,39 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
         )}
 
         <View style={styles.albumsSection}>
-          <Text style={styles.sectionTitleWithPadding}>Albums</Text>
+          {realAlbums.length > 0 && (
+            <>
+              <Text style={styles.sectionTitleWithPadding}>Albums</Text>
+              <FlatList
+                data={realAlbums}
+                numColumns={2}
+                scrollEnabled={false}
+                keyExtractor={(item: Album) => item.id}
+                renderItem={({ item }: { item: Album }) => (
+                  <ArtistAlbumItem album={item} />
+                )}
+                contentContainerStyle={styles.albumsList}
+              />
+            </>
+          )}
 
-          {albums.length > 0 ? (
-            <FlatList
-              data={albums}
-              numColumns={2}
-              scrollEnabled={false}
-              keyExtractor={(item: Album) => item.id}
-              renderItem={({ item }: { item: Album }) => (
-                <ArtistAlbumItem album={item} />
-              )}
-              contentContainerStyle={styles.albumsList}
-            />
-          ) : (
+          {singlesAndEPs.length > 0 && (
+            <>
+              <Text style={styles.sectionTitleWithPadding}>Singles & EPs</Text>
+              <FlatList
+                data={singlesAndEPs}
+                numColumns={2}
+                scrollEnabled={false}
+                keyExtractor={(item: Album) => item.id}
+                renderItem={({ item }: { item: Album }) => (
+                  <ArtistAlbumItem album={item} />
+                )}
+                contentContainerStyle={styles.albumsList}
+              />
+            </>
+          )}
+
+          {albums.length === 0 && (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No albums available</Text>
             </View>

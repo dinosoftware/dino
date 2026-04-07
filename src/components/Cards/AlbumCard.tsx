@@ -28,8 +28,7 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({
 }) => {
   const theme = useTheme();
   const [scaleAnim] = useState(new Animated.Value(1));
-  const { isAlbumDownloaded } = useDownloadStore();
-  const isDownloaded = isAlbumDownloaded(album.id);
+  const isDownloaded = useDownloadStore((state) => !!state.downloadedAlbums[album.id]);
 
   const styles = useMemo(() => StyleSheet.create({
     container: {

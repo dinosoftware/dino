@@ -39,8 +39,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
 }) => {
   const theme = useTheme();
   const { navigate } = useNavigationStore();
-  const { isTrackDownloaded } = useDownloadStore();
-    const isDownloaded = isTrackDownloaded(track.id);
+  const isDownloaded = useDownloadStore((state) => !!state.downloadedTracks[track.id]);
 
     const { data: fetchedCoverArtUrl } = useCoverArt(
         showArtwork && !propCoverArtUrl ? track.coverArt : undefined,

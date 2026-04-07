@@ -18,8 +18,10 @@ import { DOWNLOAD_CONFIG } from '../config/constants';
 export class DownloadService {
   private static instance: DownloadService;
   private activeDownloads = new Map<string, FileSystem.DownloadResumable>();
-  private downloadQueue: Array<{ type: DownloadType; item: Track | AlbumWithSongsID3 | PlaylistWithSongs }> = [];
+  private downloadQueue: { type: DownloadType; item: Track | AlbumWithSongsID3 | PlaylistWithSongs }[] = [];
   private isProcessing = false;
+  private lastProgressUpdate = new Map<string, { time: number; bytes: number }>();
+  private readonly PROGRESS_THROTTLE_MS = 500;
 
   private constructor() {}
 
@@ -80,45 +82,11 @@ export class DownloadService {
   }
 
   /**
-   * Get total download storage usage in MB
+   * Get total download storage usage in MB (from store, not disk scan)
    */
-  private async getStorageUsage(): Promise<number> {
-    try {
-      const downloadDir = this.getDownloadDirectory();
-      const metadataDir = this.getMetadataDirectory();
-      
-      let totalSize = 0;
-      
-      // Calculate size of download directory
-      const downloadDirInfo = await FileSystem.getInfoAsync(downloadDir);
-      if (downloadDirInfo.exists && downloadDirInfo.isDirectory) {
-        const files = await FileSystem.readDirectoryAsync(downloadDir);
-        for (const file of files) {
-          const fileInfo = await FileSystem.getInfoAsync(`${downloadDir}${file}`);
-          if (fileInfo.exists && !fileInfo.isDirectory) {
-            totalSize += fileInfo.size || 0;
-          }
-        }
-      }
-      
-      // Calculate size of metadata directory
-      const metadataDirInfo = await FileSystem.getInfoAsync(metadataDir);
-      if (metadataDirInfo.exists && metadataDirInfo.isDirectory) {
-        const files = await FileSystem.readDirectoryAsync(metadataDir);
-        for (const file of files) {
-          const fileInfo = await FileSystem.getInfoAsync(`${metadataDir}${file}`);
-          if (fileInfo.exists && !fileInfo.isDirectory) {
-            totalSize += fileInfo.size || 0;
-          }
-        }
-      }
-      
-      // Convert bytes to MB
-      return totalSize / (1024 * 1024);
-    } catch (error) {
-      console.error('[DownloadService] Failed to calculate storage usage:', error);
-      return 0;
-    }
+  private getStorageUsage(): number {
+    const totalBytes = useDownloadStore.getState().totalStorageUsed;
+    return totalBytes / (1024 * 1024);
   }
 
   /**
@@ -138,9 +106,9 @@ export class DownloadService {
   /**
    * Check if storage limit has been reached
    */
-  private async checkStorageLimit(): Promise<boolean> {
+  private checkStorageLimit(): boolean {
     const { storageLimit } = useSettingsStore.getState();
-    const currentUsage = await this.getStorageUsage();
+    const currentUsage = this.getStorageUsage();
     
     if (currentUsage >= storageLimit) {
       console.warn(`[DownloadService] Storage limit reached: ${currentUsage.toFixed(2)} MB / ${storageLimit} MB`);
@@ -221,7 +189,7 @@ export class DownloadService {
     }
     
     // Check storage limit
-    if (await this.checkStorageLimit()) {
+    if (this.checkStorageLimit()) {
       throw new Error('Storage limit reached. Delete some downloads or increase limit in settings.');
     }
 
@@ -246,7 +214,7 @@ export class DownloadService {
     }
     
     // Check storage limit
-    if (await this.checkStorageLimit()) {
+    if (this.checkStorageLimit()) {
       throw new Error('Storage limit reached. Delete some downloads or increase limit in settings.');
     }
 
@@ -275,7 +243,7 @@ export class DownloadService {
     }
     
     // Check storage limit
-    if (await this.checkStorageLimit()) {
+    if (this.checkStorageLimit()) {
       throw new Error('Storage limit reached. Delete some downloads or increase limit in settings.');
     }
 
@@ -361,8 +329,18 @@ export class DownloadService {
         (downloadProgress) => {
           const written = downloadProgress.totalBytesWritten;
           const expected = downloadProgress.totalBytesExpectedToWrite;
+          
           if (expected > 0) {
-            useDownloadStore.getState().updateProgress(downloadId, written, undefined, expected);
+            const now = Date.now();
+            const lastUpdate = this.lastProgressUpdate.get(downloadId);
+            
+            // Throttle updates: only update every 500ms or when progress changes by 5%
+            if (!lastUpdate || 
+                now - lastUpdate.time >= this.PROGRESS_THROTTLE_MS ||
+                Math.abs(written - lastUpdate.bytes) > expected * 0.05) {
+              this.lastProgressUpdate.set(downloadId, { time: now, bytes: written });
+              useDownloadStore.getState().updateProgress(downloadId, written, undefined, expected);
+            }
           }
         }
       );
@@ -389,6 +367,7 @@ export class DownloadService {
 
       // Remove from active downloads
       this.activeDownloads.delete(downloadId);
+      this.lastProgressUpdate.delete(downloadId);
 
       console.log(`Successfully downloaded track ${track.id}`);
       
@@ -421,6 +400,7 @@ export class DownloadService {
       if (downloadId) {
         useDownloadStore.getState().failDownload(downloadId, error instanceof Error ? error.message : 'Unknown error');
         this.activeDownloads.delete(downloadId);
+        this.lastProgressUpdate.delete(downloadId);
       }
 
       throw error;
@@ -596,6 +576,7 @@ export class DownloadService {
     if (downloadResumable) {
       await downloadResumable.cancelAsync();
       this.activeDownloads.delete(downloadId);
+      this.lastProgressUpdate.delete(downloadId);
       useDownloadStore.getState().cancelDownload(downloadId);
     }
   }

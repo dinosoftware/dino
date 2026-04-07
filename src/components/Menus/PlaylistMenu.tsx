@@ -109,7 +109,7 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
 }) => {
   const theme = useTheme();
   const translateY = useRef(new Animated.Value(0)).current;
-  const { isPlaylistDownloaded } = useDownloadStore();
+  const isPlaylistDownloaded = useDownloadStore((state) => !!state.downloadedPlaylists[playlist?.id || '']);
   const { showToast } = useToastStore();
 
   const styles = useMemo(() => StyleSheet.create({
@@ -216,9 +216,7 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
   const handleDownload = async () => {
     if (!playlist) return;
 
-    const playlistIsDownloaded = isPlaylistDownloaded(playlist.id);
-
-    if (playlistIsDownloaded) {
+    if (isPlaylistDownloaded) {
       try {
         await downloadService.deletePlaylist(playlist.id);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -324,7 +322,7 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
               )}
               <MenuItem
                 icon={<Download size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-                label={isPlaylistDownloaded(playlist.id) ? "Remove Download" : "Download Playlist"}
+                label={isPlaylistDownloaded ? "Remove Download" : "Download Playlist"}
                 onPress={handleDownload}
                 theme={theme}
               />

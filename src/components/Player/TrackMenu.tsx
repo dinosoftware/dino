@@ -62,7 +62,7 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
   const { data: coverArtUrl } = useCoverArt(track?.coverArt, 200);
   const { addToQueue, setQueue } = useQueueStore();
   const { isTrackStarred, toggleTrackStar } = useFavoritesStore();
-  const { isTrackDownloaded } = useDownloadStore();
+  const isTrackDownloaded = useDownloadStore((state) => !!state.downloadedTracks[track?.id || '']);
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
   const { navigate } = useNavigationStore();
   const { showToast } = useToastStore();
@@ -247,9 +247,7 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
   const handleDownload = async () => {
     if (!track) return;
 
-    const trackIsDownloaded = isTrackDownloaded(track.id);
-
-    if (trackIsDownloaded) {
+    if (isTrackDownloaded) {
       try {
         await downloadService.deleteTrack(track.id);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -467,7 +465,7 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
               />
               <MenuItem
                 icon={<Download size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-                label={isTrackDownloaded(track.id) ? "Remove Download" : "Download"}
+                label={isTrackDownloaded ? "Remove Download" : "Download"}
                 onPress={handleDownload}
               />
               <MenuItem

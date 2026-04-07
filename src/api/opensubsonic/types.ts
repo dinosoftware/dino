@@ -42,6 +42,8 @@ export interface Album {
   year?: number;
   genre?: string;
   starred?: string;
+  releaseTypes?: string[];
+  isCompilation?: boolean;
 }
 
 export interface AlbumWithSongsID3 extends Album {

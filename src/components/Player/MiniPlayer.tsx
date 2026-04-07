@@ -1,10 +1,5 @@
-/**
- * Dino Music App - Mini Player
- * TIDAL and shadcn/ui-inspired mini player with dynamic theming
- */
-
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { Play, Pause, SkipForward, Cast } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { usePlayer } from '../../hooks/usePlayer';
@@ -14,6 +9,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useRemotePlaybackStore } from '../../stores/remotePlaybackStore';
 import { RemoteDevicesSheet } from '../Modals/RemoteDevicesSheet';
 import { FEATURE_FLAGS } from '../../config/constants';
+import { MarqueeText } from '../common/MarqueeText';
 
 interface MiniPlayerProps {
   onPress: () => void;
@@ -21,12 +17,18 @@ interface MiniPlayerProps {
 
 export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
   const theme = useTheme();
+  const { height } = useWindowDimensions();
   const { currentTrack, isPlaying, playbackState, togglePlayPause, skipToNext, progress } = usePlayer();
   const { data: coverArtUrl } = useCoverArt(currentTrack?.coverArt, 200);
   const albumColors = useAlbumColors(coverArtUrl || undefined);
   const { activePlayerType } = useRemotePlaybackStore();
   const [showDevicesSheet, setShowDevicesSheet] = useState(false);
-  
+
+  const isLargeScreen = height > 800;
+  const artworkSize = isLargeScreen ? 72 : 64;
+  const containerHeight = isLargeScreen ? 88 : 80;
+  const containerPadding = isLargeScreen ? 12 : 10;
+
   const isBuffering = playbackState === 'buffering';
   const progressPercentage = progress.duration > 0 ? (progress.position / progress.duration) * 100 : 0;
   const isCasting = activePlayerType !== 'local';
@@ -56,7 +58,16 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
   return (
     <>
       <TouchableOpacity
-        style={[styles.container, { backgroundColor: theme.colors.background.secondary, borderTopColor: theme.colors.border }]}
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.colors.background.secondary,
+            borderTopColor: theme.colors.border,
+            height: containerHeight,
+            paddingTop: containerPadding,
+            paddingBottom: containerPadding,
+          },
+        ]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onPress();
@@ -64,70 +75,87 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
         activeOpacity={0.95}
       >
         <View style={[styles.progressIndicator, { backgroundColor: theme.colors.background.muted }]}>
-          <View 
+          <View
             style={[
-              styles.progressFill, 
-              { 
+              styles.progressFill,
+              {
                 backgroundColor: albumColors.primary,
-                width: `${Math.min(progressPercentage, 100)}%`
-              }
-            ]} 
+                width: `${Math.min(progressPercentage, 100)}%`,
+              },
+            ]}
           />
         </View>
 
-        <View style={styles.artworkContainer}>
+        <View style={[styles.artworkContainer, { width: artworkSize, height: artworkSize }]}>
           {coverArtUrl ? (
-            <Image source={{ uri: coverArtUrl }} style={styles.artwork} />
+            <Image
+              source={{ uri: coverArtUrl }}
+              style={{ width: artworkSize, height: artworkSize, borderRadius: 8 }}
+            />
           ) : (
-            <View style={[styles.artwork, styles.placeholderArtwork, { backgroundColor: theme.colors.background.muted }]}>
+            <View
+              style={[
+                styles.placeholderArtwork,
+                {
+                  width: artworkSize,
+                  height: artworkSize,
+                  backgroundColor: theme.colors.background.muted,
+                  borderRadius: 8,
+                },
+              ]}
+            >
               <Text style={[styles.placeholderText, { color: theme.colors.text.muted }]}>♪</Text>
             </View>
           )}
         </View>
 
         <View style={styles.info}>
-          <Text style={[styles.title, { color: theme.colors.text.primary }]} numberOfLines={1}>
+          <MarqueeText
+            style={{
+              fontSize: 14,
+              fontFamily: 'Inter_600SemiBold',
+              color: theme.colors.text.primary,
+            }}
+          >
             {currentTrack.title}
-          </Text>
-          <Text style={[styles.artist, { color: theme.colors.text.secondary }]} numberOfLines={1}>
+          </MarqueeText>
+          <MarqueeText
+            style={{
+              fontSize: 12,
+              fontFamily: 'Inter_400Regular',
+              color: theme.colors.text.secondary,
+            }}
+          >
             {currentTrack.displayArtist || currentTrack.artist || 'Unknown Artist'}
-          </Text>
+          </MarqueeText>
         </View>
 
-        {FEATURE_FLAGS.ENABLE_CHROMECAST || FEATURE_FLAGS.ENABLE_UPNP ? (
-          <TouchableOpacity
-            onPress={handleCastPress}
-            style={styles.castButton}
-          >
-            <Cast 
-              size={20} 
-              color={isCasting ? albumColors.primary : theme.colors.text.secondary} 
+        {(FEATURE_FLAGS.ENABLE_CHROMECAST || FEATURE_FLAGS.ENABLE_UPNP) && (
+          <TouchableOpacity style={styles.castButton} onPress={handleCastPress}>
+            <Cast
+              size={20}
+              color={isCasting ? albumColors.primary : theme.colors.text.secondary}
               fill={isCasting ? albumColors.primary : 'transparent'}
             />
           </TouchableOpacity>
-        ) : null}
+        )}
 
-        <View style={styles.controls}>
-          <TouchableOpacity
-            onPress={handlePlayPause}
-            style={[styles.controlButton, styles.playButton, { backgroundColor: albumColors.primary }]}
-          >
-            {isBuffering ? (
-              <ActivityIndicator size="small" color={albumColors.textColor} />
-            ) : isPlaying ? (
-              <Pause size={18} color={albumColors.textColor} fill={albumColors.textColor} />
-            ) : (
-              <Play size={18} color={albumColors.textColor} fill={albumColors.textColor} strokeWidth={2} />
-            )}
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.controlButton, styles.playButton, { backgroundColor: albumColors.primary }]}
+          onPress={handlePlayPause}
+        >
+          {isBuffering ? (
+            <ActivityIndicator size="small" color={albumColors.textColor} />
+          ) : isPlaying ? (
+            <Pause size={18} color={albumColors.textColor} fill={albumColors.textColor} />
+          ) : (
+            <Play size={18} color={albumColors.textColor} fill={albumColors.textColor} strokeWidth={2} />
+          )}
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={handleSkip}
-            style={styles.controlButton}
-          >
-            <SkipForward size={20} color={theme.colors.text.secondary} strokeWidth={2} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.controlButton} onPress={handleSkip}>
+          <SkipForward size={20} color={theme.colors.text.secondary} strokeWidth={2} />
+        </TouchableOpacity>
       </TouchableOpacity>
 
       <RemoteDevicesSheet
@@ -142,10 +170,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 72,
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 8,
     borderTopWidth: 1,
   },
   progressIndicator: {
@@ -163,41 +188,25 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    alignSelf: 'center',
-  },
-  artwork: {
-    width: 56,
-    height: 56,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   placeholderArtwork: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   placeholderText: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: 'Inter_500Medium',
   },
   info: {
     flex: 1,
     marginRight: 16,
-  },
-  title: {
-    fontSize: 14,
-    fontFamily: 'Inter_600SemiBold',
-    marginBottom: 4,
-  },
-  artist: {
-    fontSize: 12,
-    fontFamily: 'Inter_400Regular',
+    justifyContent: 'center',
   },
   castButton: {
     padding: 8,
-    marginRight: 8,
-  },
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    marginRight: 4,
+    alignSelf: 'center',
   },
   controlButton: {
     width: 36,
@@ -205,6 +214,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 9999,
+    alignSelf: 'center',
   },
   playButton: {
     width: 40,

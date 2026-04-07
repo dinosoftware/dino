@@ -63,8 +63,6 @@ export const Toast: React.FC<ToastProps> = ({
     },
   }), [theme]);
 
-  console.log('[Toast] Rendering:', { message, type, visible, messageLength: message?.length });
-
   useEffect(() => {
     if (visible) {
       Animated.parallel([

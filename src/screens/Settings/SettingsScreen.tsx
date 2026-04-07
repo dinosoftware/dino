@@ -5,7 +5,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { ArrowLeft, Check, ChevronRight, Edit3, Plus, Server as ServerIcon, Trash2 } from 'lucide-react-native';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Modal,
   ScrollView,
@@ -25,6 +25,7 @@ import { useAuthStore, useServerStore, useSettingsStore } from '../../stores';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useUserStore } from '../../stores/userStore';
+import { getCacheUsage, getCacheBreakdown, clearAllCache, formatCacheSize, CacheBreakdown } from '../../utils/cacheUtils';
 
 interface SettingsScreenProps {
   onLogout: () => void;
@@ -68,20 +69,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     updateServer
   } = useServerStore();
 
-  const currentServer = servers.find((s) => s.id === currentServerId);
-  const getCurrentServerAuth = useAuthStore((state) => state.getCurrentServerAuth);
-  const auth = getCurrentServerAuth();
-  const { user } = useUserStore();
-
-  const username = user?.username || auth?.username || 'Unknown';
-
-  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
-  React.useEffect(() => {
-    if (user) {
-      apiClient.buildAvatarUrl(user.username).then(setAvatarUrl);
-    }
-  }, [user]);
-
   const {
     streamingQualityWiFi,
     streamingQualityMobile,
@@ -105,6 +92,61 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     backgroundStyle,
     updateSettings,
   } = useSettingsStore();
+
+  const [loadingCache, setLoadingCache] = useState(false);
+  const [cacheUsage, setCacheUsage] = useState<CacheBreakdown[] | null>(null);
+
+  const currentServer = servers.find((s) => s.id === currentServerId);
+  const getCurrentServerAuth = useAuthStore((state) => state.getCurrentServerAuth);
+  const auth = getCurrentServerAuth();
+  const { user } = useUserStore();
+
+  const username = user?.username || auth?.username || 'Unknown';
+
+  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (user) {
+      apiClient.buildAvatarUrl(user.username).then(setAvatarUrl);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const fetchCacheInfo = async () => {
+      setLoadingCache(true);
+      try {
+        const breakdown = await getCacheBreakdown();
+        setCacheUsage(breakdown);
+      } catch (error) {
+        console.error('[SettingsScreen] Failed to fetch cache info:', error);
+      } finally {
+        setLoadingCache(false);
+      }
+    };
+
+    fetchCacheInfo();
+  }, []);
+
+  const handleClearCache = async () => {
+    setConfirmDialog({
+      visible: true,
+      title: 'Clear Cache',
+      message: 'This will clear all cached images. Your downloads will not be affected.',
+      confirmText: 'Clear Cache',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await clearAllCache();
+          const breakdown = await getCacheBreakdown();
+          setCacheUsage(breakdown);
+          showToast('Cache cleared successfully', 'success');
+        } catch (error) {
+          console.error('[SettingsScreen] Failed to clear cache:', error);
+          showToast('Failed to clear cache', 'error');
+        }
+        setConfirmDialog({ visible: false, title: '', message: '' });
+      },
+    });
+  };
 
   const styles = useMemo(() => StyleSheet.create({
     container: {
@@ -898,6 +940,27 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                 <Text style={styles.settingValue}>{streamCacheSize} MB</Text>
               </View>
               <ChevronRight size={20} color={theme.colors.text.tertiary} />
+            </TouchableOpacity>
+
+            <View style={[styles.settingItem, styles.borderTop]}>
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Cache Usage</Text>
+                <Text style={styles.settingValue}>
+                  {loadingCache ? 'Loading...' : formatCacheSize(cacheUsage?.reduce((sum, item) => sum + item.usage, 0) || 0)}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.settingItem, styles.borderTop]}
+              onPress={handleClearCache}
+              activeOpacity={0.7}
+            >
+              <View style={styles.settingLeft}>
+                <Text style={[styles.settingLabel, { color: theme.colors.error }]}>Clear Cache</Text>
+                <Text style={styles.settingValue}>Free up space</Text>
+              </View>
+              <Trash2 size={20} color={theme.colors.error} />
             </TouchableOpacity>
           </View>
         </View>

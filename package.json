@@ -53,6 +53,7 @@
     "react-native-gesture-handler": "~2.24.0",
     "react-native-google-cast": "^4.9.1",
     "react-native-image-colors": "^2.5.1",
+    "react-native-marquee": "^0.5.0",
     "react-native-mmkv": "^4.1.1",
     "react-native-nitro-modules": "^0.33.2",
     "react-native-reanimated": "~3.17.4",
