@@ -18,7 +18,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { Track } from '../../api/opensubsonic/types';
+import { Track, Artist } from '../../api/opensubsonic/types';
 import { useTheme, useBackgroundStyle } from '../../hooks/useTheme';
 import { useCoverArt } from '../../hooks/api';
 import { useAlbumColors } from '../../hooks/useAlbumColors';
@@ -82,7 +82,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>, screenWidth: number, s
     phoneArtworkSize = Math.min(screenWidth - theme.spacing.lg * 2, 400);
   }
   
-  const tabletArtworkSize = useTabletLayout ? 280 : Math.min(screenWidth * 0.5, 280);
+  const tabletArtworkSize = useTabletLayout ? 350 : Math.min(screenWidth * 0.5, 350);
   const artworkSize = isTablet ? tabletArtworkSize : phoneArtworkSize;
 
   return StyleSheet.create({
@@ -289,17 +289,30 @@ const Artwork = memo<{ uri?: string; style: any }>(({ uri, style }) => {
 });
 Artwork.displayName = 'Artwork';
 
-const TrackInfo = memo<{ track: Track; onNavigate: (action?: () => void) => void; styles: any }>(({ track, onNavigate, styles }) => {
+const TrackInfo = memo<{ 
+  track: Track; 
+  onNavigate: (action?: () => void) => void; 
+  onShowArtistSelection: (artists: Artist[]) => void;
+  styles: any 
+}>(({ track, onNavigate, onShowArtistSelection, styles }) => {
   const { navigate, currentScreen } = useNavigationStore();
 
-  const handleArtistPress = useCallback((artistId?: string) => {
+  const handleArtistPress = useCallback(() => {
+    const artists = track.artists;
+    if (artists && artists.length > 1) {
+      onShowArtistSelection(artists);
+      return;
+    }
+    
+    const artistId = artists?.[0]?.id || track.artistId;
     if (!artistId) return;
+    
     if (currentScreen.name === 'artist-detail' && currentScreen.params?.artistId === artistId) {
       onNavigate();
       return;
     }
     onNavigate(() => navigate({ name: 'artist-detail', params: { artistId } }));
-  }, [navigate, currentScreen, onNavigate]);
+  }, [track.artists, track.artistId, navigate, currentScreen, onNavigate, onShowArtistSelection]);
 
   const handleAlbumPress = useCallback(() => {
     if (!track.albumId) return;
@@ -317,7 +330,7 @@ const TrackInfo = memo<{ track: Track; onNavigate: (action?: () => void) => void
       <MarqueeText style={styles.title}>
         {track.title}
       </MarqueeText>
-      <TouchableOpacity onPress={() => handleArtistPress(track.artistId)}>
+      <TouchableOpacity onPress={handleArtistPress}>
         <MarqueeText style={styles.artist}>
           {displayArtist}
         </MarqueeText>
@@ -437,6 +450,10 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isMenuOpenRef = useRef(false);
   const translateY = useRef(new Animated.Value(screenHeight)).current;
+
+  const handleShowArtistSelection = useCallback((artists: Artist[]) => {
+    trackMenuState.handleGoToArtist(artists);
+  }, []);
 
   const closeCurrentOverlay = useCallback(() => {
     if (showQueue) {
@@ -590,7 +607,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
         </View>
 
         <View style={styles.infoRow}>
-          <TrackInfo track={currentTrack} onNavigate={handleNavigate} styles={styles} />
+          <TrackInfo track={currentTrack} onNavigate={handleNavigate} onShowArtistSelection={handleShowArtistSelection} styles={styles} />
           <View style={styles.topActions}>
             <TouchableOpacity style={styles.topActionButton} onPress={handleMenuOpen}>
               <MoreVertical size={24} color={albumColors.primary} strokeWidth={2} />

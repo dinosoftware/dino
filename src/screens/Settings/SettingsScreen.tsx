@@ -5,7 +5,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { ArrowLeft, Check, ChevronRight, Edit3, Plus, Server as ServerIcon, Trash2 } from 'lucide-react-native';
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Modal,
   ScrollView,
@@ -25,13 +25,12 @@ import { useAuthStore, useServerStore, useSettingsStore } from '../../stores';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useUserStore } from '../../stores/userStore';
-import { getCacheUsage, getCacheBreakdown, clearAllCache, formatCacheSize, CacheBreakdown } from '../../utils/cacheUtils';
 
 interface SettingsScreenProps {
   onLogout: () => void;
 }
 
-type ModalType = 'quality-wifi' | 'quality-mobile' | 'format-wifi' | 'format-mobile' | 'lyrics-font' | 'servers' | 'max-downloads' | 'instant-mix' | 'storage-limit' | 'cache-size' | 'edit-credentials' | 'theme' | 'background-style' | null;
+type ModalType = 'quality-wifi' | 'quality-mobile' | 'format-wifi' | 'format-mobile' | 'lyrics-font' | 'servers' | 'max-downloads' | 'instant-mix' | 'storage-limit' | 'edit-credentials' | 'theme' | 'background-style' | null;
 
 interface ConfirmDialog {
   visible: boolean;
@@ -85,16 +84,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     maxConcurrentDownloads,
     instantMixSize,
     storageLimit,
-    streamCacheSize,
     usePostRequests,
     autoFocusSearch,
     themeMode,
     backgroundStyle,
     updateSettings,
   } = useSettingsStore();
-
-  const [loadingCache, setLoadingCache] = useState(false);
-  const [cacheUsage, setCacheUsage] = useState<CacheBreakdown[] | null>(null);
 
   const currentServer = servers.find((s) => s.id === currentServerId);
   const getCurrentServerAuth = useAuthStore((state) => state.getCurrentServerAuth);
@@ -109,44 +104,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
       apiClient.buildAvatarUrl(user.username).then(setAvatarUrl);
     }
   }, [user]);
-
-  useEffect(() => {
-    const fetchCacheInfo = async () => {
-      setLoadingCache(true);
-      try {
-        const breakdown = await getCacheBreakdown();
-        setCacheUsage(breakdown);
-      } catch (error) {
-        console.error('[SettingsScreen] Failed to fetch cache info:', error);
-      } finally {
-        setLoadingCache(false);
-      }
-    };
-
-    fetchCacheInfo();
-  }, []);
-
-  const handleClearCache = async () => {
-    setConfirmDialog({
-      visible: true,
-      title: 'Clear Cache',
-      message: 'This will clear all cached images. Your downloads will not be affected.',
-      confirmText: 'Clear Cache',
-      destructive: true,
-      onConfirm: async () => {
-        try {
-          await clearAllCache();
-          const breakdown = await getCacheBreakdown();
-          setCacheUsage(breakdown);
-          showToast('Cache cleared successfully', 'success');
-        } catch (error) {
-          console.error('[SettingsScreen] Failed to clear cache:', error);
-          showToast('Failed to clear cache', 'error');
-        }
-        setConfirmDialog({ visible: false, title: '', message: '' });
-      },
-    });
-  };
 
   const styles = useMemo(() => StyleSheet.create({
     container: {
@@ -493,14 +450,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     { value: 51200, label: '50 GB', description: '50 GB storage limit' },
   ];
 
-  const cacheSizeOptions = [
-    { value: 50, label: '50 MB', description: '50 MB cache' },
-    { value: 100, label: '100 MB', description: '100 MB cache' },
-    { value: 200, label: '200 MB', description: '200 MB cache' },
-    { value: 500, label: '500 MB', description: '500 MB cache' },
-    { value: 1024, label: '1 GB', description: '1 GB cache' },
-  ];
-
   const themeOptions = [
     { value: 'dark', label: 'Dark', description: 'Zinc-based dark theme' },
     { value: 'light', label: 'Light', description: 'Clean light theme' },
@@ -550,9 +499,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
         break;
       case 'storage-limit':
         updateSettings({ storageLimit: value });
-        break;
-      case 'cache-size':
-        updateSettings({ streamCacheSize: value });
         break;
       case 'theme':
         updateSettings({ themeMode: value });
@@ -694,7 +640,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
       setEditPassword('');
       setEditApiKey('');
       setEditAuthMode('password');
-    } catch (error) {
+    } catch {
       showToast('Failed to update server. Please check your settings.', 'error');
     }
   };
@@ -928,39 +874,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                 <Text style={styles.settingValue}>{(storageLimit / 1024).toFixed(1)} GB</Text>
               </View>
               <ChevronRight size={20} color={theme.colors.text.tertiary} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.settingItem, styles.borderTop]}
-              onPress={() => setActiveModal('cache-size')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.settingLeft}>
-                <Text style={styles.settingLabel}>Stream Cache Size</Text>
-                <Text style={styles.settingValue}>{streamCacheSize} MB</Text>
-              </View>
-              <ChevronRight size={20} color={theme.colors.text.tertiary} />
-            </TouchableOpacity>
-
-            <View style={[styles.settingItem, styles.borderTop]}>
-              <View style={styles.settingLeft}>
-                <Text style={styles.settingLabel}>Cache Usage</Text>
-                <Text style={styles.settingValue}>
-                  {loadingCache ? 'Loading...' : formatCacheSize(cacheUsage?.reduce((sum, item) => sum + item.usage, 0) || 0)}
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.settingItem, styles.borderTop]}
-              onPress={handleClearCache}
-              activeOpacity={0.7}
-            >
-              <View style={styles.settingLeft}>
-                <Text style={[styles.settingLabel, { color: theme.colors.error }]}>Clear Cache</Text>
-                <Text style={styles.settingValue}>Free up space</Text>
-              </View>
-              <Trash2 size={20} color={theme.colors.error} />
             </TouchableOpacity>
           </View>
         </View>
@@ -1220,7 +1133,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
       {renderOptionModal('Max Concurrent Downloads', maxDownloadsOptions, maxConcurrentDownloads, 'max-downloads')}
       {renderOptionModal('Instant Mix Size', instantMixOptions, instantMixSize, 'instant-mix')}
       {renderOptionModal('Download Storage Limit', storageLimitOptions, storageLimit, 'storage-limit')}
-      {renderOptionModal('Stream Cache Size', cacheSizeOptions, streamCacheSize, 'cache-size')}
       {renderOptionModal('Theme', themeOptions, themeMode, 'theme')}
       {renderOptionModal('Background Style', backgroundStyleOptions, backgroundStyle, 'background-style')}
 

@@ -66,6 +66,7 @@ TrackPlayer.registerPlaybackService(() => PlaybackService);
 
 class TrackPlayerService {
   isInitialized = false;
+  private initPromise: Promise<void> | null = null;
   networkCheckInterval: ReturnType<typeof setInterval> | null = null;
   lastNetworkType: 'wifi' | 'mobile' | 'unknown' = 'unknown';
   isSyncingQueue = false;
@@ -74,10 +75,34 @@ class TrackPlayerService {
     return useRemotePlaybackStore.getState().activePlayerType === 'local';
   }
 
+  /**
+   * Wait for player to be initialized (with timeout)
+   * Returns true if initialized, false if timed out
+   */
+  private async waitForReady(timeoutMs: number = 5000): Promise<boolean> {
+    if (this.isInitialized) return true;
+    
+    if (this.initPromise) {
+      try {
+        await Promise.race([
+          this.initPromise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs))
+        ]);
+        return this.isInitialized;
+      } catch {
+        console.warn('[TrackPlayer] Wait for ready timed out');
+        return false;
+      }
+    }
+    
+    return this.isInitialized;
+  }
+
   // Precache: pre-resolve the next track object so PlaybackQueueEnded can start it instantly
   precachedTrackObj: any = null;      // the fully-built RNTP track object
   precachedTrackIndex: number | null = null; // which queue index is cached (not ID - handles duplicates)
   precacheTriggerred = false;         // did we already trigger precache for the current song
+  private isHandlingQueueEnded = false; // guard against concurrent PlaybackQueueEnded handling
 
   /**
    * Format audio codec name with proper capitalization
@@ -105,7 +130,13 @@ class TrackPlayerService {
    */
   async initialize() {
     if (this.isInitialized) return;
+    if (this.initPromise) return this.initPromise;
 
+    this.initPromise = this._doInitialize();
+    await this.initPromise;
+  }
+
+  private async _doInitialize() {
     console.log('[TrackPlayer] Initializing...');
 
     try {
@@ -153,6 +184,9 @@ class TrackPlayerService {
       // Start monitoring network changes
       this.startNetworkMonitoring();
       
+      // Setup app state listener for background/foreground transitions
+      // this.setupAppStateListener();
+      
       // Register callback to clear restored position when user starts new queue
       setClearRestoredPositionCallback(() => {
         usePlayerStore.setState({ restoredPosition: null });
@@ -165,6 +199,10 @@ class TrackPlayerService {
       // Load settings from storage first
       await useSettingsStore.getState().loadFromStorage();
       console.log('[TrackPlayer] Settings loaded');
+
+      // Load player state (shuffle/loop) from storage
+      await usePlayerStore.getState().loadFromStorage();
+      console.log('[TrackPlayer] Player state loaded (shuffle/loop)');
 
       // Load queue from local storage first
       await useQueueStore.getState().loadFromStorage();
@@ -382,61 +420,72 @@ queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
 
     TrackPlayer.addEventListener(Event.PlaybackQueueEnded, async () => {
       if (!this.isLocalPlayerActive()) return;
-
-      // RNTP queue is always exactly 1 track, so PlaybackQueueEnded means the
-      // current track truly finished. No false-positive from remove() anymore.
-      const { repeatMode, currentTrack, progress } = usePlayerStore.getState();
-      const { queue, currentIndex, skipToNext } = useQueueStore.getState();
-
-      console.log('[TrackPlayer] Track finished (queue ended), advancing to next');
-
-      // Scrobble the current track that just finished
-      if (currentTrack) {
-        await scrobblingManager.onTrackEnded(currentTrack, progress.position, progress.duration);
-      }
-
-      if (repeatMode === 'track') {
-        // Repeat current track
-        console.log('[TrackPlayer] Repeating current track:', currentTrack?.title);
-        await this.play();
+      
+      // Guard against concurrent execution (race condition protection)
+      if (this.isHandlingQueueEnded) {
+        console.log('[TrackPlayer] PlaybackQueueEnded already being handled, skipping');
         return;
       }
+      this.isHandlingQueueEnded = true;
+      
+      try {
+        // RNTP queue is always exactly 1 track, so PlaybackQueueEnded means the
+        // current track truly finished. No false-positive from remove() anymore.
+        const { repeatMode, currentTrack, progress } = usePlayerStore.getState();
+        const { queue, currentIndex, skipToNext } = useQueueStore.getState();
 
-      // Determine next track
-      const hasNext = currentIndex < queue.length - 1;
+        console.log('[TrackPlayer] Track finished (queue ended), advancing to next. repeatMode:', repeatMode);
 
-      if (hasNext || repeatMode === 'queue') {
-        // Advance index
-        if (hasNext) {
-          skipToNext();
-        } else {
-          // repeatMode === 'queue' - wrap around to start
-          useQueueStore.getState().skipToTrack(0);
+        // Scrobble the current track that just finished
+        if (currentTrack) {
+          await scrobblingManager.onTrackEnded(currentTrack, progress.position, progress.duration);
         }
 
-        const { queue: updatedQueue, currentIndex: newIndex } = useQueueStore.getState();
-        const nextTrack = updatedQueue[newIndex];
-
-        if (!nextTrack) {
-          console.error('[TrackPlayer] Next track not found at index', newIndex);
+        if (repeatMode === 'track') {
+          // Repeat current track
+          console.log('[TrackPlayer] Repeating current track:', currentTrack?.title);
+          await this.play();
           return;
         }
 
-        usePlayerStore.getState().setCurrentTrack(nextTrack);
+        // Determine next track
+        const hasNext = currentIndex < queue.length - 1;
 
-        // If the next track is already buffered in RNTP's queue, use native skip (gapless, no lag)
-        if (this.precachedTrackIndex === newIndex) {
-          console.log('[TrackPlayer] PlaybackQueueEnded: native skip to buffered track:', nextTrack.title);
-          this.invalidatePrecache();
-          await TrackPlayer.skipToNext();
+        if (hasNext || repeatMode === 'queue') {
+          // Advance index
+          if (hasNext) {
+            skipToNext();
+          } else {
+            // repeatMode === 'queue' - wrap around to start
+            useQueueStore.getState().skipToTrack(0);
+          }
+
+          const { queue: updatedQueue, currentIndex: newIndex } = useQueueStore.getState();
+          const nextTrack = updatedQueue[newIndex];
+
+          if (!nextTrack) {
+            console.error('[TrackPlayer] Next track not found at index', newIndex);
+            return;
+          }
+
+          usePlayerStore.getState().setCurrentTrack(nextTrack);
+
+          // If the next track is already buffered in RNTP's queue, use native skip (gapless, no lag)
+          if (this.precachedTrackIndex === newIndex) {
+            console.log('[TrackPlayer] PlaybackQueueEnded: native skip to buffered track:', nextTrack.title);
+            this.invalidatePrecache();
+            await TrackPlayer.skipToNext();
+          } else {
+            console.log('[TrackPlayer] PlaybackQueueEnded: no buffer, playing normally:', nextTrack.title);
+            this.invalidatePrecache();
+            await this.play();
+          }
         } else {
-          console.log('[TrackPlayer] PlaybackQueueEnded: no buffer, playing normally:', nextTrack.title);
-          this.invalidatePrecache();
-          await this.play();
+          console.log('[TrackPlayer] Playback ended');
+          usePlayerStore.getState().setPlaybackState('stopped');
         }
-      } else {
-        console.log('[TrackPlayer] Playback ended');
-        usePlayerStore.getState().setPlaybackState('stopped');
+      } finally {
+        this.isHandlingQueueEnded = false;
       }
     });
   }
@@ -762,10 +811,18 @@ queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
   }
 
   async pause() {
+    if (!await this.waitForReady()) {
+      console.warn('[TrackPlayer] pause() called before player ready');
+      return;
+    }
     await TrackPlayer.pause();
   }
 
   async togglePlayPause() {
+    if (!await this.waitForReady()) {
+      console.warn('[TrackPlayer] togglePlayPause() called before player ready');
+      return;
+    }
     const state = await TrackPlayer.getState();
     if (state === State.Playing) {
       await this.pause();
@@ -779,6 +836,10 @@ queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
   }
 
   async skipToNext() {
+    if (!await this.waitForReady()) {
+      console.warn('[TrackPlayer] skipToNext() called before player ready');
+      return;
+    }
     const { queue, currentIndex, skipToNext: incrementIndex } = useQueueStore.getState();
     
     // Check if there's a next track
@@ -823,6 +884,10 @@ queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
   }
 
   async skipToPrevious() {
+    if (!await this.waitForReady()) {
+      console.warn('[TrackPlayer] skipToPrevious() called before player ready');
+      return;
+    }
     const position = await TrackPlayer.getPosition();
     const { queue, currentIndex } = useQueueStore.getState();
     
@@ -865,6 +930,10 @@ queueSyncManager.loadFromServer().then(async (usedServerQueue) => {
   }
 
   async seekTo(positionSeconds: number) {
+    if (!await this.waitForReady()) {
+      console.warn('[TrackPlayer] seekTo() called before player ready');
+      return;
+    }
     await TrackPlayer.seekTo(positionSeconds);
     // Notify scrobbling manager about seek (triggers queue sync with new position)
     scrobblingManager.onSeek(positionSeconds);

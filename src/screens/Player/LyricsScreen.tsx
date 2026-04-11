@@ -40,10 +40,10 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
   const { lyricsFontSize, showLyricsTimestamps } = useSettingsStore();
   const { lyricsLoading } = usePlayerStore();
   const scrollViewRef = useRef<ScrollView>(null);
+  const lineHeightsRef = useRef<Map<number, number>>(new Map());
   const { data: coverArtUrl } = useCoverArt(currentTrack?.coverArt, 500);
   const albumColors = useAlbumColors(coverArtUrl || undefined);
   const translateY = useRef(new Animated.Value(screenHeight)).current;
-  const lineHeightsRef = useRef<Map<number, number>>(new Map());
 
   const fontSizes = LYRICS_FONT_SIZES[lyricsFontSize];
 
@@ -138,18 +138,18 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
     },
     lyricsContainer: {
       paddingHorizontal: theme.spacing.xl,
-      paddingTop: 50,
+      paddingTop: 80,
       paddingBottom: screenHeight,
     },
     lineContainer: {
-      minHeight: 90,
+      minHeight: 60,
       justifyContent: 'center',
       alignItems: 'flex-start',
-      paddingVertical: theme.spacing.sm,
+      marginBottom: theme.spacing.xs,
     },
     lyricLine: {
       textAlign: 'left',
-      lineHeight: 38,
+      lineHeight: undefined,
       color: theme.colors.text.secondary,
       flexWrap: 'wrap',
       width: '100%',
@@ -181,7 +181,7 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
       fontSize: theme.typography.fontSize.sm,
       color: theme.colors.text.secondary,
     },
-  }), [theme]);
+  }), [theme, screenHeight]);
 
   const renderBackground = () => {
     const baseBackgroundColor = theme.colors.background.primary;
@@ -226,7 +226,7 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
       tension: 300,
       friction: 30,
     }).start();
-  }, []);
+  }, [translateY]);
 
   const handleClose = useCallback(() => {
     Animated.timing(translateY, {
@@ -237,7 +237,7 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
       translateY.setValue(screenHeight);
       onClose();
     });
-  }, [translateY, onClose]);
+  }, [translateY, onClose, screenHeight]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -271,19 +271,23 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
   ).current;
 
   useEffect(() => {
-    if (lyrics?.isScrollLocked && lyrics.type === 'synced' && scrollViewRef.current && lyrics.lines) {
-      let scrollY = 0;
+    if (lyrics?.isScrollLocked && lyrics.type === 'synced' && scrollViewRef.current && lyrics.lines && lyrics.currentLineIndex >= 0) {
+      // Calculate actual Y position of current line using measured heights
+      let currentLineY = 0;
       for (let i = 0; i < lyrics.currentLineIndex; i++) {
-        const measuredHeight = lineHeightsRef.current.get(i);
-        scrollY += measuredHeight || 90;
+        currentLineY += lineHeightsRef.current.get(i) || 70;
       }
       
+      // Scroll to put current line below header (160px offset)
+      const headerOffset = 160;
+      const scrollY = headerOffset + currentLineY;
+      
       scrollViewRef.current.scrollTo({
-        y: scrollY,
+        y: Math.max(0, scrollY),
         animated: true,
       });
     }
-  }, [lyrics?.currentLineIndex, lyrics?.isScrollLocked]);
+  }, [lyrics?.currentLineIndex, lyrics?.isScrollLocked, lyrics?.lines, lyrics?.type, screenHeight]);
 
   interface LyricLineProps {
     line: { value: string; start: number };

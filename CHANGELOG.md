@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-04-08
+
+### Added
+- **MarqueeText Component**: Scrolling text for long titles/artist names in MiniPlayer and FullPlayer
+  - Uses `react-native-marquee` package
+  - Wraps in `MarqueeText` component to avoid naming conflicts
+- **Artist Selection Menu on FullPlayer**: Tapping artist name when multiple artists exist opens selection modal
+  - Uses existing `ArtistSelectionModal` and `useTrackMenuState` hook
+  - Single artist navigates directly, multiple artists show picker
+- **Player Startup Wait Protection**: `waitForReady()` method with 5s timeout on all player controls
+  - Prevents app freeze on fresh open (controls called before TrackPlayer initialized)
+  - Applied to `pause()`, `togglePlayPause()`, `skipToNext()`, `skipToPrevious()`, `seekTo()`
+- **Shuffle/Loop State Persistence**: Shuffle and loop settings now persist across app restarts
+  - Added `loadFromStorage()` call in `TrackPlayerService.initialize()`
+
+### Changed
+- **MiniPlayer Artwork Sizing**: Smaller cover art for less intrusive mini player
+  - Normal screens: 56px artwork, 72px container
+  - Large screens (>800px height): 64px artwork, 80px container
+- **FullPlayer Tablet Artwork**: Increased from 280px to 350px for better use of tablet screen space
+- **Lyrics Scrolling**: Current lyric line now stays at consistent position below header
+  - Uses measured line heights for accurate scroll positioning
+  - Smooth animated transitions between lyric lines
+  - 160px top offset to keep line visible below header
+- **Queue Screen Theme**: Replaced all hardcoded colors with `theme.colors`
+  - Now properly responds to light/dark/AMOLED theme changes
+  - Backgrounds, borders, text colors all use theme system
+  - Blur overlay respects dark/light mode
+
+### Fixed
+- **App Freeze on Fresh Open**: Player controls no longer called before TrackPlayer finishes initializing
+  - Added `waitForReady()` guard to all control methods
+  - Singleton init promise prevents duplicate initialization
+- **Song Replay Bug**: Song no longer sometimes replays when finished with loop off
+  - Added `isHandlingQueueEnded` race condition guard
+  - Wrapped `PlaybackQueueEnded` handler in try/finally
+- **Lyrics Duplicate Styles**: Removed duplicate `lineContainer` and `lyricLine` style definitions in LyricsScreen
+
+### Removed
+- **Settings Cache UI**: Removed Stream Cache Size, Cache Usage, and Clear Cache options from Settings
+  - These were non-functional and misleading
+  - Removed `cache-size` modal type and related state
+
 ## [2.0.0] - 2026-03-01
 
 ### Added

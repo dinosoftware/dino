@@ -251,11 +251,12 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
       );
     }
     if (backgroundStyle === 'blur' && coverArtUrl) {
+      const isDark = theme.mode !== 'light';
       return (
         <>
           <View style={[StyleSheet.absoluteFill, { backgroundColor: base }]} />
           <Image source={{ uri: coverArtUrl }} style={StyleSheet.absoluteFill} blurRadius={80} />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)' }]} />
         </>
       );
     }
@@ -282,8 +283,8 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
               ? theme.colors.background.elevated
               : isCurrentTrack
                 ? theme.colors.background.elevated
-                : 'rgba(30, 30, 30, 0.85)',
-            borderColor: isActive || isCurrentTrack ? theme.colors.accent : 'rgba(255, 255, 255, 0.1)',
+                : theme.colors.background.elevated,
+            borderColor: isActive || isCurrentTrack ? theme.colors.accent : theme.colors.border,
           },
           isActive && {
             elevation: 8,
@@ -371,7 +372,7 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
           <Text style={{
             fontSize: theme.typography.fontSize.xs,
             fontFamily: theme.typography.fontFamily.medium,
-            color: 'rgba(255, 255, 255, 0.6)',
+            color: theme.colors.text.muted,
             marginLeft: theme.spacing.sm,
             minWidth: 40,
             textAlign: 'right',
@@ -423,7 +424,7 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
       width: 48,
       height: 5,
       borderRadius: 3,
-      backgroundColor: 'rgba(255, 255, 255, 0.5)',
+      backgroundColor: theme.colors.text.muted,
     },
     headerContainer: {
       paddingBottom: theme.spacing.sm,
@@ -452,9 +453,9 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
       justifyContent: 'center',
       alignItems: 'center',
       borderRadius: theme.borderRadius.round,
-      backgroundColor: 'rgba(30, 30, 30, 0.8)',
+      backgroundColor: theme.colors.background.elevated,
       borderWidth: 1,
-      borderColor: 'rgba(255, 255, 255, 0.1)',
+      borderColor: theme.colors.border,
       zIndex: 1,
     },
     queueInfo: {
@@ -467,13 +468,13 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
     queueInfoText: {
       fontSize: theme.typography.fontSize.xs,
       fontFamily: theme.typography.fontFamily.regular,
-      color: 'rgba(255, 255, 255, 0.9)',
+      color: theme.colors.text.primary,
     },
     saveButton: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      backgroundColor: 'rgba(30, 30, 30, 0.8)',
+      backgroundColor: theme.colors.background.elevated,
       paddingHorizontal: theme.spacing.md,
       paddingVertical: theme.spacing.xs,
       borderRadius: theme.borderRadius.md,

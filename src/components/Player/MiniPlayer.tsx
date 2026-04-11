@@ -25,9 +25,9 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
   const [showDevicesSheet, setShowDevicesSheet] = useState(false);
 
   const isLargeScreen = height > 800;
-  const artworkSize = isLargeScreen ? 72 : 64;
-  const containerHeight = isLargeScreen ? 88 : 80;
-  const containerPadding = isLargeScreen ? 12 : 10;
+  const artworkSize = isLargeScreen ? 64 : 56;
+  const containerHeight = isLargeScreen ? 80 : 72;
+  const containerPadding = isLargeScreen ? 12 : 8;
 
   const isBuffering = playbackState === 'buffering';
   const progressPercentage = progress.duration > 0 ? (progress.position / progress.duration) * 100 : 0;
