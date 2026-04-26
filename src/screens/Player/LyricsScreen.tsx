@@ -272,22 +272,23 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
 
   useEffect(() => {
     if (lyrics?.isScrollLocked && lyrics.type === 'synced' && scrollViewRef.current && lyrics.lines && lyrics.currentLineIndex >= 0) {
-      // Calculate actual Y position of current line using measured heights
-      let currentLineY = 0;
+      const paddingTop = 80;
+      const lineSpacing = theme.spacing.xs;
+      const targetOffset = 150;
+
+      let currentLineY = paddingTop;
       for (let i = 0; i < lyrics.currentLineIndex; i++) {
-        currentLineY += lineHeightsRef.current.get(i) || 70;
+        currentLineY += (lineHeightsRef.current.get(i) || 70) + lineSpacing;
       }
-      
-      // Scroll to put current line below header (160px offset)
-      const headerOffset = 160;
-      const scrollY = headerOffset + currentLineY;
-      
+
+      const scrollY = currentLineY - targetOffset;
+
       scrollViewRef.current.scrollTo({
         y: Math.max(0, scrollY),
         animated: true,
       });
     }
-  }, [lyrics?.currentLineIndex, lyrics?.isScrollLocked, lyrics?.lines, lyrics?.type, screenHeight]);
+  }, [lyrics?.currentLineIndex, lyrics?.isScrollLocked, lyrics?.lines, lyrics?.type, screenHeight, theme.spacing.xs]);
 
   interface LyricLineProps {
     line: { value: string; start: number };

@@ -1,6 +1,6 @@
 /**
  * Dino Music App - Queue Screen
- * Optimized with drag-to-reorder and swipe-to-close
+ * Optimized with drag-to-reorder, per-item cover art, and memoized rendering
  */
 
 import React, { useRef, useState, useCallback, memo, useEffect, useMemo } from 'react';
@@ -44,51 +44,205 @@ interface QueueScreenProps {
 const ITEM_HEIGHT = 72;
 const ITEM_MARGIN = 8;
 
-async function buildCoverArtUrls(
-  tracks: Track[],
-  downloadedAlbums: Record<string, { album: { coverArt?: string }; coverArtUri?: string }>,
-  downloadedPlaylists: Record<string, { playlist: { coverArt?: string }; coverArtUri?: string }>,
-  downloadedTracks: Record<string, { track: { coverArt?: string }; coverArtUri?: string }>,
-  size: number
-): Promise<Record<string, string>> {
-  const urls: Record<string, string> = {};
-  
-  for (const track of tracks) {
-    if (!track.coverArt) continue;
-    
-    const album = Object.values(downloadedAlbums).find(a => a.album.coverArt === track.coverArt);
-    if (album?.coverArtUri) {
-      urls[track.id] = album.coverArtUri;
-      continue;
-    }
-    
-    const playlist = Object.values(downloadedPlaylists).find(p => p.playlist.coverArt === track.coverArt);
-    if (playlist?.coverArtUri) {
-      urls[track.id] = playlist.coverArtUri;
-      continue;
-    }
-    
-    const dlTrack = Object.values(downloadedTracks).find(t => t.track.coverArt === track.coverArt);
-    if (dlTrack?.coverArtUri) {
-      urls[track.id] = dlTrack.coverArtUri;
-      continue;
-    }
-    
-    try {
-      const url = await apiClient.buildCoverArtUrl(track.coverArt, size);
-      urls[track.id] = url;
-    } catch {
-    }
-  }
-  
-  return urls;
+const serverCoverArtCache = new Map<string, string>();
+
+const itemStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: ITEM_HEIGHT,
+    marginBottom: ITEM_MARGIN,
+  },
+  activeShadow: {
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+  },
+  dragHandle: {
+    width: 44,
+    height: ITEM_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  content: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  coverArt: {
+    width: 48,
+    height: 48,
+  },
+  coverPlaceholder: {
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  textContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  duration: {
+    minWidth: 40,
+    textAlign: 'right',
+  },
+  removeBtn: {
+    width: 44,
+    height: ITEM_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
+
+interface QueueItemProps {
+  item: Track;
+  index: number;
+  isCurrentTrack: boolean;
+  isActive: boolean;
+  coverArtDownloadUri: string | undefined;
+  onDrag: () => void;
+  onPress: (index: number) => void;
+  onLongPress: (track: Track) => void;
+  onRemove: (index: number) => void;
 }
+
+const QueueItem = memo(
+  function QueueItem({ item, index, isCurrentTrack, isActive, coverArtDownloadUri, onDrag, onPress, onLongPress, onRemove }: QueueItemProps) {
+    const theme = useTheme();
+    const [coverUrl, setCoverUrl] = useState<string | undefined>(coverArtDownloadUri);
+
+    useEffect(() => {
+      if (coverArtDownloadUri) {
+        setCoverUrl(coverArtDownloadUri);
+        return;
+      }
+      if (!item.coverArt) {
+        setCoverUrl(undefined);
+        return;
+      }
+      const cached = serverCoverArtCache.get(item.coverArt);
+      if (cached) {
+        setCoverUrl(cached);
+        return;
+      }
+      let cancelled = false;
+      apiClient.buildCoverArtUrl(item.coverArt, 120).then((url) => {
+        if (!cancelled) {
+          serverCoverArtCache.set(item.coverArt, url);
+          setCoverUrl(url);
+        }
+      }).catch(() => {});
+      return () => { cancelled = true; };
+    }, [coverArtDownloadUri, item.coverArt]);
+
+    const highlight = isActive || isCurrentTrack;
+
+    return (
+      <View
+        style={[
+          itemStyles.container,
+          {
+            borderRadius: theme.borderRadius.md,
+            borderWidth: 1,
+            backgroundColor: theme.colors.background.elevated,
+            borderColor: highlight ? theme.colors.accent : theme.colors.border,
+          },
+          isActive && itemStyles.activeShadow,
+        ]}
+      >
+        <TouchableOpacity
+          style={itemStyles.dragHandle}
+          onLongPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+            onDrag();
+          }}
+          delayLongPress={150}
+          activeOpacity={0.6}
+        >
+          <GripVertical size={20} color={highlight ? theme.colors.accent : theme.colors.text.muted} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={itemStyles.content}
+          onPress={() => onPress(index)}
+          onLongPress={() => onLongPress(item)}
+          activeOpacity={0.7}
+        >
+          {coverUrl ? (
+            <Image source={{ uri: coverUrl }} style={[itemStyles.coverArt, { borderRadius: theme.borderRadius.sm, marginRight: theme.spacing.md }]} />
+          ) : (
+            <View style={[itemStyles.coverPlaceholder, { borderRadius: theme.borderRadius.sm, marginRight: theme.spacing.md, backgroundColor: theme.colors.background.muted }]}>
+              <Music size={20} color={theme.colors.text.muted} />
+            </View>
+          )}
+
+          <View style={itemStyles.textContainer}>
+            <Text
+              style={{
+                fontSize: theme.typography.fontSize.sm,
+                fontFamily: highlight
+                  ? theme.typography.fontFamily.semibold
+                  : theme.typography.fontFamily.medium,
+                color: highlight ? theme.colors.accent : theme.colors.text.primary,
+              }}
+              numberOfLines={1}
+            >
+              {item.title}
+            </Text>
+            <Text
+              style={{
+                fontSize: theme.typography.fontSize.xs,
+                fontFamily: theme.typography.fontFamily.regular,
+                color: theme.colors.text.secondary,
+                marginTop: 2,
+              }}
+              numberOfLines={1}
+            >
+              {item.displayArtist || item.artist || 'Unknown Artist'}
+            </Text>
+          </View>
+
+          <Text style={{
+            fontSize: theme.typography.fontSize.xs,
+            fontFamily: theme.typography.fontFamily.medium,
+            color: theme.colors.text.muted,
+            marginLeft: theme.spacing.sm,
+            minWidth: 40,
+            textAlign: 'right',
+            marginRight: theme.spacing.sm,
+          }}>
+            {Math.floor(item.duration / 60)}:{(item.duration % 60).toString().padStart(2, '0')}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={itemStyles.removeBtn}
+          onPress={() => onRemove(index)}
+        >
+          <Trash2 size={18} color={theme.colors.text.muted} />
+        </TouchableOpacity>
+      </View>
+    );
+  },
+  (prev, next) => {
+    return (
+      prev.item.id === next.item.id &&
+      prev.index === next.index &&
+      prev.isCurrentTrack === next.isCurrentTrack &&
+      prev.isActive === next.isActive &&
+      prev.coverArtDownloadUri === next.coverArtDownloadUri
+    );
+  },
+);
 
 export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
   const theme = useTheme();
   const backgroundStyle = useBackgroundStyle();
   const { height: screenHeight } = useWindowDimensions();
-  
+
   const { queue, currentIndex, removeFromQueue, reorderQueue, clearQueue } = useQueueStore();
   const { currentTrack, setCurrentTrack } = usePlayerStore();
   const { data: coverArtUrl } = useCoverArt(currentTrack?.coverArt, 500);
@@ -97,11 +251,24 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
   const trackMenuState = useTrackMenuState();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showSaveToPlaylist, setShowSaveToPlaylist] = useState(false);
-  const [coverArtUrls, setCoverArtUrls] = useState<Record<string, string>>({});
   const flatListRef = useRef<any>(null);
   const hasScrolledToCurrentRef = useRef(false);
 
   const { downloadedAlbums, downloadedPlaylists, downloadedTracks } = useDownloadStore();
+
+  const downloadCoverArtMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of Object.values(downloadedAlbums) as any[]) {
+      if (a?.album?.coverArt && a?.coverArtUri) map.set(a.album.coverArt, a.coverArtUri);
+    }
+    for (const p of Object.values(downloadedPlaylists) as any[]) {
+      if (p?.playlist?.coverArt && p?.coverArtUri) map.set(p.playlist.coverArt, p.coverArtUri);
+    }
+    for (const t of Object.values(downloadedTracks) as any[]) {
+      if (t?.track?.coverArt && t?.coverArtUri) map.set(t.track.coverArt, t.coverArtUri);
+    }
+    return map;
+  }, [downloadedAlbums, downloadedPlaylists, downloadedTracks]);
 
   useEffect(() => {
     if (!hasScrolledToCurrentRef.current && currentIndex >= 0 && queue.length > 0 && flatListRef.current) {
@@ -119,21 +286,6 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
       }, 400);
     }
   }, []);
-
-  useEffect(() => {
-    if (queue.length === 0) {
-      setCoverArtUrls({});
-      return;
-    }
-    
-    let cancelled = false;
-    buildCoverArtUrls(queue, downloadedAlbums, downloadedPlaylists, downloadedTracks, 120)
-      .then(urls => {
-        if (!cancelled) setCoverArtUrls(urls);
-      });
-    
-    return () => { cancelled = true; };
-  }, [queue, downloadedAlbums, downloadedPlaylists, downloadedTracks]);
 
   const translateY = useRef(new Animated.Value(screenHeight)).current;
 
@@ -265,137 +417,20 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
 
   const renderItem = useCallback(({ item, getIndex, drag, isActive }: RenderItemParams<Track>) => {
     const index = getIndex() ?? 0;
-    const isCurrentTrack = index === currentIndex;
-    const artistDisplay = item.displayArtist || item.artist || 'Unknown Artist';
-    const coverUrl = coverArtUrls[item.id];
-
     return (
-      <View
-        style={[
-          {
-            flexDirection: 'row',
-            alignItems: 'center',
-            height: ITEM_HEIGHT,
-            borderRadius: theme.borderRadius.md,
-            borderWidth: 1,
-            marginBottom: ITEM_MARGIN,
-            backgroundColor: isActive
-              ? theme.colors.background.elevated
-              : isCurrentTrack
-                ? theme.colors.background.elevated
-                : theme.colors.background.elevated,
-            borderColor: isActive || isCurrentTrack ? theme.colors.accent : theme.colors.border,
-          },
-          isActive && {
-            elevation: 8,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.4,
-            shadowRadius: 8,
-          },
-        ]}
-      >
-        <TouchableOpacity
-          style={{
-            width: 44,
-            height: ITEM_HEIGHT,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-          onLongPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-            drag();
-          }}
-          delayLongPress={150}
-          activeOpacity={0.6}
-        >
-          <GripVertical size={20} color={isActive ? theme.colors.accent : theme.colors.text.muted} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            alignItems: 'center',
-          }}
-          onPress={() => handlePress(index)}
-          onLongPress={() => handleLongPress(item)}
-          activeOpacity={0.7}
-        >
-          {coverUrl ? (
-            <Image source={{ uri: coverUrl }} style={{
-              width: 48,
-              height: 48,
-              borderRadius: theme.borderRadius.sm,
-              marginRight: theme.spacing.md,
-            }} />
-          ) : (
-            <View style={{
-              width: 48,
-              height: 48,
-              borderRadius: theme.borderRadius.sm,
-              marginRight: theme.spacing.md,
-              backgroundColor: theme.colors.background.muted,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}>
-              <Music size={20} color={theme.colors.text.muted} />
-            </View>
-          )}
-
-          <View style={{ flex: 1, justifyContent: 'center' }}>
-            <Text
-              style={{
-                fontSize: theme.typography.fontSize.sm,
-                fontFamily: (isActive || isCurrentTrack) 
-                  ? theme.typography.fontFamily.semibold 
-                  : theme.typography.fontFamily.medium,
-                color: (isActive || isCurrentTrack) ? theme.colors.accent : theme.colors.text.primary,
-              }}
-              numberOfLines={1}
-            >
-              {item.title}
-            </Text>
-            <Text
-              style={{
-                fontSize: theme.typography.fontSize.xs,
-                fontFamily: theme.typography.fontFamily.regular,
-                color: theme.colors.text.secondary,
-                marginTop: 2,
-              }}
-              numberOfLines={1}
-            >
-              {artistDisplay}
-            </Text>
-          </View>
-
-          <Text style={{
-            fontSize: theme.typography.fontSize.xs,
-            fontFamily: theme.typography.fontFamily.medium,
-            color: theme.colors.text.muted,
-            marginLeft: theme.spacing.sm,
-            minWidth: 40,
-            textAlign: 'right',
-            marginRight: theme.spacing.sm,
-          }}>
-            {Math.floor(item.duration / 60)}:{(item.duration % 60).toString().padStart(2, '0')}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={{
-            width: 44,
-            height: ITEM_HEIGHT,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-          onPress={() => handleRemove(index)}
-        >
-          <Trash2 size={18} color={theme.colors.text.muted} />
-        </TouchableOpacity>
-      </View>
+      <QueueItem
+        item={item}
+        index={index}
+        isCurrentTrack={index === currentIndex}
+        isActive={isActive}
+        coverArtDownloadUri={item.coverArt ? downloadCoverArtMap.get(item.coverArt) : undefined}
+        onDrag={drag}
+        onPress={handlePress}
+        onLongPress={handleLongPress}
+        onRemove={handleRemove}
+      />
     );
-  }, [currentIndex, coverArtUrls, theme, handlePress, handleLongPress, handleRemove]);
+  }, [currentIndex, downloadCoverArtMap, handlePress, handleLongPress, handleRemove]);
 
   const getItemLayout = useCallback((_: any, index: number) => ({
     length: ITEM_HEIGHT + ITEM_MARGIN,
@@ -565,10 +600,10 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
               autoscrollThreshold={50}
               autoscrollSpeed={100}
               removeClippedSubviews={false}
-              maxToRenderPerBatch={15}
-              updateCellsBatchingPeriod={100}
-              initialNumToRender={25}
-              windowSize={31}
+              maxToRenderPerBatch={10}
+              updateCellsBatchingPeriod={50}
+              initialNumToRender={15}
+              windowSize={10}
               onScrollToIndexFailed={(info) => {
                 setTimeout(() => {
                   flatListRef.current?.scrollToIndex?.({

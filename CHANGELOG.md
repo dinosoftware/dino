@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-04-26
+
+### Fixed
+- **Queue Screen Lag with 30+ Songs**: Fixed severe lag making the queue unusable with large queues
+  - Replaced blocking `buildCoverArtUrls` with per-item lazy cover art resolution
+  - Extracted `QueueItem` as `React.memo` component — only changed items re-render
+  - Download cover art lookup now uses a `Map` (O(1)) instead of linear scans (O(n\*m))
+  - Module-level cache for server-resolved cover art URLs (instant on revisit)
+  - Reduced `windowSize` from 31 to 10 (fewer off-screen items rendered)
+- **Lyrics Scroll Position Inconsistency**: Active lyric line now consistently appears near the top with ~2-3 lines visible above it
+  - Fixed scroll calculation missing `paddingTop: 80` from `lyricsContainer`
+  - Fixed scroll calculation missing `marginBottom` per line (accumulated error with more lines)
+  - Fixed inverted formula that pushed the active line off-screen instead of positioning it
+- **Version Not Updating in Builds**: Changed `appVersionSource` from `"remote"` to `"local"` in `eas.json`
+  - EAS was ignoring local version and using its remote stored value
+
 ## [2.0.1] - 2026-04-08
 
 ### Added
