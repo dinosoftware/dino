@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-04-26
+
+### Added
+- **Playlist Track Reorder**: Edit mode for playlists with drag-to-reorder
+  - "Edit Playlist" option in playlist menu activates edit mode
+  - Drag handles for reordering tracks, X buttons for removing tracks
+  - Saves changes to server via `updatePlaylist` API
+  - Cancel/Done buttons replace Play/Shuffle in edit mode
+- **Dynamic Color Background Style**: New "Dynamic Color" option that shows a solid color extracted from cover art
+  - "Dynamic Gradient" now renders an actual `LinearGradient` with album colors (was previously a flat color)
+- **Playlist Track Artwork**: Tracks on playlist detail page now show album cover art for each song
+
+### Changed
+- **Detail Page Backgrounds**: Gradient/blur now only covers the header area (cover art + title)
+  - Fades to transparent before the Play/Shuffle/Menu buttons
+  - Buttons and track list sit on clean theme background
+  - Reduces visual noise on album, artist, and playlist pages
+- **Detail Page Spacing**: Reduced excessive padding between header content and Play/Shuffle/Menu buttons on album, artist, and playlist pages
+
+### Fixed
+- **Server Queue Position Persisting**: When queue is restored from server with a seek position, changing tracks or queue no longer preserves the old seek position on the new track
+  - `skipToTrack()` now clears `restoredPosition` since any track change invalidates the server seek position
+- **Playlist Edit Mode Background Cutoff**: Gradient background in edit mode no longer has visible left/right gaps — padding moved from list container to individual rows so header extends full width
+
 ## [2.5.0] - 2026-04-26
 
 ### Added

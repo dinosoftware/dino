@@ -70,7 +70,7 @@ export const STREAMING_FORMAT_OPTIONS = [
   { value: 'original', label: 'Original' },
 ] as const;
 
-export type BackgroundStyle = 'blur' | 'solid' | 'gradient';
+export type BackgroundStyle = 'blur' | 'solid' | 'gradient' | 'dynamicColor';
 
 // Default Settings
 export const DEFAULT_SETTINGS = {

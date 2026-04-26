@@ -14,6 +14,7 @@ import {
   PanResponder,
   useWindowDimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import DraggableFlatList, {
   RenderItemParams,
 } from 'react-native-draggable-flatlist';
@@ -396,11 +397,29 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
     if (backgroundStyle === 'solid') {
       return <View style={[StyleSheet.absoluteFill, { backgroundColor: base }]} />;
     }
-    if (backgroundStyle === 'gradient') {
+    if (backgroundStyle === 'dynamicColor') {
       return (
         <>
           <View style={[StyleSheet.absoluteFill, { backgroundColor: base }]} />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: albumColors.background || base }]} />
+        </>
+      );
+    }
+    if (backgroundStyle === 'gradient') {
+      const isDark = theme.mode !== 'light';
+      return (
+        <>
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: base }]} />
+          <LinearGradient
+            colors={
+              isDark
+                ? [albumColors.primary + '40', albumColors.secondary + '60', albumColors.background + '90', base]
+                : [albumColors.primary + '20', albumColors.secondary + '30', albumColors.background + '60', base]
+            }
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+          />
         </>
       );
     }

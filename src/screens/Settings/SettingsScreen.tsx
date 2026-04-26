@@ -459,7 +459,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
   const backgroundStyleOptions = [
     { value: 'blur', label: 'Blurred Cover', description: 'Blurred album art background' },
     { value: 'solid', label: 'Solid Color', description: 'Theme-based solid background' },
-    { value: 'gradient', label: 'Dynamic Gradient', description: 'Color-changing gradient from cover art' },
+    { value: 'gradient', label: 'Dynamic Gradient', description: 'Color gradient from cover art' },
+    { value: 'dynamicColor', label: 'Dynamic Color', description: 'Solid color from cover art' },
   ];
 
   const getQualityLabel = (value: string) => {
@@ -1091,7 +1092,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                 <Text style={styles.settingDescription}>Player and detail screen backgrounds</Text>
                 <Text style={styles.settingValue}>
                   {backgroundStyle === 'blur' ? 'Blurred Cover' : 
-                   backgroundStyle === 'gradient' ? 'Dynamic Gradient' : 'Solid Color'}
+                   backgroundStyle === 'gradient' ? 'Dynamic Gradient' :
+                   backgroundStyle === 'dynamicColor' ? 'Dynamic Color' : 'Solid Color'}
                 </Text>
               </View>
               <ChevronRight size={20} color={theme.colors.text.tertiary} />

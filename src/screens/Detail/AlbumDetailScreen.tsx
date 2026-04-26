@@ -75,9 +75,11 @@ export default function AlbumDetailScreen({ albumId }: AlbumDetailScreenProps) {
       alignItems: 'center',
     },
     header: {
-      padding: theme.spacing.lg,
-      alignItems: 'center',
+      paddingLeft: theme.spacing.lg,
+      paddingRight: theme.spacing.lg,
       paddingTop: 60,
+      paddingBottom: theme.spacing.sm,
+      alignItems: 'center',
       gap: theme.spacing.sm,
     },
     coverArt: {
@@ -244,14 +246,25 @@ export default function AlbumDetailScreen({ albumId }: AlbumDetailScreenProps) {
       return null;
     }
 
+    if (backgroundStyle === 'dynamicColor' && coverArtUrl) {
+      const bgColor = albumColors.background || theme.colors.background.primary;
+      return (
+        <LinearGradient
+          colors={[bgColor, bgColor, 'transparent']}
+          locations={[0, 0.7, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+      );
+    }
+
     if (backgroundStyle === 'gradient' && coverArtUrl) {
       const isDark = theme.mode !== 'light';
       return (
         <LinearGradient
           colors={
             isDark
-              ? [albumColors.primary + '50', albumColors.secondary + '70', theme.colors.background.primary]
-              : [albumColors.primary + '30', albumColors.secondary + '40', theme.colors.background.primary]
+              ? [albumColors.primary + '30', albumColors.secondary + '40', 'transparent']
+              : [albumColors.primary + '15', albumColors.secondary + '20', 'transparent']
           }
           style={StyleSheet.absoluteFill}
           start={{ x: 0, y: 0 }}
@@ -273,10 +286,10 @@ export default function AlbumDetailScreen({ albumId }: AlbumDetailScreenProps) {
           <LinearGradient
             colors={
               isDark
-                ? ['transparent', 'rgba(0, 0, 0, 0.6)', theme.colors.background.primary]
-                : ['transparent', 'rgba(255, 255, 255, 0.6)', theme.colors.background.primary]
+                ? ['transparent', 'rgba(0, 0, 0, 0.3)', theme.colors.background.primary]
+                : ['transparent', 'rgba(255, 255, 255, 0.3)', theme.colors.background.primary]
             }
-            locations={[0, 0.6, 1]}
+            locations={[0, 0.5, 1]}
             style={StyleSheet.absoluteFill}
           />
         </>
@@ -362,8 +375,9 @@ export default function AlbumDetailScreen({ albumId }: AlbumDetailScreenProps) {
               </Text>
             </View>
           </View>
+        </View>
 
-          <View style={styles.actions}>
+        <View style={styles.actions}>
             <TouchableOpacity
               style={[styles.playButton, { backgroundColor: albumColors.primary }]}
               onPress={handlePlayAll}
@@ -393,7 +407,6 @@ export default function AlbumDetailScreen({ albumId }: AlbumDetailScreenProps) {
               <MoreVertical size={24} color={theme.colors.text.secondary} />
             </TouchableOpacity>
           </View>
-        </View>
 
         <View style={styles.trackList}>
           {album.song && album.song.length > 0 ? (

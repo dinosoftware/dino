@@ -404,6 +404,9 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
   },
 
   skipToTrack: (index) => {
+    // Clear restored position - any track change invalidates server seek position
+    clearRestoredPosition();
+    
     set((state) => {
       // Add current track to history
       if (state.currentIndex >= 0 && state.currentIndex < state.queue.length) {

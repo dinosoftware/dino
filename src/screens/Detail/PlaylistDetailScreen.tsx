@@ -1,13 +1,14 @@
 /**
  * Dino Music App - Playlist Detail Screen
- * Shows playlist details and tracks
+ * Shows playlist details and tracks with drag-to-reorder in edit mode
  */
 
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronLeft, MoreVertical, Play, Shuffle } from 'lucide-react-native';
-import React, { useState, useMemo } from 'react';
+import { Check, ChevronLeft, GripVertical, MoreVertical, Play, Shuffle, X } from 'lucide-react-native';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
+  ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
@@ -15,7 +16,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { deletePlaylist } from '../../api/opensubsonic/playlists';
+import DraggableFlatList, {
+  RenderItemParams,
+} from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { deletePlaylist, updatePlaylist } from '../../api/opensubsonic/playlists';
 import { Track } from '../../api/opensubsonic/types';
 import { TrackRow } from '../../components/Cards/TrackRow';
 import { PlaylistMenu } from '../../components/Menus';
@@ -35,6 +40,7 @@ import { trackPlayerService } from '../../services/player/TrackPlayerService';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useQueueStore } from '../../stores/queueStore';
+import { useToastStore } from '../../stores/toastStore';
 
 interface PlaylistDetailScreenProps {
   playlistId: string;
@@ -49,8 +55,12 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
   const { setQueue, addToQueue } = useQueueStore();
   const { goBack, navigate } = useNavigationStore();
+  const showToast = useToastStore((s) => s.showToast);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedTracks, setEditedTracks] = useState<Track[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   const trackMenuState = useTrackMenuState();
 
@@ -77,7 +87,7 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
     },
     header: {
       paddingTop: theme.spacing.xxl * 2,
-      paddingBottom: theme.spacing.xl,
+      paddingBottom: theme.spacing.sm,
       alignItems: 'center',
     },
     coverArt: {
@@ -157,8 +167,48 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
       borderWidth: 1,
       borderColor: theme.colors.border,
     },
+    editActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.lg,
+      gap: theme.spacing.md,
+    },
+    editActionButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: theme.spacing.md,
+      borderRadius: theme.borderRadius.lg,
+      gap: theme.spacing.sm,
+    },
+    editActionButtonText: {
+      fontSize: theme.typography.fontSize.md,
+      fontFamily: theme.typography.fontFamily.semibold,
+    },
     trackList: {
       paddingHorizontal: theme.spacing.lg,
+    },
+    editTrackRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.lg,
+    },
+    dragHandle: {
+      width: 40,
+      height: 56,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    removeButton: {
+      width: 40,
+      height: 56,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    editTrackInfo: {
+      flex: 1,
     },
     emptyContainer: {
       paddingVertical: theme.spacing.xxl,
@@ -171,9 +221,10 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
     },
   }), [theme]);
 
-  const getTotalDuration = () => {
-    if (!playlist?.entry) return '0:00';
-    const total = playlist.entry.reduce((sum: number, track: Track) => sum + (track.duration || 0), 0);
+  const getTotalDuration = (tracks?: Track[]) => {
+    const list = tracks || playlist?.entry;
+    if (!list) return '0:00';
+    const total = list.reduce((sum: number, track: Track) => sum + (track.duration || 0), 0);
     const mins = Math.floor(total / 60);
     return `${mins} min`;
   };
@@ -239,9 +290,84 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
     navigate({ name: 'artist-detail', params: { artistId } });
   };
 
+  const handleStartEdit = () => {
+    if (!playlist?.entry) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setEditedTracks([...playlist.entry]);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIsEditing(false);
+    setEditedTracks([]);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!playlist?.entry) return;
+
+    const originalIds = playlist.entry.map((t: Track) => t.id);
+    const newIds = editedTracks.map((t: Track) => t.id);
+    const hasChanges = originalIds.length !== newIds.length || originalIds.some((id: string, i: number) => id !== newIds[i]);
+
+    if (!hasChanges) {
+      setIsEditing(false);
+      setEditedTracks([]);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const originalCount = playlist.entry.length;
+      const indicesToRemove = Array.from({ length: originalCount }, (_, i) => i);
+      const songIdsToAdd = editedTracks.map((t: Track) => t.id);
+      await updatePlaylist(playlistId, undefined, undefined, undefined, songIdsToAdd, indicesToRemove);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setIsEditing(false);
+      setEditedTracks([]);
+      refetch();
+    } catch (err) {
+      console.error('[PlaylistDetail] Failed to save reorder:', err);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to save changes', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDragEnd = useCallback(({ from, to }: { from: number; to: number }) => {
+    if (from === to) return;
+    setEditedTracks((prev) => {
+      const newTracks = [...prev];
+      const [moved] = newTracks.splice(from, 1);
+      newTracks.splice(to, 0, moved);
+      return newTracks;
+    });
+  }, []);
+
+  const handleRemoveTrack = useCallback((index: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setEditedTracks((prev) => {
+      const newTracks = [...prev];
+      newTracks.splice(index, 1);
+      return newTracks;
+    });
+  }, []);
+
   const renderHeaderBackground = () => {
     if (backgroundStyle === 'solid') {
       return null;
+    }
+
+    if (backgroundStyle === 'dynamicColor' && coverArtUrl) {
+      const bgColor = playlistColors.background || theme.colors.background.primary;
+      return (
+        <LinearGradient
+          colors={[bgColor, bgColor, 'transparent']}
+          locations={[0, 0.7, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+      );
     }
 
     if (backgroundStyle === 'gradient' && coverArtUrl) {
@@ -250,8 +376,8 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
         <LinearGradient
           colors={
             isDark
-              ? [playlistColors.primary + '50', playlistColors.secondary + '70', theme.colors.background.primary]
-              : [playlistColors.primary + '30', playlistColors.secondary + '40', theme.colors.background.primary]
+              ? [playlistColors.primary + '30', playlistColors.secondary + '40', 'transparent']
+              : [playlistColors.primary + '15', playlistColors.secondary + '20', 'transparent']
           }
           style={StyleSheet.absoluteFill}
           start={{ x: 0, y: 0 }}
@@ -273,10 +399,10 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
           <LinearGradient
             colors={
               isDark
-                ? ['transparent', 'rgba(0, 0, 0, 0.6)', theme.colors.background.primary]
-                : ['transparent', 'rgba(255, 255, 255, 0.6)', theme.colors.background.primary]
+                ? ['transparent', 'rgba(0, 0, 0, 0.3)', theme.colors.background.primary]
+                : ['transparent', 'rgba(255, 255, 255, 0.3)', theme.colors.background.primary]
             }
-            locations={[0, 0.6, 1]}
+            locations={[0, 0.5, 1]}
             style={StyleSheet.absoluteFill}
           />
         </>
@@ -285,6 +411,35 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
 
     return null;
   };
+
+  const renderEditItem = useCallback(({ item, getIndex, drag, isActive }: RenderItemParams<Track>) => {
+    const index = getIndex() ?? 0;
+    return (
+      <View style={[styles.editTrackRow, isActive && { backgroundColor: theme.colors.background.card, borderRadius: theme.borderRadius.md }]}>
+        <TouchableOpacity
+          style={styles.dragHandle}
+          onLongPress={() => { drag(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}
+          delayLongPress={150}
+        >
+          <GripVertical size={20} color={theme.colors.text.tertiary} strokeWidth={2} />
+        </TouchableOpacity>
+        <View style={styles.editTrackInfo}>
+          <TrackRow
+            track={item}
+            onPress={() => {}}
+            showArtwork={false}
+            showMenu={false}
+          />
+        </View>
+        <TouchableOpacity
+          style={styles.removeButton}
+          onPress={() => handleRemoveTrack(index)}
+        >
+          <X size={20} color={theme.colors.error} strokeWidth={2} />
+        </TouchableOpacity>
+      </View>
+    );
+  }, [theme, styles, handleRemoveTrack]);
 
   if (isLoading) {
     return <LoadingSpinner message="Loading playlist..." />;
@@ -299,6 +454,133 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
     );
   }
 
+  const renderHeaderContent = () => (
+    <>
+      <View style={styles.headerSection}>
+        {renderHeaderBackground()}
+        <View style={styles.header}>
+          <Image
+            source={
+              coverArtUrl
+                ? { uri: coverArtUrl }
+                : require('../../../assets/images/album_art_placeholder.png')
+            }
+            style={styles.coverArt}
+          />
+
+          <Text style={styles.title} numberOfLines={2}>
+            {playlist.name}
+          </Text>
+
+          {playlist.comment && (
+            <Text style={styles.comment} numberOfLines={2}>
+              {playlist.comment}
+            </Text>
+          )}
+
+          <View style={styles.metadata}>
+            <Text style={styles.metadataText}>
+              {isEditing
+                ? `${editedTracks.length} songs • ${getTotalDuration(editedTracks)}`
+                : `${playlist.songCount || playlist.entry?.length || 0} songs • ${getTotalDuration()}`}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {isEditing ? (
+        <View style={styles.editActions}>
+          <TouchableOpacity
+            style={[styles.editActionButton, { backgroundColor: theme.colors.background.card, borderWidth: 1, borderColor: theme.colors.border }]}
+            onPress={handleCancelEdit}
+            activeOpacity={0.8}
+            disabled={isSaving}
+          >
+            <X size={20} color={theme.colors.text.primary} />
+            <Text style={styles.editActionButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.editActionButton, { backgroundColor: playlistColors.primary }]}
+            onPress={handleSaveEdit}
+            activeOpacity={0.8}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color={playlistColors.textColor} />
+            ) : (
+              <Check size={20} color={playlistColors.textColor} />
+            )}
+            <Text style={[styles.editActionButtonText, { color: playlistColors.textColor }]}>
+              {isSaving ? 'Saving...' : 'Done'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.playButton, { backgroundColor: playlistColors.primary }]}
+            onPress={handlePlayAll}
+            activeOpacity={0.8}
+          >
+            <Play size={24} color={playlistColors.textColor} fill={playlistColors.textColor} />
+            <Text style={[styles.playButtonText, { color: playlistColors.textColor }]}>Play</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.shuffleButton}
+            onPress={handleShuffle}
+            activeOpacity={0.8}
+          >
+            <Shuffle size={20} color={theme.colors.text.primary} />
+            <Text style={styles.shuffleButtonText}>Shuffle</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.iconButton}
+            activeOpacity={0.8}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowPlaylistMenu(true);
+            }}
+          >
+            <MoreVertical size={24} color={theme.colors.text.secondary} />
+          </TouchableOpacity>
+        </View>
+      )}
+    </>
+  );
+
+  if (isEditing) {
+    return (
+      <GestureHandlerRootView style={styles.container}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => goBack()}
+          activeOpacity={0.7}
+        >
+          <ChevronLeft size={28} color={theme.colors.text.primary} strokeWidth={2.5} />
+        </TouchableOpacity>
+
+        <DraggableFlatList
+          data={editedTracks}
+          renderItem={renderEditItem}
+          keyExtractor={(item: Track, index: number) => `${item.id}-${index}`}
+          onDragEnd={handleDragEnd}
+          ListHeaderComponent={() => (
+            <>
+              {renderHeaderContent()}
+            </>
+          )}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+          activationDistance={10}
+          autoscrollThreshold={50}
+          autoscrollSpeed={100}
+        />
+      </GestureHandlerRootView>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <TouchableOpacity
@@ -310,66 +592,7 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
       </TouchableOpacity>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.headerSection}>
-          {renderHeaderBackground()}
-          <View style={styles.header}>
-            <Image
-              source={
-                coverArtUrl
-                  ? { uri: coverArtUrl }
-                  : require('../../../assets/images/album_art_placeholder.png')
-              }
-              style={styles.coverArt}
-            />
-
-            <Text style={styles.title} numberOfLines={2}>
-              {playlist.name}
-            </Text>
-
-            {playlist.comment && (
-              <Text style={styles.comment} numberOfLines={2}>
-                {playlist.comment}
-              </Text>
-            )}
-
-            <View style={styles.metadata}>
-              <Text style={styles.metadataText}>
-                {playlist.songCount || playlist.entry?.length || 0} songs • {getTotalDuration()}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.playButton, { backgroundColor: playlistColors.primary }]}
-              onPress={handlePlayAll}
-              activeOpacity={0.8}
-            >
-              <Play size={24} color={playlistColors.textColor} fill={playlistColors.textColor} />
-              <Text style={[styles.playButtonText, { color: playlistColors.textColor }]}>Play</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.shuffleButton}
-              onPress={handleShuffle}
-              activeOpacity={0.8}
-            >
-              <Shuffle size={20} color={theme.colors.text.primary} />
-              <Text style={styles.shuffleButtonText}>Shuffle</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.iconButton}
-              activeOpacity={0.8}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setShowPlaylistMenu(true);
-              }}
-            >
-              <MoreVertical size={24} color={theme.colors.text.secondary} />
-            </TouchableOpacity>
-          </View>
-        </View>
+        {renderHeaderContent()}
 
         <View style={styles.trackList}>
           {playlist.entry && playlist.entry.length > 0 ? (
@@ -382,7 +605,7 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   trackMenuState.openTrackMenu(track);
                 }}
-                showArtwork={false}
+                showArtwork={true}
                 showMenu={true}
                 onMenuPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -444,6 +667,10 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
         coverArtUrl={coverArtUrl || undefined}
         onPlay={handlePlayAll}
         onShuffle={handleShuffle}
+        onEdit={() => {
+          setShowPlaylistMenu(false);
+          setTimeout(handleStartEdit, 200);
+        }}
         onPlayNext={handlePlayNext}
         onAddToQueue={handleAddToQueue}
         onDelete={() => {

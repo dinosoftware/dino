@@ -3,7 +3,7 @@ module.exports = {
     name: "Dino",
     slug: "dino",
     scheme: "dino",
-    version: "2.5.0",
+    version: "2.6.0",
     orientation: "default",
     icon: "./assets/images/icon-square.png",
     userInterfaceStyle: "dark",
