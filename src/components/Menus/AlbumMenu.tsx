@@ -245,18 +245,16 @@ export const AlbumMenu: React.FC<AlbumMenuProps> = ({
       return;
     }
 
-    try {
-      await downloadService.downloadAlbum(album);
+    onClose();
+    downloadService.downloadAlbum(album).then(() => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showToast(`Downloading ${album.songCount} tracks`);
-      onClose();
-    } catch (error) {
+    }).catch((error) => {
       showToast(
         error instanceof Error ? error.message : 'Failed to download album',
         'error'
       );
-      onClose();
-    }
+    });
   };
 
   const handleShare = async () => {

@@ -93,6 +93,17 @@ interface DownloadStore {
   saveToStorage: () => void;
 }
 
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+
+const flushSave = (get: () => DownloadStore) => {
+  const state = get();
+  Promise.all([
+    AsyncStorage.setItem(STORAGE_KEYS.DOWNLOADED_TRACKS, JSON.stringify(state.downloadedTracks)),
+    AsyncStorage.setItem(STORAGE_KEYS.DOWNLOADED_ALBUMS, JSON.stringify(state.downloadedAlbums)),
+    AsyncStorage.setItem(STORAGE_KEYS.DOWNLOADED_PLAYLISTS, JSON.stringify(state.downloadedPlaylists)),
+  ]).catch((error) => console.error('Failed to save downloads to storage:', error));
+};
+
 export const useDownloadStore = create<DownloadStore>((set, get) => ({
   activeDownloads: {},
   downloadedTracks: {},
@@ -411,11 +422,10 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
   },
 
   saveToStorage: () => {
-    const state = get();
-    Promise.all([
-      AsyncStorage.setItem(STORAGE_KEYS.DOWNLOADED_TRACKS, JSON.stringify(state.downloadedTracks)),
-      AsyncStorage.setItem(STORAGE_KEYS.DOWNLOADED_ALBUMS, JSON.stringify(state.downloadedAlbums)),
-      AsyncStorage.setItem(STORAGE_KEYS.DOWNLOADED_PLAYLISTS, JSON.stringify(state.downloadedPlaylists)),
-    ]).catch((error) => console.error('Failed to save downloads to storage:', error));
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+      saveTimeout = null;
+      flushSave(get);
+    }, 3000);
   },
 }));

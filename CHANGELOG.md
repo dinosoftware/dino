@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-04-26
+
+### Added
+- **Download Library**: New "Download Library" button in User Settings Menu
+  - Fetches all albums from server, compares with downloaded ones
+  - Queues missing albums for download, skips already-downloaded ones
+  - Re-downloads albums when new songs have been added (detects `songCount` mismatch)
+- **Cancel Download Button**: Active downloads in Downloads screen now show an X button to cancel
+  - Cancels all child track downloads for album/playlist groups
+  - Removes queued tracks and cleans up partial files
+  - Properly cancels individual track downloads
+
+### Changed
+- **Download Concurrency Overhaul**: Complete rewrite of `DownloadService` for proper parallel downloading
+  - Replaced item-level queue with flat track-level queue — tracks within albums now download in parallel (up to `maxConcurrentDownloads`)
+  - Event-driven scheduling replaces polling loop — no more `setTimeout(1000)` checks
+  - Album/playlist groups track completion and finalize when all tracks finish
+  - Skips already-downloaded tracks instantly (counts toward group completion)
+  - Progress throttle increased to 2000ms to reduce store update overhead
+- **Download Persistence**: `saveToStorage` now debounced to 3 seconds
+  - Previously serialized ALL downloads to AsyncStorage after every single track — 20× per album
+  - Now batches all changes between track completions into a single write
+- **Non-Blocking Download Menus**: Album/Playlist/Track menus close immediately when starting a download
+  - Previously `await`ed the entire download setup before closing, freezing the menu
+  - Now fires download in background and closes menu instantly
+- **Version bumped to 2.5.0**
+
+### Fixed
+- **Download Cancel Not Working**: Cancelling an album download now actually stops all running track downloads
+  - Added `cancelledGroups` set — tracks check cancellation at 4 points during download
+  - Added `trackToGroup` map — cancel can find and kill all child resumables
+  - Deletes partial files for cancelled tracks
+- **App Lag During Downloads**: Fixed excessive re-renders caused by download progress updates
+  - QueueScreen no longer subscribes to entire download store (uses selective selectors)
+  - AlbumCard, TrackRow, and other components already used selective subscriptions
+  - Debounced storage saves eliminate redundant AsyncStorage writes
+
 ## [2.0.2] - 2026-04-26
 
 ### Fixed

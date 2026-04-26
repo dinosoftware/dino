@@ -3,7 +3,7 @@
  * Comprehensive offline downloads management
  */
 
-import { Download, Play, Shuffle, Trash2 } from 'lucide-react-native';
+import { Download, Play, Shuffle, Trash2, X } from 'lucide-react-native';
 import React, { useState, useMemo } from 'react';
 import {
   FlatList,
@@ -444,10 +444,21 @@ export const DownloadsScreen: React.FC = () => {
     </View>
   );
 
+  const handleCancelDownload = async (itemId: string) => {
+    try {
+      await downloadService.cancelDownload(itemId);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Download cancelled');
+    } catch (error) {
+      showToast('Failed to cancel download', 'error');
+    }
+  };
+
   const renderActiveDownload = ({ item }: { item: any }) => {
     const progressPercent = Math.round(item.progress * 100);
     const isComplete = item.status === 'completed';
     const isFailed = item.status === 'failed';
+    const isCancellable = item.status === 'downloading' || item.status === 'pending';
 
     const title = item.title || 'Downloading...';
     let subtitle = '';
@@ -491,6 +502,14 @@ export const DownloadsScreen: React.FC = () => {
             </>
           )}
         </View>
+        {isCancellable && (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => handleCancelDownload(item.itemId)}
+          >
+            <X size={18} color={theme.colors.text.secondary} />
+          </TouchableOpacity>
+        )}
       </View>
     );
   };

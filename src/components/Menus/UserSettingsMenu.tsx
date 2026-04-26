@@ -12,6 +12,7 @@ import {
   Code,
   Dices,
   Download,
+  FolderDown,
   Info,
   LogOut,
   RefreshCw,
@@ -33,6 +34,7 @@ import {
 } from 'react-native';
 import { getRandomSongs } from '../../api/opensubsonic/songs';
 import { startScan } from '../../api/opensubsonic/system';
+import { downloadService } from '../../services/DownloadService';
 import { queueSyncManager } from '../../services/player/QueueSyncManager';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuthStore } from '../../stores/authStore';
@@ -280,6 +282,25 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
     }
   };
 
+  const handleDownloadLibrary = async () => {
+    onClose();
+    try {
+      showToast('Scanning library for downloads...');
+      const result = await downloadService.downloadLibrary();
+      const parts: string[] = [];
+      if (result.queued > 0) parts.push(`${result.queued} new`);
+      if (result.updated > 0) parts.push(`${result.updated} updated`);
+      if (parts.length > 0) {
+        showToast(`Downloading ${parts.join(', ')} (${result.skipped} already downloaded)`);
+      } else {
+        showToast('All albums already downloaded');
+      }
+    } catch (error) {
+      console.error('Failed to download library:', error);
+      showToast(error instanceof Error ? error.message : 'Failed to download library', 'error');
+    }
+  };
+
   const handleLogout = () => {
     onClose();
     onLogout();
@@ -341,6 +362,12 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
                 icon={<Download size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                 label="Get Server Queue"
                 onPress={handleGetServerQueue}
+                theme={theme}
+              />
+              <MenuItem
+                icon={<FolderDown size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Download Library"
+                onPress={handleDownloadLibrary}
                 theme={theme}
               />
               <MenuItem

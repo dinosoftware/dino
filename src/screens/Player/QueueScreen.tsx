@@ -254,7 +254,9 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
   const flatListRef = useRef<any>(null);
   const hasScrolledToCurrentRef = useRef(false);
 
-  const { downloadedAlbums, downloadedPlaylists, downloadedTracks } = useDownloadStore();
+  const downloadedAlbums = useDownloadStore((s) => s.downloadedAlbums);
+  const downloadedPlaylists = useDownloadStore((s) => s.downloadedPlaylists);
+  const downloadedTracks = useDownloadStore((s) => s.downloadedTracks);
 
   const downloadCoverArtMap = useMemo(() => {
     const map = new Map<string, string>();

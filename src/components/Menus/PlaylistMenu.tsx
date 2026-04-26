@@ -229,18 +229,16 @@ export const PlaylistMenu: React.FC<PlaylistMenuProps> = ({
       return;
     }
 
-    try {
-      await downloadService.downloadPlaylist(playlist);
+    onClose();
+    downloadService.downloadPlaylist(playlist).then(() => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showToast(`Downloading ${playlist.songCount} tracks`);
-      onClose();
-    } catch (error) {
+    }).catch((error) => {
       showToast(
         error instanceof Error ? error.message : 'Failed to download playlist',
         'error'
       );
-      onClose();
-    }
+    });
   };
 
   return (

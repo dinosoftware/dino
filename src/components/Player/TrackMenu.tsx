@@ -260,18 +260,16 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
       return;
     }
 
-    try {
-      await downloadService.downloadTrack(track);
+    onClose();
+    downloadService.downloadTrack(track).then(() => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showToast('Download started');
-      onClose();
-    } catch (error) {
+    }).catch((error) => {
       showToast(
         error instanceof Error ? error.message : 'Failed to download',
         'error'
       );
-      onClose();
-    }
+    });
   };
 
   const handleShare = async () => {
