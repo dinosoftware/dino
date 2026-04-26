@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Server Queue Position Persisting**: When queue is restored from server with a seek position, changing tracks or queue no longer preserves the old seek position on the new track
   - `skipToTrack()` now clears `restoredPosition` since any track change invalidates the server seek position
 - **Playlist Edit Mode Background Cutoff**: Gradient background in edit mode no longer has visible left/right gaps — padding moved from list container to individual rows so header extends full width
+- **Keyboard Avoiding on Android**: Text inputs in modals and auth screens now properly adjust when the keyboard opens
+  - Added `adjustResize` to Android manifest via config plugin (native, no JS overhead)
+  - Changed `KeyboardAvoidingView` behavior from `undefined` to `'height'` on Android — previous value was a no-op
+  - Applied to: LoginScreen, ServerSetupScreen, CreatePlaylistModal, EditShareModal, Settings edit server modal
 
 ## [2.5.0] - 2026-04-26
 

@@ -16,6 +16,7 @@ const withAndroidConfigChanges = (config) => {
     if (activity) {
       activity.$['android:configChanges'] = 
         'keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode|smallestScreenSize|density';
+      activity.$['android:windowSoftInputMode'] = 'adjustResize';
     }
     
     return config;

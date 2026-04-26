@@ -7,7 +7,9 @@ import * as Haptics from 'expo-haptics';
 import { ArrowLeft, Check, ChevronRight, Edit3, Plus, Server as ServerIcon, Trash2 } from 'lucide-react-native';
 import React, { useState, useMemo } from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -700,10 +702,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
+            </ScrollView>
+          </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
   );
 
   return (
@@ -1233,6 +1235,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
         statusBarTranslucent
         onRequestClose={() => setActiveModal(null)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <TouchableOpacity
             style={styles.modalBackdrop}
@@ -1344,6 +1347,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
             </ScrollView>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

@@ -12,6 +12,8 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { X } from 'lucide-react-native';
@@ -174,6 +176,7 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
       statusBarTranslucent
       onRequestClose={handleClose}
     >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <View style={styles.overlay}>
         <View style={styles.modal}>
           <View style={styles.header}>
@@ -234,6 +237,7 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

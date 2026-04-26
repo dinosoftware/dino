@@ -13,6 +13,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Switch,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { X, Calendar } from 'lucide-react-native';
@@ -210,6 +212,7 @@ export const EditShareModal: React.FC<EditShareModalProps> = ({
       statusBarTranslucent
       onRequestClose={handleClose}
     >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <View style={styles.overlay}>
         <View style={styles.modal}>
           <View style={styles.header}>
@@ -298,6 +301,7 @@ export const EditShareModal: React.FC<EditShareModalProps> = ({
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
