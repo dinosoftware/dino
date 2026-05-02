@@ -27,13 +27,10 @@ const triggerSync = (debounced: boolean = true) => {
 };
 
 const triggerNativeSync = () => {
-  if (syncQueueCallback) {
-    const result = syncQueueCallback();
-    if (result && typeof result.catch === 'function') {
-      result.catch((error: unknown) => {
-        console.error('[QueueStore] Failed to sync queue with native player:', error);
-      });
-    }
+  if (nativeRebuildCallback) {
+    nativeRebuildCallback().catch((error: unknown) => {
+      console.error('[QueueStore] Failed to rebuild native queue:', error);
+    });
   }
 };
 
@@ -50,16 +47,28 @@ const clearRestoredPosition = () => {
   }
 };
 
-// Callback to sync queue with TrackPlayer (set by TrackPlayerService)
-let syncQueueCallback: (() => Promise<void>) | null = null;
 let clearPreloadedTracksCallback: (() => void) | null = null;
-
-export const setSyncQueueCallback = (callback: () => Promise<void>) => {
-  syncQueueCallback = callback;
-};
 
 export const setClearPreloadedTracksCallback = (callback: () => void) => {
   clearPreloadedTracksCallback = callback;
+};
+
+let nativeAddToQueueCallback: ((trackId: string, position: 'next' | 'end') => Promise<void>) | null = null;
+let nativeRemoveFromQueueCallback: ((nativeIndex: number) => Promise<void>) | null = null;
+let nativeReorderQueueCallback: ((fromNativeIndex: number, toNativeIndex: number) => Promise<void>) | null = null;
+let nativeRebuildCallback: (() => Promise<void>) | null = null;
+
+export const setNativeAddToQueueCallback = (cb: (trackId: string, position: 'next' | 'end') => Promise<void>) => {
+  nativeAddToQueueCallback = cb;
+};
+export const setNativeRemoveFromQueueCallback = (cb: (nativeIndex: number) => Promise<void>) => {
+  nativeRemoveFromQueueCallback = cb;
+};
+export const setNativeReorderQueueCallback = (cb: (fromNativeIndex: number, toNativeIndex: number) => Promise<void>) => {
+  nativeReorderQueueCallback = cb;
+};
+export const setNativeRebuildCallback = (cb: () => Promise<void>) => {
+  nativeRebuildCallback = cb;
 };
 
 // Callbacks for player operations (set by NitroPlayerService)
@@ -253,7 +262,14 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     }
     
     triggerSync(true);
-    triggerNativeSync();
+
+    if (nativeAddToQueueCallback) {
+      for (const t of tracksArray) {
+        nativeAddToQueueCallback(t.id, position).catch((err: Error) => {
+          console.error('[QueueStore] Failed to add track to native queue:', err);
+        });
+      }
+    }
   },
 
   removeFromQueue: (index) => {
@@ -293,12 +309,16 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         });
       }
     } else if (index === oldCurrentIndex + 1) {
-      // Removed the immediate next track - preloaded track is now stale
       clearPreloadedTracks();
     }
     
     triggerSync(true);
-    triggerNativeSync();
+
+    if (!removingCurrentTrack && nativeRemoveFromQueueCallback) {
+      nativeRemoveFromQueueCallback(index).catch((err: Error) => {
+        console.error('[QueueStore] Failed to remove track from native queue:', err);
+      });
+    }
   },
 
   reorderQueue: (fromIndex, toIndex) => {
@@ -341,7 +361,12 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     }
     
     triggerSync(true);
-    triggerNativeSync();
+
+    if (nativeReorderQueueCallback) {
+      nativeReorderQueueCallback(fromIndex, toIndex).catch((err: Error) => {
+        console.error('[QueueStore] Failed to reorder native queue:', err);
+      });
+    }
   },
 
   clearQueue: async (clearServerQueue = true) => {

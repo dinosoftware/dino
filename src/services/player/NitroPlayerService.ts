@@ -3,17 +3,19 @@
  * Audio playback engine with react-native-nitro-player
  */
 
+import { PermissionsAndroid, Platform } from 'react-native';
 import * as Network from 'expo-network';
 import { TrackPlayer, PlayerQueue, AndroidAutoMediaLibraryHelper, DownloadManager } from 'react-native-nitro-player';
 import type { TrackItem, RepeatMode as NitroRepeatMode } from 'react-native-nitro-player';
-import { getCoverArtUrl, getStreamUrl } from '../../api/opensubsonic/streaming';
+import { getStreamUrl } from '../../api/opensubsonic/streaming';
+import { getCachedArtworkUri } from '../../utils/artworkCache';
 import { getSimilarSongs2 } from '../../api/opensubsonic/radio';
 import { getAlbumList2, getAlbum } from '../../api/opensubsonic/albums';
 import { getPlaylists, getPlaylist } from '../../api/opensubsonic/playlists';
 import { Track } from '../../api/opensubsonic/types';
 import { usePlayerStore, useQueueStore, useSettingsStore } from '../../stores';
 import { useDownloadStore } from '../../stores/downloadStore';
-import { setClearRestoredPositionCallback, setSyncQueueCallback, setClearPreloadedTracksCallback, setResetPlayerCallback, setSkipToNextPlayerCallback, setPlayTrackCallback } from '../../stores/queueStore';
+import { setClearRestoredPositionCallback, setClearPreloadedTracksCallback, setResetPlayerCallback, setSkipToNextPlayerCallback, setPlayTrackCallback, setNativeAddToQueueCallback, setNativeRemoveFromQueueCallback, setNativeReorderQueueCallback, setNativeRebuildCallback } from '../../stores/queueStore';
 import { queueSyncManager } from './QueueSyncManager';
 import { scrobblingManager } from './ScrobblingManager';
 import { useRemotePlaybackStore } from '../../stores/remotePlaybackStore';
@@ -98,6 +100,12 @@ class NitroPlayerService implements PlayerService {
   private async _doInitialize() {
     console.log('[NitroPlayer] Initializing...');
 
+    if (Platform.OS === 'android') {
+      try {
+        await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+      } catch {}
+    }
+
     try {
       await TrackPlayer.configure({
         showInNotification: true,
@@ -117,13 +125,26 @@ class NitroPlayerService implements PlayerService {
         usePlayerStore.setState({ restoredPosition: null });
       });
 
-      setSyncQueueCallback(async () => {
-        this.syncPromise = this.syncQueueWithNative();
-      });
       setClearPreloadedTracksCallback(() => { this.clearPreloadedTracks().catch(() => {}); });
       setResetPlayerCallback(() => this.resetPlayer());
       setSkipToNextPlayerCallback(() => this.skipToNext());
       setPlayTrackCallback((index: number) => this.playTrack(index));
+
+      setNativeRebuildCallback(async () => {
+        this.syncPromise = this.syncQueueWithNative();
+      });
+
+      setNativeAddToQueueCallback(async (trackId: string, position: 'next' | 'end') => {
+        await this.nativeAddToQueue(trackId, position);
+      });
+
+      setNativeRemoveFromQueueCallback(async (nativeIndex: number) => {
+        await this.nativeRemoveFromQueue(nativeIndex);
+      });
+
+      setNativeReorderQueueCallback(async (fromIndex: number, toIndex: number) => {
+        await this.nativeReorderQueue(fromIndex, toIndex);
+      });
 
       await useSettingsStore.getState().loadFromStorage();
       console.log('[NitroPlayer] Settings loaded');
@@ -471,18 +492,33 @@ class NitroPlayerService implements PlayerService {
     }
   }
 
+  private async buildLazyTrackItem(track: Track, index: number): Promise<TrackItem> {
+    let artwork: string | undefined;
+    if (track.coverArt) {
+      try { artwork = (await getCachedArtworkUri(track.coverArt, 500)) ?? undefined; } catch {}
+    }
+
+    return {
+      id: track.id,
+      title: track.title,
+      artist: getTrackArtistString(track),
+      album: track.album || 'Unknown Album',
+      duration: track.duration,
+      url: '',
+      artwork,
+      extraPayload: {
+        queueIndex: index,
+      },
+    };
+  }
+
   private async buildTrackItem(track: Track, index: number, streamingSettings: any): Promise<TrackItem> {
     const url = await getStreamUrl(track.id, streamingSettings.maxBitRate, streamingSettings.format);
 
-    const downloadedTrack = useDownloadStore.getState().getDownloadedTrack(track.id);
     let artwork: string | undefined;
-    if (downloadedTrack?.coverArtUri) {
-      artwork = downloadedTrack.coverArtUri;
-    } else if (track.coverArt) {
-      try { artwork = await getCoverArtUrl(track.coverArt, 500); } catch {}
+    if (track.coverArt) {
+      try { artwork = (await getCachedArtworkUri(track.coverArt, 500)) ?? undefined; } catch {}
     }
-
-    console.log('[NitroPlayer] buildTrackItem:', track.title, '| artwork:', artwork?.substring(0, 80) || 'NONE', '| downloaded:', !!downloadedTrack);
 
     return {
       id: track.id,
@@ -535,10 +571,14 @@ private async ensurePlaylistSynced(): Promise<void> {
 
     const streamingSettings = await this.getActiveStreamingSettings();
 
-    const trackItems: TrackItem[] = [];
-    for (let i = 0; i < queue.length; i++) {
-      trackItems.push(await this.buildTrackItem(queue[i], i, streamingSettings));
-    }
+    const trackItems: TrackItem[] = await Promise.all(
+      queue.map((track, i) => {
+        if (i === currentIndex || (i >= currentIndex + 1 && i <= currentIndex + 2)) {
+          return this.buildTrackItem(track, i, streamingSettings);
+        }
+        return this.buildLazyTrackItem(track, i);
+      })
+    );
 
     console.log('[NitroPlayer] Adding', trackItems.length, 'tracks to playlist', id);
     console.log('[NitroPlayer] First track:', JSON.stringify({ id: trackItems[0]?.id, title: trackItems[0]?.title, url: trackItems[0]?.url?.substring(0, 60) }));
@@ -921,6 +961,45 @@ private async ensurePlaylistSynced(): Promise<void> {
         setTimeout(() => this.syncQueueWithNative(), 100);
       }
     }
+  }
+
+  private async nativeAddToQueue(trackId: string, position: 'next' | 'end') {
+    if (!this.playlistId) return;
+    const { queue, currentIndex } = useQueueStore.getState();
+    const track = queue.find(t => t.id === trackId);
+    if (!track) return;
+
+    const streamingSettings = await this.getActiveStreamingSettings();
+    const trackItem = await this.buildTrackItem(track, position === 'next' ? currentIndex + 1 : queue.length, streamingSettings);
+
+    const insertIndex = position === 'next' ? currentIndex + 1 : undefined;
+
+    await PlayerQueue.addTrackToPlaylist(this.playlistId, trackItem, insertIndex);
+    this.lastQueueHash = '';
+    console.log('[NitroPlayer] Native add:', track.title, 'at', position);
+  }
+
+  private async nativeRemoveFromQueue(nativeIndex: number) {
+    if (!this.playlistId) return;
+    const playlist = PlayerQueue.getPlaylist(this.playlistId);
+    if (!playlist || nativeIndex >= playlist.tracks.length) return;
+
+    const trackId = playlist.tracks[nativeIndex].id;
+    await PlayerQueue.removeTrackFromPlaylist(this.playlistId, trackId);
+    this.lastQueueHash = '';
+    console.log('[NitroPlayer] Native remove at index:', nativeIndex);
+  }
+
+  private async nativeReorderQueue(fromIndex: number, toIndex: number) {
+    if (!this.playlistId) return;
+    const playlist = PlayerQueue.getPlaylist(this.playlistId);
+    if (!playlist) return;
+    if (fromIndex >= playlist.tracks.length || toIndex >= playlist.tracks.length) return;
+
+    const trackId = playlist.tracks[fromIndex].id;
+    await PlayerQueue.reorderTrackInPlaylist(this.playlistId, trackId, toIndex);
+    this.lastQueueHash = '';
+    console.log('[NitroPlayer] Native reorder:', fromIndex, '->', toIndex);
   }
 
   async clearPreloadedTracks() {
