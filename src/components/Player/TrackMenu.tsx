@@ -36,7 +36,7 @@ import { Artist, Track } from '../../api/opensubsonic/types';
 import { useCoverArt } from '../../hooks/api';
 import { useTheme } from '../../hooks/useTheme';
 import { downloadService } from '../../services/DownloadService';
-import { trackPlayerService } from '../../services/player/TrackPlayerService';
+import { nitroPlayerService } from '../../services/player/NitroPlayerService';
 import { useQueueStore } from '../../stores';
 import { useDownloadStore } from '../../stores/downloadStore';
 import { useFavoritesStore } from '../../stores/favoritesStore';
@@ -60,12 +60,14 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
   const theme = useTheme();
   const translateY = useRef(new Animated.Value(0)).current;
   const { data: coverArtUrl } = useCoverArt(track?.coverArt, 200);
-  const { addToQueue, setQueue } = useQueueStore();
-  const { isTrackStarred, toggleTrackStar } = useFavoritesStore();
+  const addToQueue = useQueueStore((state) => state.addToQueue);
+  const setQueue = useQueueStore((state) => state.setQueue);
+  const isTrackStarred = useFavoritesStore((state) => state.isTrackStarred);
+  const toggleTrackStar = useFavoritesStore((state) => state.toggleTrackStar);
   const isTrackDownloaded = useDownloadStore((state) => !!state.downloadedTracks[track?.id || '']);
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
-  const { navigate } = useNavigationStore();
-  const { showToast } = useToastStore();
+  const navigate = useNavigationStore((state) => state.navigate);
+  const showToast = useToastStore((state) => state.showToast);
 
   const styles = useMemo(() => StyleSheet.create({
     overlay: {
@@ -204,7 +206,7 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
       const mixQueue = [track, ...similarSongs];
       setQueue(mixQueue, 0);
       setCurrentTrack(track);
-      await trackPlayerService.play();
+      await nitroPlayerService.play();
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showToast(`Instant Mix started • ${mixQueue.length} songs`);

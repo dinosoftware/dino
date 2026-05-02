@@ -296,7 +296,8 @@ const TrackInfo = memo<{
   onShowArtistSelection: (artists: Artist[]) => void;
   styles: any 
 }>(({ track, onNavigate, onShowArtistSelection, styles }) => {
-  const { navigate, currentScreen } = useNavigationStore();
+  const navigate = useNavigationStore((state) => state.navigate);
+  const currentScreen = useNavigationStore((state) => state.currentScreen);
 
   const handleArtistPress = useCallback(() => {
     const artists = track.artists;
@@ -458,11 +459,13 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
   const streamingInfo = usePlayerStore((state) => state.streamingInfo);
   const activePlayerType = useRemotePlaybackStore((state) => state.activePlayerType);
   const isCasting = activePlayerType !== 'local';
-  const { setPlayerOverlay, setCloseOverlayCallback } = useNavigationStore();
+  const setPlayerOverlay = useNavigationStore((state) => state.setPlayerOverlay);
+  const setCloseOverlayCallback = useNavigationStore((state) => state.setCloseOverlayCallback);
 
   const { data: coverArtUrl } = useCoverArt(currentTrack?.coverArt, 500);
   const albumColors = useAlbumColors(coverArtUrl || undefined);
-  const { isTrackStarred, toggleTrackStar } = useFavoritesStore();
+  const isTrackStarred = useFavoritesStore((state) => state.isTrackStarred);
+  const toggleTrackStar = useFavoritesStore((state) => state.toggleTrackStar);
   const trackMenuState = useTrackMenuState();
   const [showLyrics, setShowLyrics] = useState(false);
   const [showQueue, setShowQueue] = useState(false);

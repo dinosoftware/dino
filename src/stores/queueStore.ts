@@ -5,7 +5,6 @@
 
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import TrackPlayer from 'react-native-track-player';
 import { Track } from '../api/opensubsonic/types';
 import { STORAGE_KEYS } from '../config/constants';
 import { usePlayerStore } from './playerStore';
@@ -24,6 +23,17 @@ export const setQueueSyncCallback = (callback: (debounced?: boolean) => void) =>
 const triggerSync = (debounced: boolean = true) => {
   if (queueSyncCallback) {
     queueSyncCallback(debounced);
+  }
+};
+
+const triggerNativeSync = () => {
+  if (syncQueueCallback) {
+    const result = syncQueueCallback();
+    if (result && typeof result.catch === 'function') {
+      result.catch((error: unknown) => {
+        console.error('[QueueStore] Failed to sync queue with native player:', error);
+      });
+    }
   }
 };
 
@@ -52,17 +62,26 @@ export const setClearPreloadedTracksCallback = (callback: () => void) => {
   clearPreloadedTracksCallback = callback;
 };
 
+// Callbacks for player operations (set by NitroPlayerService)
+let resetPlayerCallback: (() => Promise<void>) | null = null;
+let skipToNextPlayerCallback: (() => Promise<void>) | null = null;
+let playTrackCallback: ((index: number) => Promise<void>) | null = null;
+
+export const setResetPlayerCallback = (callback: () => Promise<void>) => {
+  resetPlayerCallback = callback;
+};
+
+export const setSkipToNextPlayerCallback = (callback: () => Promise<void>) => {
+  skipToNextPlayerCallback = callback;
+};
+
+export const setPlayTrackCallback = (callback: (index: number) => Promise<void>) => {
+  playTrackCallback = callback;
+};
+
 const clearPreloadedTracks = () => {
   if (clearPreloadedTracksCallback) {
     clearPreloadedTracksCallback();
-  }
-};
-
-const syncQueue = () => {
-  if (syncQueueCallback) {
-    syncQueueCallback().catch((error) => {
-      console.error('[QueueStore] Failed to sync queue with TrackPlayer:', error);
-    });
   }
 };
 
@@ -191,9 +210,6 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     
     // If queue is empty, create new queue and start playing
     if (state.queue.length === 0) {
-      const { usePlayerStore } = require('./playerStore');
-      const { trackPlayerService } = require('../services/player/TrackPlayerService');
-      
       set({
         queue: tracksArray,
         currentIndex: 0,
@@ -201,9 +217,12 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
       });
       
       usePlayerStore.getState().setCurrentTrack(tracksArray[0]);
-      trackPlayerService.playTrack(0).catch((err: Error) => {
-        console.error('[QueueStore] Failed to play track:', err);
-      });
+      
+      if (playTrackCallback) {
+        playTrackCallback(0).catch((err: Error) => {
+          console.error('[QueueStore] Failed to play track:', err);
+        });
+      }
       
       get().saveToStorage();
       triggerSync(true);
@@ -234,6 +253,7 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     }
     
     triggerSync(true);
+    triggerNativeSync();
   },
 
   removeFromQueue: (index) => {
@@ -267,15 +287,18 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     if (removingCurrentTrack && get().queue.length > 0) {
       // Removing current track - skip to next
       console.log('[QueueStore] Removed current track, skipping to next');
-      TrackPlayer.skipToNext().catch(err => {
-        console.error('[QueueStore] Failed to skip to next after removing current:', err);
-      });
+      if (skipToNextPlayerCallback) {
+        skipToNextPlayerCallback().catch(err => {
+          console.error('[QueueStore] Failed to skip to next after removing current:', err);
+        });
+      }
     } else if (index === oldCurrentIndex + 1) {
       // Removed the immediate next track - preloaded track is now stale
       clearPreloadedTracks();
     }
     
     triggerSync(true);
+    triggerNativeSync();
   },
 
   reorderQueue: (fromIndex, toIndex) => {
@@ -318,11 +341,14 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     }
     
     triggerSync(true);
+    triggerNativeSync();
   },
 
   clearQueue: async (clearServerQueue = true) => {
-    // Stop playback and reset TrackPlayer
-    await TrackPlayer.reset();
+    // Stop playback and reset player
+    if (resetPlayerCallback) {
+      await resetPlayerCallback();
+    }
     
     // Clear queue state
     set({
@@ -382,25 +408,27 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     });
     
     get().saveToStorage();
+    triggerNativeSync();
   },
 
   unshuffleQueue: () => {
     set((state) => {
       if (state.originalQueue.length === 0) return state;
-      
+
       const currentTrack = state.queue[state.currentIndex];
       const originalIndex = currentTrack
         ? state.originalQueue.findIndex((t) => t.id === currentTrack.id)
         : -1;
-      
+
       return {
         queue: state.originalQueue,
         currentIndex: originalIndex,
         originalQueue: [],
       };
     });
-    
+
     get().saveToStorage();
+    triggerNativeSync();
   },
 
   skipToTrack: (index) => {

@@ -3,13 +3,13 @@
  * Lyrics fetching, caching, and sync logic
  */
 
-import TrackPlayer from 'react-native-track-player';
 import * as FileSystem from 'expo-file-system';
 import { getLyricsBySongId } from '../../api/opensubsonic/lyrics';
 import { usePlayerStore } from '../../stores';
 import { useDownloadStore } from '../../stores/downloadStore';
 import { LYRICS_SYNC_CONFIG } from '../../config/constants';
 import { LyricLine } from '../../api/opensubsonic/types';
+import { playerRouter } from './PlayerRouter';
 
 class LyricsManager {
   private syncIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -258,7 +258,7 @@ class LyricsManager {
     // console.log('[Lyrics] Seeking to line:', line.value, 'at', positionSeconds, 'seconds');
     
     try {
-      await TrackPlayer.seekTo(positionSeconds);
+      await playerRouter.seekTo(positionSeconds);
       usePlayerStore.getState().setProgress(positionSeconds, usePlayerStore.getState().progress.duration);
     } catch (error) {
       console.error('[Lyrics] Failed to seek:', error);

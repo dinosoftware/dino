@@ -25,7 +25,7 @@ export const useAlbums = (
 };
 
 export const useAlbum = (albumId: string) => {
-  const { getDownloadedAlbum } = useDownloadStore();
+  const getDownloadedAlbum = useDownloadStore((state) => state.getDownloadedAlbum);
   
   return useQuery({
     queryKey: ['album', albumId],
@@ -48,7 +48,9 @@ export const useAlbum = (albumId: string) => {
 };
 
 export const useCoverArt = (coverArtId: string | undefined, size = 300) => {
-  const { downloadedAlbums, downloadedPlaylists, downloadedTracks } = useDownloadStore();
+  const downloadedAlbums = useDownloadStore((state) => state.downloadedAlbums);
+  const downloadedPlaylists = useDownloadStore((state) => state.downloadedPlaylists);
+  const downloadedTracks = useDownloadStore((state) => state.downloadedTracks);
   
   return useQuery({
     queryKey: ['coverArt', coverArtId, size],

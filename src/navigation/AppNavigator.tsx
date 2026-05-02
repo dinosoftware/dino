@@ -10,8 +10,8 @@ import { AuthNavigator } from './AuthNavigator';
 import { MainNavigator } from './MainNavigator';
 import { useServerStore, useAuthStore, useSettingsStore, useQueueStore } from '../stores';
 import { useFavoritesStore } from '../stores/favoritesStore';
-import { useDownloadStore } from '../stores/downloadStore';
-import { trackPlayerService } from '../services/player/TrackPlayerService';
+import { downloadService } from '../services/DownloadService';
+import { nitroPlayerService } from '../services/player/NitroPlayerService';
 import { queueSyncManager } from '../services/player/QueueSyncManager';
 import { getOpenSubsonicExtensions, supportsFormPost, supportsApiKeyAuth, supportsSongLyrics } from '../api/opensubsonic/extensions';
 import { apiClient } from '../api/client';
@@ -92,13 +92,13 @@ export const AppNavigator: React.FC = () => {
         await Promise.all([
           useAuthStore.getState().loadFromStorage(),
           useSettingsStore.getState().loadFromStorage(),
-          useDownloadStore.getState().loadFromStorage(),
+          downloadService.hydrateFromNitro(),
         ]);
         console.log('[AppNavigator] Stores loaded');
         
         // Initialize TrackPlayer (which will also initialize QueueManager)
         console.log('[AppNavigator] Initializing TrackPlayer...');
-        await trackPlayerService.initialize();
+        await nitroPlayerService.initialize();
         console.log('[AppNavigator] TrackPlayer initialized');
 
         // Get fresh state directly from stores

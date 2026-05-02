@@ -36,7 +36,7 @@ import { useCoverArt } from '../../hooks/api/useAlbums';
 import { usePlaylist } from '../../hooks/api/usePlaylists';
 import { useAlbumColors } from '../../hooks/useAlbumColors';
 import { useTrackMenuState } from '../../hooks/useTrackMenuState';
-import { trackPlayerService } from '../../services/player/TrackPlayerService';
+import { nitroPlayerService } from '../../services/player/NitroPlayerService';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useQueueStore } from '../../stores/queueStore';
@@ -236,7 +236,7 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
 
     setQueue(tracks, 0);
     setCurrentTrack(tracks[0]);
-    await trackPlayerService.play();
+    await nitroPlayerService.play();
   };
 
   const handleShuffle = async () => {
@@ -252,7 +252,7 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
 
     setQueue(shuffled, 0);
     setCurrentTrack(shuffled[0]);
-    await trackPlayerService.play();
+    await nitroPlayerService.play();
   };
 
   const handleTrackPress = async (track: Track, index: number) => {
@@ -260,7 +260,7 @@ export default function PlaylistDetailScreen({ playlistId }: PlaylistDetailScree
 
     setQueue(playlist.entry, index);
     setCurrentTrack(track);
-    await trackPlayerService.play();
+    await nitroPlayerService.play();
   };
 
   const handlePlayNext = () => {

@@ -1,48 +1,67 @@
 /**
  * Dino Music App - Download Service
- * Manages track/album/playlist downloads with proper concurrent track-level processing
+ * Uses react-native-nitro-player DownloadManager for native downloads
  */
 
 import * as FileSystem from 'expo-file-system';
 import * as Network from 'expo-network';
-import { Track, Album, Playlist, AlbumWithSongsID3 } from '../api/opensubsonic/types';
-import { useDownloadStore, DownloadedTrack } from '../stores/downloadStore';
+import { DownloadManager } from 'react-native-nitro-player';
+import type { TrackItem } from 'react-native-nitro-player';
+import { Track, Album, Playlist } from '../api/opensubsonic/types';
+import { useDownloadStore, CachedDownloadedTrack, CachedDownloadedAlbum, CachedDownloadedPlaylist } from '../stores/downloadStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { getDownloadUrl, getCoverArtUrl } from '../api/opensubsonic/streaming';
 import { getLyricsBySongId } from '../api/opensubsonic/lyrics';
 import { getAlbum, getAlbumList2 } from '../api/opensubsonic/albums';
 import { getPlaylist } from '../api/opensubsonic/playlists';
-import { DOWNLOAD_CONFIG } from '../config/constants';
+import { getArtist } from '../api/opensubsonic/artists';
+import { getTrackArtistString } from '../utils/artistUtils';
 
-interface TrackQueueItem {
-  track: Track;
-  groupId: string | null;
-}
-
-interface DownloadGroup {
+interface PendingGroup {
   type: 'album' | 'playlist';
-  downloadId: string;
   name: string;
   totalTracks: number;
-  completedTracks: DownloadedTrack[];
-  failedTracks: string[];
+  completedTracks: number;
+  failedTracks: number;
   coverArtUri?: string;
-  metadataPromise: Promise<any>;
-  resolve: () => void;
-  reject: (error: any) => void;
+  metadata?: any;
+  albumOrPlaylist: Album | Playlist;
+}
+
+export interface PendingGroupInfo {
+  id: string;
+  type: 'album' | 'playlist';
+  name: string;
+  completedTracks: number;
+  totalTracks: number;
+  failedTracks: number;
+  coverArtUri?: string;
+}
+
+export interface QueuedTrackInfo {
+  title: string;
+  artist: string;
+  groupId: string;
+}
+
+interface QueuedDownload {
+  track: Track;
+  groupId: string;
 }
 
 export class DownloadService {
   private static instance: DownloadService;
-  private activeDownloads = new Map<string, FileSystem.DownloadResumable>();
-  private trackToGroup = new Map<string, string>();
-  private trackQueue: TrackQueueItem[] = [];
-  private groups = new Map<string, DownloadGroup>();
-  private cancelledGroups = new Set<string>();
+  private configured = false;
+  private callbacksSetup = false;
+  private pendingGroups = new Map<string, PendingGroup>();
+  private trackMetaMap = new Map<string, Track>();
+  private lyricsMap = new Map<string, string>();
+  private trackGroupMap = new Map<string, Set<string>>();
+  private trackCoverArtMap = new Map<string, string>();
+  private downloadQueue: QueuedDownload[] = [];
   private activeCount = 0;
-  private processingScheduled = false;
-  private lastProgressUpdate = new Map<string, { time: number; bytes: number }>();
-  private readonly PROGRESS_THROTTLE_MS = 2000;
+  private processingQueue = false;
+  private readonly GROUPS_FILE = `${FileSystem.documentDirectory}metadata/download_groups.json`;
 
   private constructor() {}
 
@@ -53,62 +72,256 @@ export class DownloadService {
     return DownloadService.instance;
   }
 
-  private getDownloadDirectory(): string {
-    return `${FileSystem.documentDirectory}downloads/`;
+  configure() {
+    const settings = useSettingsStore.getState();
+    const maxConcurrent = settings.maxConcurrentDownloads || 3;
+    const wifiOnly = settings.wifiOnlyDownloads ?? false;
+
+    console.log('[DownloadService] CONFIGURE CALLED — maxConcurrent:', maxConcurrent, 'wifiOnly:', wifiOnly, 'wasConfigured:', this.configured);
+
+    try {
+      DownloadManager.configure({
+        maxConcurrentDownloads: maxConcurrent,
+        wifiOnlyDownloads: wifiOnly,
+        autoRetry: true,
+        maxRetryAttempts: 3,
+        backgroundDownloadsEnabled: true,
+        downloadArtwork: true,
+      });
+      this.configured = true;
+
+      try {
+        const verified = DownloadManager.getConfig();
+        console.log('[DownloadService] CONFIG VERIFIED — maxConcurrent:', verified.maxConcurrentDownloads, 'wifiOnly:', verified.wifiOnlyDownloads);
+      } catch (ve) {
+        console.error('[DownloadService] Failed to read back config:', ve);
+      }
+
+      try {
+        const status = DownloadManager.getQueueStatus();
+        console.log('[DownloadService] QUEUE STATUS after configure — active:', status.activeCount, 'pending:', status.pendingCount, 'completed:', status.completedCount, 'failed:', status.failedCount);
+      } catch {}
+    } catch (e) {
+      console.error('[DownloadService] Failed to configure DownloadManager:', e);
+    }
   }
 
-  private getMetadataDirectory(): string {
-    return `${FileSystem.documentDirectory}metadata/`;
+  setupCallbacks() {
+    if (this.callbacksSetup) return;
+    this.callbacksSetup = true;
+
+    try {
+      DownloadManager.onDownloadComplete((downloaded) => {
+        const trackId = downloaded.trackId;
+        const localPath = downloaded.localPath;
+        const fileSize = downloaded.fileSize;
+        const artworkPath = downloaded.localArtworkPath || undefined;
+
+        this.activeCount = Math.max(0, this.activeCount - 1);
+
+        let qStatus: any;
+        try { qStatus = DownloadManager.getQueueStatus(); } catch {}
+        console.log('[DownloadService] DOWNLOAD COMPLETE —', trackId, fileSize, 'bytes, active:', this.activeCount, 'queueRemaining:', this.downloadQueue.length, 'nitro active:', qStatus?.activeCount, 'pending:', qStatus?.pendingCount);
+
+        const originalTrack = this.trackMetaMap.get(trackId);
+        const lyricsUri = this.lyricsMap.get(trackId);
+
+        let coverArtUri = artworkPath;
+        if (!coverArtUri && originalTrack?.coverArt) {
+          getCoverArtUrl(originalTrack.coverArt, 500).then((url) => {
+            this.upsertCachedTrack(trackId, originalTrack, localPath, fileSize, url, lyricsUri);
+          }).catch(() => {
+            this.upsertCachedTrack(trackId, originalTrack, localPath, fileSize, undefined, lyricsUri);
+          });
+        } else {
+          this.upsertCachedTrack(trackId, originalTrack, localPath, fileSize, coverArtUri, lyricsUri);
+        }
+
+        this.processQueue();
+      });
+
+      DownloadManager.onDownloadStateChange((_downloadId, trackId, state, error) => {
+        console.log('[DownloadService] STATE CHANGE —', trackId, '→', state, 'active:', this.activeCount, 'queueRemaining:', this.downloadQueue.length);
+
+        if (state === 'failed') {
+          this.activeCount = Math.max(0, this.activeCount - 1);
+          console.error('[DownloadService] Download failed:', trackId, error?.message);
+          const groupIds = this.trackGroupMap.get(trackId);
+          if (groupIds) {
+            for (const gid of groupIds) {
+              const group = this.pendingGroups.get(gid);
+              if (group) {
+                group.failedTracks++;
+                this.checkGroupComplete(gid);
+              }
+            }
+          }
+          this.trackMetaMap.delete(trackId);
+          this.lyricsMap.delete(trackId);
+          this.trackGroupMap.delete(trackId);
+          this.trackCoverArtMap.delete(trackId);
+          this.processQueue();
+        }
+        if (state === 'cancelled') {
+          this.activeCount = Math.max(0, this.activeCount - 1);
+          const groupIds = this.trackGroupMap.get(trackId);
+          if (groupIds) {
+            for (const gid of groupIds) {
+              const group = this.pendingGroups.get(gid);
+              if (group) {
+                group.failedTracks++;
+              }
+            }
+          }
+          this.trackMetaMap.delete(trackId);
+          this.lyricsMap.delete(trackId);
+          this.trackGroupMap.delete(trackId);
+          this.trackCoverArtMap.delete(trackId);
+          this.processQueue();
+        }
+      });
+
+      console.log('[DownloadService] Nitro download callbacks registered');
+    } catch (e) {
+      console.error('[DownloadService] Failed to setup callbacks:', e);
+    }
   }
 
-  private getTrackFilePath(trackId: string): string {
-    return `${this.getDownloadDirectory()}${trackId}.audio`;
-  }
+  private upsertCachedTrack(
+    trackId: string,
+    originalTrack: Track | undefined,
+    localPath: string,
+    fileSize: number,
+    coverArtUri?: string,
+    lyricsUri?: string,
+  ) {
+    const store = useDownloadStore.getState();
+    if (store.isTrackDownloaded(trackId)) return;
 
-  private getCoverArtFilePath(id: string): string {
-    return `${this.getMetadataDirectory()}cover_${id}.jpg`;
-  }
+    const track: Track = originalTrack || {
+      id: trackId,
+      title: trackId,
+      duration: 0,
+    } as Track;
 
-  private getLyricsFilePath(trackId: string): string {
-    return `${this.getMetadataDirectory()}lyrics_${trackId}.json`;
-  }
+    const cached: CachedDownloadedTrack = {
+      track,
+      localUri: localPath,
+      coverArtUri,
+      lyricsUri,
+      downloadedAt: Date.now(),
+      size: fileSize,
+      bitRate: track.bitRate,
+      suffix: track.suffix,
+    };
 
-  private async ensureDirectoriesExist(): Promise<void> {
-    const dirs = [this.getDownloadDirectory(), this.getMetadataDirectory()];
-    for (const dir of dirs) {
-      const dirInfo = await FileSystem.getInfoAsync(dir);
-      if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+    store.upsertTrack(cached);
+
+    const groupIds = this.trackGroupMap.get(trackId);
+    if (groupIds) {
+      for (const gid of groupIds) {
+        const group = this.pendingGroups.get(gid);
+        if (group) {
+          group.completedTracks++;
+          this.checkGroupComplete(gid);
+        }
       }
     }
   }
 
-  private getStorageUsageMB(): number {
-    return useDownloadStore.getState().totalStorageUsed / (1024 * 1024);
-  }
-
-  private async shouldBlockDownload(): Promise<boolean> {
-    const { wifiOnlyDownloads } = useSettingsStore.getState();
-    if (!wifiOnlyDownloads) return false;
-    const networkState = await Network.getNetworkStateAsync();
-    return networkState.type !== Network.NetworkStateType.WIFI;
-  }
-
-  private checkStorageLimit(): boolean {
-    const { storageLimit } = useSettingsStore.getState();
-    return this.getStorageUsageMB() >= storageLimit;
-  }
-
-  private async downloadCoverArt(coverArtId: string): Promise<string | undefined> {
-    try {
-      const coverArtUrl = await getCoverArtUrl(coverArtId, 500);
-      const localPath = this.getCoverArtFilePath(coverArtId);
-      const download = FileSystem.createDownloadResumable(coverArtUrl, localPath);
-      const result = await download.downloadAsync();
-      return result?.uri;
-    } catch {
-      return undefined;
+  private async buildDownloadTrackItem(track: Track): Promise<TrackItem> {
+    const url = await getDownloadUrl(track.id);
+    console.log('[DownloadService] Built TrackItem for', track.title, '- URL length:', url?.length ?? 0);
+    let artwork: string | undefined;
+    if (track.coverArt) {
+      try { artwork = await getCoverArtUrl(track.coverArt, 500); } catch {}
     }
+    return {
+      id: track.id,
+      title: track.title,
+      artist: getTrackArtistString(track),
+      album: track.album || 'Unknown Album',
+      duration: track.duration,
+      url,
+      artwork,
+      extraPayload: {
+        bitRate: track.bitRate ?? 0,
+        suffix: track.suffix ?? '',
+        _trackData: JSON.stringify(track),
+      },
+    };
+  }
+
+  private processQueue() {
+    if (this.processingQueue) return;
+    this.processingQueue = true;
+
+    const maxConcurrent = useSettingsStore.getState().maxConcurrentDownloads || 3;
+
+    const startNext = () => {
+      while (this.activeCount < maxConcurrent && this.downloadQueue.length > 0) {
+        if (this.checkStorageLimit()) {
+          console.log('[DownloadService] Storage limit hit — dropping', this.downloadQueue.length, 'queued tracks');
+          for (const dropped of this.downloadQueue) {
+            const groupIds = this.trackGroupMap.get(dropped.track.id);
+            if (groupIds) {
+              for (const gid of groupIds) {
+                const group = this.pendingGroups.get(gid);
+                if (group) {
+                  group.failedTracks++;
+                  this.checkGroupComplete(gid);
+                }
+              }
+            }
+          }
+          this.downloadQueue = [];
+          break;
+        }
+
+        const item = this.downloadQueue.shift()!;
+        this.activeCount++;
+        console.log('[DownloadService] STARTING —', item.track.title, 'active:', this.activeCount, '/', maxConcurrent, 'remaining:', this.downloadQueue.length);
+
+        this.buildDownloadTrackItem(item.track).then((trackItem) => {
+          DownloadManager.downloadTrack(trackItem).then((downloadId) => {
+            console.log('[DownloadService] downloadTrack resolved —', item.track.title, 'downloadId:', downloadId);
+          }).catch((e) => {
+            console.error('[DownloadService] downloadTrack REJECTED —', item.track.title, e);
+            this.activeCount = Math.max(0, this.activeCount - 1);
+            const groupIds = this.trackGroupMap.get(item.track.id);
+            if (groupIds) {
+              for (const gid of groupIds) {
+                const group = this.pendingGroups.get(gid);
+                if (group) {
+                  group.failedTracks++;
+                  this.checkGroupComplete(gid);
+                }
+              }
+            }
+            startNext();
+          });
+        }).catch((e) => {
+          console.error('[DownloadService] buildTrackItem FAILED —', item.track.title, e);
+          this.activeCount = Math.max(0, this.activeCount - 1);
+          const groupIds = this.trackGroupMap.get(item.track.id);
+          if (groupIds) {
+            for (const gid of groupIds) {
+              const group = this.pendingGroups.get(gid);
+              if (group) {
+                group.failedTracks++;
+                this.checkGroupComplete(gid);
+              }
+            }
+          }
+          startNext();
+        });
+      }
+    };
+
+    startNext();
+
+    console.log('[DownloadService] processQueue done — active:', this.activeCount, '/', maxConcurrent, 'remaining:', this.downloadQueue.length);
+    this.processingQueue = false;
   }
 
   private async downloadLyrics(trackId: string): Promise<string | undefined> {
@@ -121,7 +334,10 @@ export class DownloadService {
         lyricsData = response.lyrics;
       }
       if (!lyricsData) return undefined;
-      const localPath = this.getLyricsFilePath(trackId);
+      const dir = `${FileSystem.documentDirectory}metadata/`;
+      const dirInfo = await FileSystem.getInfoAsync(dir);
+      if (!dirInfo.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+      const localPath = `${dir}lyrics_${trackId}.json`;
       await FileSystem.writeAsStringAsync(localPath, JSON.stringify(lyricsData));
       return localPath;
     } catch {
@@ -129,205 +345,17 @@ export class DownloadService {
     }
   }
 
-  private scheduleProcessing(): void {
-    if (this.processingScheduled) return;
-    this.processingScheduled = true;
-    setTimeout(() => {
-      this.processingScheduled = false;
-      this.processQueue();
-    }, 0);
+  private async shouldBlockDownload(): Promise<boolean> {
+    const { wifiOnlyDownloads } = useSettingsStore.getState();
+    if (!wifiOnlyDownloads) return false;
+    const networkState = await Network.getNetworkStateAsync();
+    return networkState.type !== Network.NetworkStateType.WIFI;
   }
 
-  private processQueue(): void {
-    const maxConcurrent = useSettingsStore.getState().maxConcurrentDownloads;
-
-    while (this.trackQueue.length > 0 && this.activeCount < maxConcurrent) {
-      const item = this.trackQueue.shift()!;
-      this.activeCount++;
-
-      this.downloadQueuedTrack(item.track, item.groupId)
-        .catch((error) => {
-          console.error(`[DownloadService] Track ${item.track.id} failed:`, error);
-        })
-        .finally(() => {
-          this.activeCount--;
-          this.scheduleProcessing();
-        });
-    }
-  }
-
-  private async downloadQueuedTrack(track: Track, groupId: string | null, retryCount = 0): Promise<void> {
-    if (groupId && this.cancelledGroups.has(groupId)) return;
-
-    const store = useDownloadStore.getState();
-
-    if (store.isTrackDownloaded(track.id)) {
-      if (groupId && !this.cancelledGroups.has(groupId)) {
-        const existing = store.getDownloadedTrack(track.id);
-        if (existing) this.handleTrackComplete(groupId, existing);
-      }
-      return;
-    }
-
-    if (this.checkStorageLimit()) {
-      if (groupId && !this.cancelledGroups.has(groupId)) this.handleTrackFailed(groupId, track.title);
-      return;
-    }
-
-    try {
-      await this.ensureDirectoriesExist();
-
-      if (groupId && this.cancelledGroups.has(groupId)) return;
-
-      const downloadUrl = await getDownloadUrl(track.id);
-      const fileUri = this.getTrackFilePath(track.id);
-      const coverArtUri = track.coverArt ? await this.downloadCoverArt(track.coverArt) : undefined;
-
-      const dlId = useDownloadStore.getState().addDownload(track.id, 'track', 0);
-      useDownloadStore.getState().updateDownloadMeta(dlId, {
-        title: track.title,
-        artist: track.artist,
-        coverArtUri,
-      });
-
-      if (groupId) this.trackToGroup.set(dlId, groupId);
-
-      const resumable = FileSystem.createDownloadResumable(
-        downloadUrl,
-        fileUri,
-        {},
-        (dp) => {
-          const written = dp.totalBytesWritten;
-          const expected = dp.totalBytesExpectedToWrite;
-          if (expected > 0) {
-            const now = Date.now();
-            const last = this.lastProgressUpdate.get(dlId);
-            if (!last || now - last.time >= this.PROGRESS_THROTTLE_MS || Math.abs(written - last.bytes) > expected * 0.1) {
-              this.lastProgressUpdate.set(dlId, { time: now, bytes: written });
-              useDownloadStore.getState().updateProgress(dlId, written, undefined, expected);
-            }
-          }
-        }
-      );
-
-      this.activeDownloads.set(dlId, resumable);
-      const result = await resumable.downloadAsync();
-
-      if (groupId && this.cancelledGroups.has(groupId)) {
-        this.activeDownloads.delete(dlId);
-        this.lastProgressUpdate.delete(dlId);
-        useDownloadStore.getState().cancelDownload(dlId);
-        try { await FileSystem.deleteAsync(fileUri, { idempotent: true }); } catch {}
-        return;
-      }
-
-      if (!result) throw new Error('Download failed: No result');
-
-      const fileInfo = await FileSystem.getInfoAsync(result.uri);
-      const fileSize = fileInfo.exists && 'size' in fileInfo ? fileInfo.size : 0;
-      const lyricsUri = await this.downloadLyrics(track.id);
-
-      const downloadedTrack: DownloadedTrack = {
-        track,
-        localUri: result.uri,
-        coverArtUri,
-        lyricsUri,
-        downloadedAt: Date.now(),
-        size: fileSize,
-      };
-
-      useDownloadStore.getState().markTrackDownloaded(track, result.uri, fileSize, coverArtUri, lyricsUri);
-      useDownloadStore.getState().completeDownload(dlId);
-      this.activeDownloads.delete(dlId);
-      this.lastProgressUpdate.delete(dlId);
-
-      if (groupId && !this.cancelledGroups.has(groupId)) {
-        this.handleTrackComplete(groupId, downloadedTrack);
-      }
-    } catch (error) {
-      if (groupId && this.cancelledGroups.has(groupId)) return;
-
-      if (retryCount < DOWNLOAD_CONFIG.RETRY_ATTEMPTS) {
-        const delay = DOWNLOAD_CONFIG.RETRY_DELAY_BASE * Math.pow(2, retryCount);
-        await new Promise(r => setTimeout(r, delay));
-        return this.downloadQueuedTrack(track, groupId, retryCount + 1);
-      }
-
-      const downloads = useDownloadStore.getState().activeDownloads;
-      const dlId = Object.keys(downloads).find(id => downloads[id]?.itemId === track.id);
-      if (dlId) {
-        useDownloadStore.getState().failDownload(dlId, error instanceof Error ? error.message : 'Unknown error');
-        this.activeDownloads.delete(dlId);
-        this.lastProgressUpdate.delete(dlId);
-      }
-
-      if (groupId) {
-        this.handleTrackFailed(groupId, track.title);
-      }
-    }
-  }
-
-  private handleTrackComplete(groupId: string, track: DownloadedTrack): void {
-    const group = this.groups.get(groupId);
-    if (!group) return;
-
-    group.completedTracks.push(track);
-    useDownloadStore.getState().updateProgress(group.downloadId, 0, group.completedTracks.length);
-
-    const totalProcessed = group.completedTracks.length + group.failedTracks.length;
-    if (totalProcessed >= group.totalTracks) {
-      this.finalizeGroup(group);
-    }
-  }
-
-  private handleTrackFailed(groupId: string, trackTitle: string): void {
-    const group = this.groups.get(groupId);
-    if (!group) return;
-
-    group.failedTracks.push(trackTitle);
-
-    const totalProcessed = group.completedTracks.length + group.failedTracks.length;
-    if (totalProcessed >= group.totalTracks) {
-      this.finalizeGroup(group);
-    }
-  }
-
-  private async finalizeGroup(group: DownloadGroup): Promise<void> {
-    try {
-      if (group.completedTracks.length === 0) {
-        useDownloadStore.getState().failDownload(group.downloadId, 'All tracks failed to download');
-        group.reject(new Error('All tracks failed'));
-        return;
-      }
-
-      const metadata = await group.metadataPromise;
-
-      if (group.type === 'album') {
-        const fullAlbum = metadata?.album;
-        if (fullAlbum) {
-          useDownloadStore.getState().markAlbumDownloaded(fullAlbum, group.completedTracks, metadata, group.coverArtUri);
-        }
-      } else {
-        const fullPlaylist = metadata?.playlist;
-        if (fullPlaylist) {
-          useDownloadStore.getState().markPlaylistDownloaded(fullPlaylist, group.completedTracks, metadata, group.coverArtUri);
-        }
-      }
-
-      useDownloadStore.getState().completeDownload(group.downloadId);
-
-      if (group.failedTracks.length > 0) {
-        const { showToast } = await import('../stores/toastStore').then(m => m.useToastStore.getState());
-        showToast(`${group.name}: ${group.failedTracks.length} track(s) failed`, 'error');
-      }
-
-      group.resolve();
-    } catch (error) {
-      useDownloadStore.getState().failDownload(group.downloadId, error instanceof Error ? error.message : 'Unknown error');
-      group.reject(error);
-    } finally {
-      this.groups.delete(group.downloadId);
-    }
+  private checkStorageLimit(): boolean {
+    const { storageLimit } = useSettingsStore.getState();
+    const usedMB = useDownloadStore.getState().totalStorageUsed / (1024 * 1024);
+    return usedMB >= storageLimit;
   }
 
   async downloadTrack(track: Track): Promise<void> {
@@ -335,87 +363,76 @@ export class DownloadService {
     if (await this.shouldBlockDownload()) {
       throw new Error('WiFi-only downloads is enabled. Connect to WiFi to download.');
     }
-    if (this.checkStorageLimit()) {
-      throw new Error('Storage limit reached. Delete some downloads or increase limit in settings.');
-    }
 
-    this.trackQueue.push({ track, groupId: null });
-    this.scheduleProcessing();
+    this.configure();
+    this.setupCallbacks();
+
+    this.trackMetaMap.set(track.id, track);
+
+    this.downloadLyrics(track.id).then((lyricsUri) => {
+      if (lyricsUri) this.lyricsMap.set(track.id, lyricsUri);
+    }).catch(() => {});
+
+    console.log('[DownloadService] Enqueuing single track:', track.title, 'active:', this.activeCount, 'queued:', this.downloadQueue.length);
+    this.downloadQueue.push({ track, groupId: '' });
+    this.processQueue();
   }
 
   async downloadAlbum(album: Album): Promise<void> {
     if (await this.shouldBlockDownload()) {
       throw new Error('WiFi-only downloads is enabled. Connect to WiFi to download.');
     }
-    if (this.checkStorageLimit()) {
-      throw new Error('Storage limit reached. Delete some downloads or increase limit in settings.');
-    }
+
+    this.configure();
+    this.setupCallbacks();
+
+    const response = await getAlbum(album.id);
+    const fullAlbum = response.album;
+    const tracks = fullAlbum.song || [];
+    if (tracks.length === 0) return;
 
     const store = useDownloadStore.getState();
-    const existingAlbum = store.getDownloadedAlbum(album.id);
+    const newTracks = tracks.filter(t => !store.isTrackDownloaded(t.id));
+    if (newTracks.length === 0) return;
 
-    let tracks: Track[];
-    let fullAlbum: AlbumWithSongsID3;
-    let metadataPromise: Promise<any>;
-
-    if (existingAlbum) {
-      const response = await getAlbum(album.id);
-      fullAlbum = response.album;
-      metadataPromise = Promise.resolve(response);
-      tracks = fullAlbum.song || [];
-
-      const existingTrackIds = new Set(existingAlbum.tracks.map(t => t.track.id));
-      const newTracks = tracks.filter(t => !existingTrackIds.has(t.id));
-
-      if (newTracks.length === 0) return;
-    } else {
-      const response = await getAlbum(album.id);
-      fullAlbum = response.album;
-      metadataPromise = Promise.resolve(response);
-      tracks = fullAlbum.song || [];
+    if (this.checkStorageLimit()) {
+      console.log('[DownloadService] Storage limit hit, skipping album:', album.name);
+      return;
     }
 
-    const coverArtUri = album.coverArt ? await this.downloadCoverArt(album.coverArt) : undefined;
-    const downloadId = useDownloadStore.getState().addDownload(album.id, 'album', 0, tracks.length);
-    useDownloadStore.getState().updateDownloadMeta(downloadId, {
-      title: album.name || fullAlbum.name,
-      artist: album.artist || fullAlbum.artist,
-      coverArtUri,
-    });
+    let coverArtUri: string | undefined;
+    if (album.coverArt) {
+      try { coverArtUri = await getCoverArtUrl(album.coverArt, 500); } catch {}
+    }
 
-    const groupId = downloadId;
+    const groupId = `album_${album.id}`;
 
-    let groupResolve!: () => void;
-    let groupReject!: (e: any) => void;
-    const groupPromise = new Promise<void>((resolve, reject) => {
-      groupResolve = resolve;
-      groupReject = reject;
-    });
-
-    this.groups.set(groupId, {
+    this.pendingGroups.set(groupId, {
       type: 'album',
-      downloadId,
       name: album.name || fullAlbum.name,
-      totalTracks: tracks.length,
-      completedTracks: [],
-      failedTracks: [],
+      totalTracks: newTracks.length,
+      completedTracks: 0,
+      failedTracks: 0,
       coverArtUri,
-      metadataPromise,
-      resolve: groupResolve,
-      reject: groupReject,
+      metadata: response,
+      albumOrPlaylist: album,
     });
 
-    for (const track of tracks) {
-      if (useDownloadStore.getState().isTrackDownloaded(track.id)) {
-        const existing = useDownloadStore.getState().getDownloadedTrack(track.id);
-        if (existing) this.handleTrackComplete(groupId, existing);
-      } else {
-        this.trackQueue.push({ track, groupId });
-      }
+    for (const track of newTracks) {
+      this.trackMetaMap.set(track.id, track);
+      const existing = this.trackGroupMap.get(track.id);
+      if (existing) { existing.add(groupId); } else { this.trackGroupMap.set(track.id, new Set([groupId])); }
+      if (coverArtUri) this.trackCoverArtMap.set(track.id, coverArtUri);
+      this.downloadLyrics(track.id).then((lyricsUri) => {
+        if (lyricsUri) this.lyricsMap.set(track.id, lyricsUri);
+      }).catch(() => {});
     }
 
-    this.scheduleProcessing();
-    return groupPromise;
+    console.log('[DownloadService] Enqueuing album —', album.name, 'tracks:', newTracks.length, 'active:', this.activeCount, 'queued:', this.downloadQueue.length);
+    for (const track of newTracks) {
+      this.downloadQueue.push({ track, groupId });
+    }
+    this.processQueue();
   }
 
   async downloadPlaylist(playlist: Playlist): Promise<void> {
@@ -423,108 +440,230 @@ export class DownloadService {
     if (await this.shouldBlockDownload()) {
       throw new Error('WiFi-only downloads is enabled. Connect to WiFi to download.');
     }
-    if (this.checkStorageLimit()) {
-      throw new Error('Storage limit reached. Delete some downloads or increase limit in settings.');
-    }
+
+    this.configure();
+    this.setupCallbacks();
 
     const response = await getPlaylist(playlist.id);
     const fullPlaylist = response.playlist;
     const tracks = fullPlaylist.entry || [];
+    if (tracks.length === 0) return;
 
+    let coverArtUri: string | undefined;
     const coverArtId = playlist.coverArt || tracks[0]?.coverArt;
-    const coverArtUri = coverArtId ? await this.downloadCoverArt(coverArtId) : undefined;
-
-    const downloadId = useDownloadStore.getState().addDownload(playlist.id, 'playlist', 0, tracks.length);
-    useDownloadStore.getState().updateDownloadMeta(downloadId, {
-      title: playlist.name,
-      artist: `${tracks.length} tracks`,
-      coverArtUri,
-    });
-
-    const groupId = downloadId;
-
-    let groupResolve!: () => void;
-    let groupReject!: (e: any) => void;
-    const groupPromise = new Promise<void>((resolve, reject) => {
-      groupResolve = resolve;
-      groupReject = reject;
-    });
-
-    this.groups.set(groupId, {
-      type: 'playlist',
-      downloadId,
-      name: playlist.name,
-      totalTracks: tracks.length,
-      completedTracks: [],
-      failedTracks: [],
-      coverArtUri,
-      metadataPromise: Promise.resolve(response),
-      resolve: groupResolve,
-      reject: groupReject,
-    });
-
-    for (const track of tracks) {
-      if (useDownloadStore.getState().isTrackDownloaded(track.id)) {
-        const existing = useDownloadStore.getState().getDownloadedTrack(track.id);
-        if (existing) this.handleTrackComplete(groupId, existing);
-      } else {
-        this.trackQueue.push({ track, groupId });
-      }
+    if (coverArtId) {
+      try { coverArtUri = await getCoverArtUrl(coverArtId, 500); } catch {}
     }
 
-    this.scheduleProcessing();
-    return groupPromise;
+    const groupId = `playlist_${playlist.id}`;
+    const store = useDownloadStore.getState();
+    const newTracks = tracks.filter(t => !store.isTrackDownloaded(t.id));
+    if (newTracks.length === 0) return;
+
+    this.pendingGroups.set(groupId, {
+      type: 'playlist',
+      name: playlist.name,
+      totalTracks: newTracks.length,
+      completedTracks: 0,
+      failedTracks: 0,
+      coverArtUri,
+      metadata: response,
+      albumOrPlaylist: playlist,
+    });
+
+    for (const track of newTracks) {
+      this.trackMetaMap.set(track.id, track);
+      const existing = this.trackGroupMap.get(track.id);
+      if (existing) { existing.add(groupId); } else { this.trackGroupMap.set(track.id, new Set([groupId])); }
+      if (coverArtUri) this.trackCoverArtMap.set(track.id, coverArtUri);
+      this.downloadLyrics(track.id).then((lyricsUri) => {
+        if (lyricsUri) this.lyricsMap.set(track.id, lyricsUri);
+      }).catch(() => {});
+    }
+
+    console.log('[DownloadService] Enqueuing playlist —', playlist.name, 'tracks:', newTracks.length, 'active:', this.activeCount, 'queued:', this.downloadQueue.length);
+    for (const track of newTracks) {
+      this.downloadQueue.push({ track, groupId });
+    }
+    this.processQueue();
   }
 
-  async cancelDownload(itemId: string): Promise<void> {
-    const downloads = useDownloadStore.getState().activeDownloads;
-    const downloadId = Object.keys(downloads).find(id => downloads[id]?.itemId === itemId);
-    if (!downloadId) return;
+  private checkGroupComplete(groupId: string) {
+    const group = this.pendingGroups.get(groupId);
+    if (!group) return;
+    if (group.completedTracks + group.failedTracks >= group.totalTracks) {
+      this.finalizeGroup(groupId, group);
+    }
+  }
 
-    const isGroup = this.groups.has(downloadId);
+  private finalizeGroup(groupId: string, group: PendingGroup) {
+    this.pendingGroups.delete(groupId);
+    if (group.completedTracks === 0) return;
 
-    if (isGroup) {
-      this.cancelledGroups.add(downloadId);
-      this.trackQueue = this.trackQueue.filter(item => item.groupId !== downloadId);
+    const store = useDownloadStore.getState();
+    const cachedTracks: CachedDownloadedTrack[] = [];
+
+    const songs = group.type === 'album'
+      ? group.metadata?.album?.song || []
+      : group.metadata?.playlist?.entry || [];
+
+    for (const song of songs) {
+      const cached = store.getDownloadedTrack(song.id);
+      if (cached) cachedTracks.push(cached);
     }
 
-    const trackDownloadIds: string[] = [];
-    for (const [dlId, gid] of this.trackToGroup.entries()) {
-      if (gid === downloadId) trackDownloadIds.push(dlId);
-    }
-    if (!isGroup && downloadId) trackDownloadIds.push(downloadId);
+    const totalSize = cachedTracks.reduce((sum, t) => sum + t.size, 0);
 
-    for (const dlId of trackDownloadIds) {
-      const resumable = this.activeDownloads.get(dlId);
-      if (resumable) {
-        try { await resumable.cancelAsync(); } catch {}
-        this.activeDownloads.delete(dlId);
-        this.lastProgressUpdate.delete(dlId);
-      }
-      this.trackToGroup.delete(dlId);
-      useDownloadStore.getState().cancelDownload(dlId);
-    }
-
-    if (isGroup) {
-      this.groups.delete(downloadId);
-      useDownloadStore.getState().cancelDownload(downloadId);
+    if (group.type === 'album') {
+      const albumObj: Album = group.albumOrPlaylist as Album;
+      const albumData: CachedDownloadedAlbum = {
+        album: albumObj,
+        tracks: cachedTracks,
+        coverArtUri: group.coverArtUri,
+        downloadedAt: Date.now(),
+        totalSize,
+        metadata: group.metadata,
+      };
+      store.upsertAlbum(albumData);
     } else {
-      useDownloadStore.getState().cancelDownload(downloadId);
+      const playlistObj: Playlist = group.albumOrPlaylist as Playlist;
+      const playlistData: CachedDownloadedPlaylist = {
+        playlist: playlistObj,
+        tracks: cachedTracks,
+        coverArtUri: group.coverArtUri,
+        downloadedAt: Date.now(),
+        totalSize,
+        metadata: group.metadata,
+      };
+      store.upsertPlaylist(playlistData);
     }
 
-    this.scheduleProcessing();
+    console.log('[DownloadService] Group complete:', group.name, `${group.completedTracks}/${group.totalTracks} tracks`);
+    this.saveGroupMetadata();
+  }
+
+  private async saveGroupMetadata() {
+    try {
+      const store = useDownloadStore.getState();
+      const data = {
+        albums: store.downloadedAlbums,
+        playlists: store.downloadedPlaylists,
+      };
+      const dir = `${FileSystem.documentDirectory}metadata/`;
+      const dirInfo = await FileSystem.getInfoAsync(dir);
+      if (!dirInfo.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+      await FileSystem.writeAsStringAsync(this.GROUPS_FILE, JSON.stringify(data));
+    } catch (e) {
+      console.error('[DownloadService] Failed to save group metadata:', e);
+    }
+  }
+
+  private async loadGroupMetadata(): Promise<{
+    albums: Record<string, CachedDownloadedAlbum>;
+    playlists: Record<string, CachedDownloadedPlaylist>;
+  } | null> {
+    try {
+      const info = await FileSystem.getInfoAsync(this.GROUPS_FILE);
+      if (!info.exists) return null;
+      const content = await FileSystem.readAsStringAsync(this.GROUPS_FILE);
+      return JSON.parse(content);
+    } catch {
+      return null;
+    }
+  }
+
+  async cancelDownload(downloadId: string): Promise<void> {
+    try {
+      await DownloadManager.cancelDownload(downloadId);
+    } catch (e) {
+      console.error('[DownloadService] Failed to cancel download:', e);
+    }
   }
 
   async deleteTrack(trackId: string): Promise<void> {
-    await useDownloadStore.getState().removeTrackDownload(trackId);
+    const store = useDownloadStore.getState();
+    const cached = store.getDownloadedTrack(trackId);
+
+    try { await DownloadManager.deleteDownloadedTrack(trackId); } catch (e) {
+      console.error('[DownloadService] Failed to delete track from nitro:', e);
+    }
+
+    if (cached?.lyricsUri) {
+      try { await FileSystem.deleteAsync(cached.lyricsUri, { idempotent: true }); } catch {}
+    }
+
+    store.removeTrack(trackId);
   }
 
   async deleteAlbum(albumId: string): Promise<void> {
-    await useDownloadStore.getState().removeAlbumDownload(albumId);
+    const store = useDownloadStore.getState();
+    const album = store.getDownloadedAlbum(albumId);
+    if (!album) return;
+
+    const albumTrackIds = new Set(album.tracks.map(t => t.track.id));
+    const sharedTrackIds = this.findSharedTrackIds(albumTrackIds, albumId, undefined);
+
+    for (const t of album.tracks) {
+      if (!sharedTrackIds.has(t.track.id)) {
+        try { await DownloadManager.deleteDownloadedTrack(t.track.id); } catch {}
+      }
+      if (t.lyricsUri) {
+        try { await FileSystem.deleteAsync(t.lyricsUri, { idempotent: true }); } catch {}
+      }
+    }
+
+    try { await DownloadManager.deleteDownloadedPlaylist(`album_${albumId}`); } catch {}
+
+    store.removeAlbum(albumId);
+    this.saveGroupMetadata();
   }
 
   async deletePlaylist(playlistId: string): Promise<void> {
-    await useDownloadStore.getState().removePlaylistDownload(playlistId);
+    const store = useDownloadStore.getState();
+    const playlist = store.getDownloadedPlaylist(playlistId);
+    if (!playlist) return;
+
+    const playlistTrackIds = new Set(playlist.tracks.map(t => t.track.id));
+    const sharedTrackIds = this.findSharedTrackIds(playlistTrackIds, undefined, playlistId);
+
+    for (const t of playlist.tracks) {
+      if (!sharedTrackIds.has(t.track.id)) {
+        try { await DownloadManager.deleteDownloadedTrack(t.track.id); } catch {}
+      }
+      if (t.lyricsUri) {
+        try { await FileSystem.deleteAsync(t.lyricsUri, { idempotent: true }); } catch {}
+      }
+    }
+
+    try { await DownloadManager.deleteDownloadedPlaylist(`playlist_${playlistId}`); } catch {}
+
+    store.removePlaylist(playlistId);
+    this.saveGroupMetadata();
+  }
+
+  private findSharedTrackIds(
+    trackIds: Set<string>,
+    excludeAlbumId?: string,
+    excludePlaylistId?: string,
+  ): Set<string> {
+    const store = useDownloadStore.getState();
+    const shared = new Set<string>();
+
+    for (const [id, album] of Object.entries(store.downloadedAlbums)) {
+      if (excludeAlbumId && id === excludeAlbumId) continue;
+      for (const t of album.tracks) {
+        if (trackIds.has(t.track.id)) shared.add(t.track.id);
+      }
+    }
+
+    for (const [id, playlist] of Object.entries(store.downloadedPlaylists)) {
+      if (excludePlaylistId && id === excludePlaylistId) continue;
+      for (const t of playlist.tracks) {
+        if (trackIds.has(t.track.id)) shared.add(t.track.id);
+      }
+    }
+
+    return shared;
   }
 
   getTotalStorageUsed(): number {
@@ -532,27 +671,125 @@ export class DownloadService {
   }
 
   getActiveDownloadCount(): number {
-    return this.activeCount + this.trackQueue.length;
+    return this.activeCount + this.downloadQueue.length;
+  }
+
+  getTrackDownloadMeta(trackId: string): { title: string; artist?: string; coverArtUri?: string; groupId?: string } | undefined {
+    const track = this.trackMetaMap.get(trackId);
+    if (!track) return undefined;
+    return {
+      title: track.title,
+      artist: track.artist || undefined,
+      coverArtUri: this.trackCoverArtMap.get(trackId) || undefined,
+      groupId: this.trackGroupMap.get(trackId)?.values().next().value || undefined,
+    };
+  }
+
+  getGroupInfo(groupId: string): PendingGroupInfo | undefined {
+    const group = this.pendingGroups.get(groupId);
+    if (!group) return undefined;
+    return {
+      id: groupId,
+      type: group.type,
+      name: group.name,
+      completedTracks: group.completedTracks,
+      totalTracks: group.totalTracks,
+      failedTracks: group.failedTracks,
+      coverArtUri: group.coverArtUri,
+    };
+  }
+
+  getPendingGroups(): PendingGroupInfo[] {
+    const result: PendingGroupInfo[] = [];
+    for (const [id, group] of this.pendingGroups.entries()) {
+      result.push({
+        id,
+        type: group.type,
+        name: group.name,
+        completedTracks: group.completedTracks,
+        totalTracks: group.totalTracks,
+        failedTracks: group.failedTracks,
+        coverArtUri: group.coverArtUri,
+      });
+    }
+    return result;
+  }
+
+  getQueuedDownloads(): QueuedTrackInfo[] {
+    return this.downloadQueue.map(q => ({
+      title: q.track.title,
+      artist: q.track.artist || '',
+      groupId: q.groupId,
+    }));
+  }
+
+  async cancelAllQueuedDownloads(): Promise<void> {
+    console.log('[DownloadService] Cancel ALL — clearing JS queue:', this.downloadQueue.length, 'active:', this.activeCount);
+
+    this.downloadQueue = [];
+    this.activeCount = 0;
+
+    for (const [, group] of this.pendingGroups.entries()) {
+      const remaining = group.totalTracks - group.completedTracks - group.failedTracks;
+      group.failedTracks += remaining;
+    }
+
+    try {
+      await DownloadManager.cancelAllDownloads();
+    } catch {}
+
+    this.pendingGroups.clear();
+    this.trackMetaMap.clear();
+    this.lyricsMap.clear();
+    this.trackGroupMap.clear();
+    this.trackCoverArtMap.clear();
+
+    console.log('[DownloadService] Cancel ALL complete');
+  }
+
+  async downloadArtistDiscography(artistId: string): Promise<void> {
+    if (await this.shouldBlockDownload()) {
+      throw new Error('WiFi-only downloads is enabled. Connect to WiFi to download.');
+    }
+
+    this.configure();
+    this.setupCallbacks();
+
+    const response = await getArtist(artistId);
+    const albums = response.artist.album || [];
+    if (albums.length === 0) return;
+
+    console.log('[DownloadService] Downloading artist discography:', response.artist.name, albums.length, 'albums');
+
+    for (const album of albums) {
+      this.downloadAlbum(album).catch(err => {
+        console.error(`[DownloadService] Artist discography failed for ${album.name}:`, err);
+      });
+    }
   }
 
   async clearAllDownloads(): Promise<void> {
-    this.trackQueue = [];
-    this.groups.clear();
-    this.cancelledGroups.clear();
-    this.trackToGroup.clear();
+    try {
+      await DownloadManager.cancelAllDownloads();
+    } catch {}
+    try {
+      await DownloadManager.deleteAllDownloads();
+    } catch (e) {
+      console.error('[DownloadService] Failed to clear all downloads from nitro:', e);
+    }
 
-    const downloadIds = Object.keys(useDownloadStore.getState().activeDownloads);
-    await Promise.all(downloadIds.map(id => {
-      const download = useDownloadStore.getState().activeDownloads[id];
-      return download ? this.cancelDownload(download.itemId) : Promise.resolve();
-    }));
+    const metadataDir = `${FileSystem.documentDirectory}metadata/`;
+    try {
+      const dirInfo = await FileSystem.getInfoAsync(metadataDir);
+      if (dirInfo.exists) await FileSystem.deleteAsync(metadataDir);
+    } catch {}
 
-    const { getAllTracks, getAllAlbums, getAllPlaylists } = useDownloadStore.getState();
-    await Promise.all([
-      ...getAllAlbums().map(a => this.deleteAlbum(a.album.id)),
-      ...getAllPlaylists().map(p => this.deletePlaylist(p.playlist.id)),
-      ...getAllTracks().map(t => this.deleteTrack(t.track.id)),
-    ]);
+    this.downloadQueue = [];
+    this.activeCount = 0;
+    this.pendingGroups.clear();
+    this.trackMetaMap.clear();
+    this.lyricsMap.clear();
+    useDownloadStore.getState().clearAll();
   }
 
   async downloadLibrary(): Promise<{ queued: number; skipped: number; updated: number }> {
@@ -593,8 +830,121 @@ export class DownloadService {
     }
 
     const skipped = allServerAlbums.length - queued - updated;
+    console.log('[DownloadService] downloadLibrary — queued:', queued, 'updated:', updated, 'skipped:', skipped, 'total albums:', allServerAlbums.length);
     return { queued, skipped, updated };
   }
+
+  async hydrateFromNitro(): Promise<void> {
+    try {
+      this.configure();
+
+      const nitroTracks = await DownloadManager.getAllDownloadedTracks();
+      const nitroTrackIds = new Set(nitroTracks.map(nt => nt.trackId));
+
+      const cachedTracks: Record<string, CachedDownloadedTrack> = {};
+
+      for (const nt of nitroTracks) {
+        const trackDataStr = nt.originalTrack.extraPayload?._trackData as string | undefined;
+        let track: Track;
+        if (trackDataStr) {
+          try { track = JSON.parse(trackDataStr); } catch { track = nitroTrackToTrack(nt); }
+        } else {
+          track = nitroTrackToTrack(nt);
+        }
+
+        let coverArtUri: string | undefined = nt.localArtworkPath || undefined;
+        if (!coverArtUri && track.coverArt) {
+          try { coverArtUri = await getCoverArtUrl(track.coverArt, 500); } catch {}
+        }
+
+        cachedTracks[nt.trackId] = {
+          track,
+          localUri: nt.localPath,
+          coverArtUri,
+          downloadedAt: nt.downloadedAt,
+          size: nt.fileSize,
+          bitRate: track.bitRate || (nt.originalTrack.extraPayload?.bitRate as number | undefined),
+          suffix: track.suffix || (nt.originalTrack.extraPayload?.suffix as string | undefined),
+        };
+      }
+
+      let cachedAlbums: Record<string, CachedDownloadedAlbum> = {};
+      let cachedPlaylists: Record<string, CachedDownloadedPlaylist> = {};
+
+      const savedGroups = await this.loadGroupMetadata();
+      if (savedGroups) {
+        for (const [albumId, album] of Object.entries(savedGroups.albums)) {
+          const validTracks = album.tracks.filter(t => nitroTrackIds.has(t.track.id));
+          if (validTracks.length > 0) {
+            let coverArtUri = album.coverArtUri;
+            if (!coverArtUri && album.album.coverArt) {
+              try { coverArtUri = await getCoverArtUrl(album.album.coverArt, 500); } catch {}
+            }
+            cachedAlbums[albumId] = {
+              ...album,
+              tracks: validTracks.map(t => cachedTracks[t.track.id] || t),
+              coverArtUri,
+              totalSize: validTracks.reduce((sum, t) => sum + (cachedTracks[t.track.id]?.size || t.size), 0),
+            };
+          }
+        }
+
+        for (const [playlistId, playlist] of Object.entries(savedGroups.playlists)) {
+          const validTracks = playlist.tracks.filter(t => nitroTrackIds.has(t.track.id));
+          if (validTracks.length > 0) {
+            let coverArtUri = playlist.coverArtUri;
+            if (!coverArtUri && playlist.playlist.coverArt) {
+              try { coverArtUri = await getCoverArtUrl(playlist.playlist.coverArt, 500); } catch {}
+            }
+            cachedPlaylists[playlistId] = {
+              ...playlist,
+              tracks: validTracks.map(t => cachedTracks[t.track.id] || t),
+              coverArtUri,
+              totalSize: validTracks.reduce((sum, t) => sum + (cachedTracks[t.track.id]?.size || t.size), 0),
+            };
+          }
+        }
+      }
+
+      let totalStorageUsed = 0;
+      const countedIds = new Set<string>();
+      for (const t of Object.values(cachedTracks)) {
+        if (!countedIds.has(t.track.id)) {
+          countedIds.add(t.track.id);
+          totalStorageUsed += t.size;
+        }
+      }
+
+      useDownloadStore.setState({
+        downloadedTracks: cachedTracks,
+        downloadedAlbums: cachedAlbums,
+        downloadedPlaylists: cachedPlaylists,
+        totalStorageUsed,
+        isHydrated: true,
+      });
+
+      console.log('[DownloadService] Hydrated from nitro:',
+        Object.keys(cachedTracks).length, 'tracks,',
+        Object.keys(cachedAlbums).length, 'albums,',
+        Object.keys(cachedPlaylists).length, 'playlists');
+    } catch (e) {
+      console.error('[DownloadService] Failed to hydrate from nitro:', e);
+      useDownloadStore.getState().setHydrated(true);
+    }
+  }
+}
+
+function nitroTrackToTrack(nt: { trackId: string; originalTrack: TrackItem; fileSize: number }): Track {
+  const ot = nt.originalTrack;
+  return {
+    id: nt.trackId,
+    title: ot.title,
+    album: ot.album !== 'Unknown Album' ? ot.album : undefined,
+    artist: ot.artist || undefined,
+    duration: ot.duration,
+    bitRate: ot.extraPayload?.bitRate as number | undefined,
+    suffix: ot.extraPayload?.suffix as string | undefined,
+  } as Track;
 }
 
 export const downloadService = DownloadService.getInstance();

@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-05-01
+
+### Added
+- **Download Artist Discography**: New option in artist menu to download all albums by an artist
+- **Download Queue with Concurrency Control**: Manual queue system that properly respects the max concurrent downloads setting
+  - Tracks are queued and started one at a time, only up to the configured limit
+  - Storage limit is checked before each track starts, not just at the beginning
+- **Persistent Download Groups**: Album and playlist groupings now survive app restarts via metadata file
+- **Active Downloads View**: Downloads screen shows downloading groups, active tracks, and queued tracks in one unified section
+- **Cancel All**: Properly cancels everything — active nitro downloads, JS queue, and pending groups
+
+### Changed
+- **Player Engine**: Replaced `react-native-track-player` with `react-native-nitro-player` for all audio playback
+  - Gapless playback with precache system (resolves next track URLs at 50% progress)
+  - Surgical queue sync — only updates changed tracks instead of full rebuild
+  - Track IDs encode queue index for reliable position tracking
+- **Download System Overhaul**: Replaced expo-file-system downloads with native nitro DownloadManager
+  - Background downloads via WorkManager (continues when app is minimized)
+  - Full track metadata (including cover art) stored in download payload for offline hydration
+  - Lazy URL resolution — streaming URLs only fetched when a download slot opens (reduces API spam)
+  - Lyrics still downloaded via expo-file-system alongside audio files
+- **Download Deletion**: Deleting an album/playlist now properly removes the actual audio files
+  - Shared tracks between multiple albums/playlists are detected and preserved
+- **Downloads Screen Performance**: Polling optimized to prevent lag with many downloads
+  - 2-second poll interval with reference equality checks to skip unnecessary re-renders
+  - Groups and queued tracks only update when data actually changes
+- **Progress Updates**: Throttled to 250ms intervals to reduce JS bridge overhead
+
+### Fixed
+- **Quality Indicator Missing on Fresh Open**: Streaming info now updates when restoring queue from server/local storage on app launch
+- **Downloads Disappearing on Revisit**: All data types (groups, active tasks, queued tracks) now load on first poll instead of skipping
+- **Album Covers Missing After Restart**: Hydration now resolves cover art URLs from track metadata and server
+- **Concurrent Downloads Not Respected**: Native `downloadPlaylist()` API ignored the setting — switched to manual `downloadTrack()` calls with JS-side concurrency control
+- **Cancel All Not Working**: Previous implementation only cancelled nitro-level tasks while JS queue kept starting new ones
+- **Download Storage Spam**: Removed error throws on storage limit — downloads now silently stop when limit is hit
+- **FullPlayer/MiniPlayer Freeze**: Zustand selector fixes across multiple components to prevent infinite re-renders
+- **Downloaded Track Cover Art**: Always uses remote URLs for artwork (local file URIs don't work as artwork sources)
+
+### Removed
+- `react-native-track-player` and all related code
+- Old download persistence via AsyncStorage (now uses nitro's native storage + JSON metadata file)
+
 ## [2.6.0] - 2026-04-26
 
 ### Added

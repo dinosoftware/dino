@@ -5,11 +5,11 @@
 
 import { PlayerService } from './types';
 import { PlayerType, RemoteDevice, useRemotePlaybackStore } from '../../stores/remotePlaybackStore';
-import { trackPlayerService } from './TrackPlayerService';
+import { nitroPlayerService } from './NitroPlayerService';
 
 class PlayerRouter {
   private players: Partial<Record<PlayerType, PlayerService>> = {
-    local: trackPlayerService,
+    local: nitroPlayerService,
   };
 
   private get activePlayer(): PlayerService {
@@ -17,7 +17,7 @@ class PlayerRouter {
     const player = this.players[type];
     if (!player) {
       console.warn('[PlayerRouter] Player not available:', type, ', falling back to local');
-      return trackPlayerService;
+      return nitroPlayerService;
     }
     return player;
   }
@@ -91,10 +91,10 @@ class PlayerRouter {
       throw new Error(`Player type ${device.type} does not support connection`);
     }
 
-    const previousState = await trackPlayerService.saveState();
+    const previousState = await nitroPlayerService.saveState();
 
     if (previousState.isPlaying) {
-      await trackPlayerService.pause();
+      await nitroPlayerService.pause();
     }
 
     try {
@@ -115,7 +115,7 @@ class PlayerRouter {
       useRemotePlaybackStore.getState().selectDevice(null);
       useRemotePlaybackStore.getState().setActivePlayerType('local');
       if (previousState.isPlaying) {
-        await trackPlayerService.play();
+        await nitroPlayerService.play();
       }
       throw error;
     }
@@ -136,8 +136,8 @@ class PlayerRouter {
 
         if (state.isPlaying) {
           console.log('[PlayerRouter] Resuming local playback from', state.position);
-          await trackPlayerService.play();
-          await trackPlayerService.seekTo(state.position);
+          await nitroPlayerService.play();
+          await nitroPlayerService.seekTo(state.position);
         }
       } catch (error) {
         console.error('[PlayerRouter] Error during disconnect:', error);

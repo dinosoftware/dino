@@ -10,7 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { usePlaylists, useCoverArt } from '../../hooks/api';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { useQueueStore, usePlayerStore } from '../../stores';
-import { trackPlayerService } from '../../services/player/TrackPlayerService';
+import { nitroPlayerService } from '../../services/player/NitroPlayerService';
 import { CreatePlaylistModal } from '../../components/Modals/CreatePlaylistModal';
 import { ConfirmModal } from '../../components/Modals/ConfirmModal';
 import { PlaylistMenu } from '../../components/Menus';
@@ -148,7 +148,7 @@ const PlaylistMenuWrapper: React.FC<{
       }
       setQueue(response.playlist.entry, 0);
       setCurrentTrack(response.playlist.entry[0]);
-      await trackPlayerService.play();
+      await nitroPlayerService.play();
       onClose();
     } catch (error) {
       showToast('Failed to load playlist', 'error');
@@ -165,7 +165,7 @@ const PlaylistMenuWrapper: React.FC<{
       const shuffled = [...response.playlist.entry].sort(() => Math.random() - 0.5);
       setQueue(shuffled, 0);
       setCurrentTrack(shuffled[0]);
-      await trackPlayerService.play();
+      await nitroPlayerService.play();
       onClose();
     } catch (error) {
       showToast('Failed to load playlist', 'error');

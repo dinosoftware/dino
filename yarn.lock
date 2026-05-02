@@ -6084,15 +6084,20 @@ react-native-marquee@^0.5.0:
   dependencies:
     "@react-navigation/native-stack" "^6.9.11"
 
-react-native-mmkv@^4.1.1:
-  version "4.1.1"
-  resolved "https://registry.npmjs.org/react-native-mmkv/-/react-native-mmkv-4.1.1.tgz"
-  integrity sha512-nYFjM27l7zVhIiyAqWEFRagGASecb13JMIlzAuOeakRRz9GMJ49hCQntUBE2aeuZRE4u4ehSqTOomB0mTF56Ew==
+react-native-mmkv@^4.3.1:
+  version "4.3.1"
+  resolved "https://registry.npmjs.org/react-native-mmkv/-/react-native-mmkv-4.3.1.tgz"
+  integrity sha512-APyGGaaHtayVgT18dBM8QGGZKr9pGfSTiBwbbPNzhGGfJQSU7awLGRGq879OqYl31HmVks9hOBLCs+qfgacRZg==
 
-react-native-nitro-modules@*, react-native-nitro-modules@^0.33.2:
-  version "0.33.2"
-  resolved "https://registry.npmjs.org/react-native-nitro-modules/-/react-native-nitro-modules-0.33.2.tgz"
-  integrity sha512-ZlfOe6abODeHv/eZf8PxeSkrxIUhEKha6jaAAA9oXy7I6VPr7Ff4dUsAq3cyF3kX0L6qt2Dh9nzD2NdSsDwGpA==
+react-native-nitro-modules@*, react-native-nitro-modules@^0.35.6:
+  version "0.35.6"
+  resolved "https://registry.npmjs.org/react-native-nitro-modules/-/react-native-nitro-modules-0.35.6.tgz"
+  integrity sha512-3Cb7s+O5tpZ6RdIiPOB/wi3IMfBxD6tl6VDF8gJ5zvM/BEGTWxwMMLjzmWmsYPKekdbYBznF6qp2d2SxixPy8g==
+
+react-native-nitro-player@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.npmjs.org/react-native-nitro-player/-/react-native-nitro-player-1.1.0.tgz"
+  integrity sha512-ykjk1MqxvKX8btpw7IosB/eKjWurijmgUJ95QEsYmKpczGLyM7P30UQuM1eCluoIeyTcX/jljqAZAtZ2RUus7w==
 
 react-native-reanimated@*, react-native-reanimated@>=2.8.0, react-native-reanimated@~3.17.4:
   version "3.17.5"
@@ -6135,11 +6140,6 @@ react-native-screens@*, "react-native-screens@>= 3.0.0", "react-native-screens@>
     css-tree "^1.1.3"
     warn-once "0.1.1"
 
-react-native-track-player@^4.1.1-nightly-c46c8fb107e0de61d9b33c28e7228002077b4f20:
-  version "4.1.1-nightly-c46c8fb107e0de61d9b33c28e7228002077b4f20"
-  resolved "https://registry.npmjs.org/react-native-track-player/-/react-native-track-player-4.1.1-nightly-c46c8fb107e0de61d9b33c28e7228002077b4f20.tgz"
-  integrity sha512-/uU0xLETbTdmnWM2JGOoQ+qBg/LQFbWm0MlLXrw7Dum0Sim5xTwrlFYmL0OYDHUYzC3abYBR0FNezhMCjeze2w==
-
 react-native-udp@^4.1.7:
   version "4.1.7"
   resolved "https://registry.npmjs.org/react-native-udp/-/react-native-udp-4.1.7.tgz"
@@ -6162,7 +6162,7 @@ react-native-web@*, react-native-web@^0.20.0:
     postcss-value-parser "^4.2.0"
     styleq "^0.1.3"
 
-react-native@*, "react-native@^0.0.0-0 || >=0.65 <1.0", "react-native@>= 0.30.0", react-native@>=0.60.0-rc.2, react-native@>=0.64.0, react-native@0.79.6:
+react-native@*, "react-native@^0.0.0-0 || >=0.65 <1.0", "react-native@>= 0.30.0", react-native@>=0.64.0, react-native@0.79.6:
   version "0.79.6"
   resolved "https://registry.npmjs.org/react-native/-/react-native-0.79.6.tgz"
   integrity sha512-kvIWSmf4QPfY41HC25TR285N7Fv0Pyn3DAEK8qRL9dA35usSaxsJkHfw+VqnonqJjXOaoKCEanwudRAJ60TBGA==
@@ -6209,7 +6209,7 @@ react-refresh@^0.14.0, react-refresh@^0.14.2:
   resolved "https://registry.npmjs.org/react-refresh/-/react-refresh-0.14.2.tgz"
   integrity sha512-jCvmsr+1IUSMUyzOkRcvnVbX3ZYC6g9TDrDbFuFmRDq7PD4yaGbLKNQL6k2jnArV8hjYxh7hVhAZB6s9HDGpZA==
 
-react@*, "react@^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc", "react@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^18 || ^19", "react@^18.0.0 || ^19.0.0", react@^19.0.0, "react@>= 15.2.1", "react@>= 18.2.0", react@>=16.8, react@>=16.8.6, react@>=17.0.0, react@>=18.0.0, react@19.0.0:
+react@*, "react@^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc", "react@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^18 || ^19", "react@^18.0.0 || ^19.0.0", react@^19.0.0, "react@>= 15.2.1", "react@>= 18.2.0", react@>=16.8, react@>=17.0.0, react@>=18.0.0, react@19.0.0:
   version "19.0.0"
   resolved "https://registry.npmjs.org/react/-/react-19.0.0.tgz"
   integrity sha512-V8AVnmPIICiWpGfm6GLzCR/W5FXLchHop40W4nXBmdlEceh16rCN8O8LNWm5bh5XUX91fh7KpA+W0TgMKmgTpQ==

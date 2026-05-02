@@ -31,7 +31,7 @@ import { Theme } from '../../config/theme';
 import { useCoverArt } from '../../hooks/api';
 import { useAlbumMenuState } from '../../hooks/useAlbumMenuState';
 import { useTrackMenuState } from '../../hooks/useTrackMenuState';
-import { trackPlayerService } from '../../services/player/TrackPlayerService';
+import { nitroPlayerService } from '../../services/player/NitroPlayerService';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useQueueStore } from '../../stores/queueStore';
@@ -338,7 +338,7 @@ const TrackItem: React.FC<{ track: Track }> = ({ track }) => {
   const handlePlayTrack = async () => {
     setQueue([track], 0);
     setCurrentTrack(track);
-    await trackPlayerService.play();
+    await nitroPlayerService.play();
   };
 
   return (

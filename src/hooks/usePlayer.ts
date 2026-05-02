@@ -11,7 +11,6 @@ import { usePlayerStore } from '../stores';
 export const usePlayer = () => {
   const currentTrack = usePlayerStore((state) => state.currentTrack);
   const playbackState = usePlayerStore((state) => state.playbackState);
-  const progress = usePlayerStore((state) => state.progress);
   const repeatMode = usePlayerStore((state) => state.repeatMode);
   const shuffleEnabled = usePlayerStore((state) => state.shuffleEnabled);
   const volume = usePlayerStore((state) => state.volume);
@@ -55,7 +54,6 @@ export const usePlayer = () => {
   return {
     currentTrack,
     playbackState,
-    progress,
     repeatMode,
     shuffleEnabled,
     volume,

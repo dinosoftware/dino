@@ -9,7 +9,6 @@ export * from './settingsStore';
 export * from './playerStore';
 export * from './queueStore';
 export * from './downloadStore';
-export * from './offlineStore';
 export * from './radioStore';
 export * from './userStore';
 export * from './remotePlaybackStore';

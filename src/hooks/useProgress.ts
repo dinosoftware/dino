@@ -1,12 +1,14 @@
 /**
  * Dino Music App - useProgress Hook
  * Separate hook for progress to prevent unnecessary re-renders
- * Components that DON'T need progress updates won't re-render
+ * Uses primitive selectors to minimize re-render frequency
  */
 
 import { usePlayerStore } from '../stores';
 
 export const useProgress = () => {
-  const progress = usePlayerStore((state) => state.progress);
-  return progress;
+  const position = usePlayerStore((state) => state.progress.position);
+  const duration = usePlayerStore((state) => state.progress.duration);
+  const buffered = usePlayerStore((state) => state.progress.buffered);
+  return { position, duration, buffered };
 };

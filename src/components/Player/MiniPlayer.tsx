@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator, use
 import { Play, Pause, SkipForward, Cast } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { usePlayer } from '../../hooks/usePlayer';
+import { useProgress } from '../../hooks/useProgress';
 import { useCoverArt } from '../../hooks/api';
 import { useAlbumColors } from '../../hooks/useAlbumColors';
 import { useTheme } from '../../hooks/useTheme';
@@ -18,10 +19,11 @@ interface MiniPlayerProps {
 export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
   const theme = useTheme();
   const { height } = useWindowDimensions();
-  const { currentTrack, isPlaying, playbackState, togglePlayPause, skipToNext, progress } = usePlayer();
+  const { currentTrack, isPlaying, playbackState, togglePlayPause, skipToNext } = usePlayer();
+  const progress = useProgress();
   const { data: coverArtUrl } = useCoverArt(currentTrack?.coverArt, 200);
   const albumColors = useAlbumColors(coverArtUrl || undefined);
-  const { activePlayerType } = useRemotePlaybackStore();
+  const activePlayerType = useRemotePlaybackStore((state) => state.activePlayerType);
   const [showDevicesSheet, setShowDevicesSheet] = useState(false);
 
   const isLargeScreen = height > 800;

@@ -22,7 +22,7 @@ import { Theme } from '../../config/theme';
 import { useCoverArt } from '../../hooks/api';
 import { useAlbumMenuState } from '../../hooks/useAlbumMenuState';
 import { useTrackMenuState } from '../../hooks/useTrackMenuState';
-import { trackPlayerService } from '../../services/player/TrackPlayerService';
+import { nitroPlayerService } from '../../services/player/NitroPlayerService';
 import { useFavoritesStore } from '../../stores/favoritesStore';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { usePlayerStore } from '../../stores/playerStore';
@@ -122,14 +122,14 @@ const StarredTracks: React.FC<{
 
     setQueue(tracks, 0);
     setCurrentTrack(tracks[0]);
-    await trackPlayerService.play();
+    await nitroPlayerService.play();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const handleTrackPress = async (track: Track, index: number) => {
     setQueue(tracks, index);
     setCurrentTrack(track);
-    await trackPlayerService.play();
+    await nitroPlayerService.play();
   };
 
   if (tracks.length === 0) {

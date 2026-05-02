@@ -41,7 +41,7 @@ import { useTopSongs } from '../../hooks/api/useTopSongs';
 import { useAlbumColors } from '../../hooks/useAlbumColors';
 import { useAlbumMenuState } from '../../hooks/useAlbumMenuState';
 import { useTrackMenuState } from '../../hooks/useTrackMenuState';
-import { trackPlayerService } from '../../services/player/TrackPlayerService';
+import { nitroPlayerService } from '../../services/player/NitroPlayerService';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useQueueStore } from '../../stores/queueStore';
@@ -334,7 +334,7 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
     if (topSongs && topSongs.length > 0) {
       setQueue(topSongs, 0);
       setCurrentTrack(topSongs[0]);
-      await trackPlayerService.play();
+      await nitroPlayerService.play();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       return;
     }
@@ -346,7 +346,7 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
 
       setQueue(tracks, 0);
       setCurrentTrack(tracks[0]);
-      await trackPlayerService.play();
+      await nitroPlayerService.play();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
       console.error('Failed to play all:', err);
@@ -382,7 +382,7 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
 
     setQueue(shuffled, 0);
     setCurrentTrack(shuffled[0]);
-    await trackPlayerService.play();
+    await nitroPlayerService.play();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
@@ -391,7 +391,7 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
 
     setQueue(topSongs, index);
     setCurrentTrack(track);
-    await trackPlayerService.play();
+    await nitroPlayerService.play();
   };
 
   const handleOpenSongsModal = async () => {
@@ -422,7 +422,7 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
 
     setQueue(songs, index);
     setCurrentTrack(track);
-    await trackPlayerService.play();
+    await nitroPlayerService.play();
   };
 
   const handleModalPlayAll = async () => {
@@ -431,7 +431,7 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
 
     setQueue(songs, 0);
     setCurrentTrack(songs[0]);
-    await trackPlayerService.play();
+    await nitroPlayerService.play();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
@@ -447,7 +447,7 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
 
     setQueue(shuffled, 0);
     setCurrentTrack(shuffled[0]);
-    await trackPlayerService.play();
+    await nitroPlayerService.play();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 

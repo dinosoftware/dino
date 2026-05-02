@@ -27,7 +27,7 @@ import { HeroBannerSkeleton } from '../../../components/common';
 import { useQueueStore } from '../../../stores/queueStore';
 import { usePlayerStore } from '../../../stores/playerStore';
 import { useServerStore } from '../../../stores/serverStore';
-import { trackPlayerService } from '../../../services/player/TrackPlayerService';
+import { nitroPlayerService } from '../../../services/player/NitroPlayerService';
 import { useTheme } from '../../../hooks/useTheme';
 import { Theme } from '../../../config/theme';
 import { Track } from '../../../api/opensubsonic/types';
@@ -184,12 +184,12 @@ const HeroCard: React.FC<HeroCardProps> = ({ track, cardWidth }) => {
         const mixTracks = [track, ...similarTracks];
         setQueue(mixTracks, 0);
         setCurrentTrack(mixTracks[0]);
-        await trackPlayerService.play();
+        await nitroPlayerService.play();
       } else {
         // No similar tracks, just play the current track
         setQueue([track], 0);
         setCurrentTrack(track);
-        await trackPlayerService.play();
+        await nitroPlayerService.play();
       }
     } catch (error) {
       console.error('Failed to start instant mix:', error);
@@ -210,12 +210,12 @@ const HeroCard: React.FC<HeroCardProps> = ({ track, cardWidth }) => {
         const mixTracks = [track, ...shuffled];
         setQueue(mixTracks, 0);
         setCurrentTrack(mixTracks[0]);
-        await trackPlayerService.play();
+        await nitroPlayerService.play();
       } else {
         // No similar tracks, just play the current track
         setQueue([track], 0);
         setCurrentTrack(track);
-        await trackPlayerService.play();
+        await nitroPlayerService.play();
       }
     } catch (error) {
       console.error('Failed to shuffle instant mix:', error);

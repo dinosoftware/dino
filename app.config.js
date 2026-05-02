@@ -3,7 +3,7 @@ module.exports = {
     name: "Dino",
     slug: "dino",
     scheme: "dino",
-    version: "2.6.0",
+    version: "3.0.0",
     orientation: "default",
     icon: "./assets/images/icon-square.png",
     userInterfaceStyle: "dark",
@@ -91,6 +91,7 @@ module.exports = {
     plugins: [
       "./plugins/withAndroidConfigChanges",
       "./plugins/googleCastFix",
+      "./plugins/withNitroPlayerAndroidAuto",
       [
         "expo-splash-screen",
         {

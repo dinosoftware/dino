@@ -3,7 +3,7 @@
  * Export all player-related services
  */
 
-export { trackPlayerService } from './TrackPlayerService';
+export { nitroPlayerService } from './NitroPlayerService';
 export { queueSyncManager } from './QueueSyncManager';
 export { scrobblingManager } from './ScrobblingManager';
 export { playerRouter } from './PlayerRouter';

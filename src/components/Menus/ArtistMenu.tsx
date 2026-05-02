@@ -23,11 +23,14 @@ import {
   Radio,
   Info,
   X,
+  Download,
 } from 'lucide-react-native';
 import { ArtistArtImage } from '../common';
 import { useTheme } from '../../hooks/useTheme';
 import { Artist } from '../../api/opensubsonic/types';
 import { useFavoritesStore } from '../../stores/favoritesStore';
+import { downloadService } from '../../services/DownloadService';
+import { useToastStore } from '../../stores/toastStore';
 
 interface ArtistMenuProps {
   visible: boolean;
@@ -221,6 +224,17 @@ export const ArtistMenu: React.FC<ArtistMenuProps> = ({ visible, onClose, artist
     onClose();
   };
 
+  const handleDownloadDiscography = async () => {
+    if (!artist) return;
+    try {
+      await downloadService.downloadArtistDiscography(artist.id);
+      useToastStore.getState().showToast(`Downloading ${artist.name} discography`);
+    } catch {
+      useToastStore.getState().showToast('Failed to start download', 'error');
+    }
+    onClose();
+  };
+
   if (!artist) return null;
 
   return (
@@ -288,6 +302,12 @@ export const ArtistMenu: React.FC<ArtistMenuProps> = ({ visible, onClose, artist
                 }
                 label={artist && isArtistStarred(artist.id) ? "Remove from Favorites" : "Add to Favorites"}
                 onPress={handleFavorite}
+                theme={theme}
+              />
+              <MenuItem
+                icon={<Download size={24} color={theme.colors.text.primary} />}
+                label="Download Discography"
+                onPress={handleDownloadDiscography}
                 theme={theme}
               />
               <MenuItem

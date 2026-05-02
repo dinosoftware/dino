@@ -3,7 +3,7 @@
  * Settings, app info, and user profile
  */
 
-import { trackPlayerService } from '@/src/services/player/TrackPlayerService';
+import { nitroPlayerService } from '@/src/services/player/NitroPlayerService';
 import { usePlayerStore } from '@/src/stores/playerStore';
 import { useQueueStore } from '@/src/stores/queueStore';
 import { useSettingsStore } from '@/src/stores/settingsStore';
@@ -20,7 +20,7 @@ import {
   Share2,
   X
 } from 'lucide-react-native';
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Linking,
@@ -42,6 +42,7 @@ import { useNavigationStore } from '../../stores/navigationStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useUserStore } from '../../stores/userStore';
 import { Avatar } from '../common';
+import { ConfirmModal } from '../Modals/ConfirmModal';
 
 interface UserSettingsMenuProps {
   visible: boolean;
@@ -105,6 +106,7 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
   const user = useUserStore((state) => state.user);
   const { navigate } = useNavigationStore();
   const { showToast } = useToastStore();
+  const [showDownloadLibConfirm, setShowDownloadLibConfirm] = useState(false);
 
   const username = user?.username || auth?.username || 'User';
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
@@ -228,7 +230,7 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
       }
       setQueue(response.randomSongs.song, 0);
       setCurrentTrack(response.randomSongs.song[0]);
-      await trackPlayerService.play();
+      await nitroPlayerService.play();
       showToast('Random songs started');
       onClose();
     } catch (error) {
@@ -284,6 +286,11 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
 
   const handleDownloadLibrary = async () => {
     onClose();
+    setShowDownloadLibConfirm(true);
+  };
+
+  const confirmDownloadLibrary = async () => {
+    setShowDownloadLibConfirm(false);
     try {
       showToast('Scanning library for downloads...');
       const result = await downloadService.downloadLibrary();
@@ -307,6 +314,7 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
   };
 
   return (
+    <>
     <Modal
       visible={visible}
       transparent
@@ -400,5 +408,15 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
         </Pressable>
       </Pressable>
     </Modal>
+    <ConfirmModal
+      visible={showDownloadLibConfirm}
+      title="Download Library"
+      message="This will download all albums from your server that aren't already downloaded. This may use significant storage and data. Continue?"
+      confirmText="Download"
+      cancelText="Cancel"
+      onClose={() => setShowDownloadLibConfirm(false)}
+      onConfirm={confirmDownloadLibrary}
+    />
+  </>
   );
 };

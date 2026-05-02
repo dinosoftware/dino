@@ -22,7 +22,7 @@ import { ToastContainer } from '../components/common/ToastContainer';
 import { OfflineBanner } from '../components/common';
 import { usePlayerStore } from '../stores';
 import { useNavigationStore } from '../stores/navigationStore';
-import { trackPlayerService } from '../services/player/TrackPlayerService';
+import { nitroPlayerService } from '../services/player/NitroPlayerService';
 import { useTheme } from '../hooks/useTheme';
 
 const queryClient = new QueryClient();
@@ -43,7 +43,7 @@ const SettingsScreenComponent = ({ onLogout }: { onLogout: () => void }) => (
 
 export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
   const theme = useTheme();
-  const { currentTrack } = usePlayerStore();
+  const currentTrack = usePlayerStore((state) => state.currentTrack);
   const { currentScreen, navigate, goBack, canGoBack, showFullPlayer, setShowFullPlayer, isPlayerOverlayOpen, closePlayerOverlay } = useNavigationStore();
   
   const activeTab = currentScreen.name === 'album-detail' || 
@@ -80,13 +80,13 @@ export const MainNavigator: React.FC<MainNavigatorProps> = ({ onLogout }) => {
 
   // Initialize TrackPlayer on mount
   useEffect(() => {
-    trackPlayerService.initialize().catch((error) => {
+    nitroPlayerService.initialize().catch((error) => {
       console.error('Failed to initialize TrackPlayer:', error);
     });
 
     return () => {
       // Cleanup on unmount
-      trackPlayerService.destroy();
+      nitroPlayerService.destroy();
     };
   }, []);
 

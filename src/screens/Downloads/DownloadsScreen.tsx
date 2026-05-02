@@ -1,12 +1,11 @@
 /**
  * Dino Music App - Downloads Screen
- * Comprehensive offline downloads management
+ * Comprehensive offline downloads management using nitro DownloadManager
  */
 
 import { Download, Play, Shuffle, Trash2, X } from 'lucide-react-native';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
-  FlatList,
   Image,
   SectionList,
   StyleSheet,
@@ -16,10 +15,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { DownloadManager } from 'react-native-nitro-player';
+import type { DownloadTask } from 'react-native-nitro-player';
 import { useTheme } from '../../hooks/useTheme';
 import { downloadService } from '../../services/DownloadService';
-import { trackPlayerService } from '../../services/player/TrackPlayerService';
-import { useDownloadStore, DownloadedTrack, DownloadedAlbum, DownloadedPlaylist } from '../../stores/downloadStore';
+import type { PendingGroupInfo, QueuedTrackInfo } from '../../services/DownloadService';
+import { nitroPlayerService } from '../../services/player/NitroPlayerService';
+import { useDownloadStore, CachedDownloadedTrack, CachedDownloadedAlbum, CachedDownloadedPlaylist } from '../../stores/downloadStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { usePlayerStore } from '../../stores/playerStore';
@@ -39,32 +41,75 @@ export const DownloadsScreen: React.FC = () => {
   const downloadedAlbums = useDownloadStore((state) => state.downloadedAlbums);
   const downloadedPlaylists = useDownloadStore((state) => state.downloadedPlaylists);
   const totalStorageUsed = useDownloadStore((state) => state.totalStorageUsed);
-  const activeDownloads = useDownloadStore((state) => state.activeDownloads);
-  const clearCompletedDownloads = useDownloadStore((state) => state.clearCompletedDownloads);
   const { storageLimit } = useSettingsStore();
   const { navigate } = useNavigationStore();
   const { setCurrentTrack } = usePlayerStore();
   const { setQueue } = useQueueStore();
   const { showToast } = useToastStore();
-  
+
+  const [activeTasks, setActiveTasks] = useState<DownloadTask[]>([]);
+  const [pendingGroups, setPendingGroups] = useState<PendingGroupInfo[]>([]);
+  const [queuedTracks, setQueuedTracks] = useState<QueuedTrackInfo[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    let pollCount = 0;
+    const poll = () => {
+      if (!mounted) return;
+      pollCount++;
+      try {
+        const tasks = DownloadManager.getActiveDownloads();
+        if (mounted) {
+          setActiveTasks(prev => {
+            if (prev.length === tasks.length && prev.every((t, i) => t.downloadId === tasks[i].downloadId && t.state === tasks[i].state && t.progress.progress === tasks[i].progress.progress)) return prev;
+            return tasks;
+          });
+        }
+        if (pollCount % 5 === 0 && tasks.length > 0) {
+          const qs = DownloadManager.getQueueStatus();
+          console.log('[DownloadsScreen] POLL — active:', qs.activeCount, 'pending:', qs.pendingCount, 'completed:', qs.completedCount, 'failed:', qs.failedCount);
+        }
+      } catch {}
+      try {
+        const groups = downloadService.getPendingGroups();
+        if (mounted) {
+          setPendingGroups(prev => {
+            if (prev.length === groups.length && prev.every((g, i) => g.completedTracks === groups[i].completedTracks && g.failedTracks === groups[i].failedTracks)) return prev;
+            return groups;
+          });
+        }
+      } catch {}
+      try {
+        const queued = downloadService.getQueuedDownloads();
+        if (mounted) {
+          setQueuedTracks(prev => {
+            if (prev.length === queued.length) return prev;
+            return queued;
+          });
+        }
+      } catch {}
+    };
+    poll();
+    const interval = setInterval(poll, 2000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, []);
+
   const albums = Object.values(downloadedAlbums);
   const playlists = Object.values(downloadedPlaylists);
-  const activeDownloadsList = Object.values(activeDownloads);
-  const completedCount = activeDownloadsList.filter(d => d.status === 'completed' || d.status === 'failed').length;
-  
+
   const albumTrackIds = new Set(
     albums.flatMap(album => album.tracks.map(t => t.track.id))
   );
   const playlistTrackIds = new Set(
     playlists.flatMap(playlist => playlist.tracks.map(t => t.track.id))
   );
-  
-  const tracks = Object.values(downloadedTracks).filter(
-    downloadedTrack => !albumTrackIds.has(downloadedTrack.track.id) && !playlistTrackIds.has(downloadedTrack.track.id)
+
+  const standaloneTracks = Object.values(downloadedTracks).filter(
+    t => !albumTrackIds.has(t.track.id) && !playlistTrackIds.has(t.track.id)
   );
 
   const storageLimitBytes = storageLimit * 1024 * 1024;
-  const storagePercentage = (totalStorageUsed / storageLimitBytes) * 100;
+  const storagePercentage = storageLimitBytes > 0 ? (totalStorageUsed / storageLimitBytes) * 100 : 0;
 
   const styles = useMemo(() => StyleSheet.create({
     container: {
@@ -178,11 +223,12 @@ export const DownloadsScreen: React.FC = () => {
     clearCompletedButton: {
       paddingHorizontal: theme.spacing.sm,
       paddingVertical: theme.spacing.xs,
+      marginRight: theme.spacing.sm,
     },
     clearCompletedText: {
       fontSize: theme.typography.fontSize.xs,
       fontWeight: theme.typography.fontWeight.semibold,
-      color: theme.colors.accent,
+      color: '#EF4444',
     },
     itemRow: {
       flexDirection: 'row',
@@ -265,10 +311,6 @@ export const DownloadsScreen: React.FC = () => {
       color: theme.colors.text.secondary,
       marginBottom: theme.spacing.xs,
     },
-    activeDownloadError: {
-      fontSize: theme.typography.fontSize.sm,
-      color: '#EF4444',
-    },
     miniProgressBar: {
       height: 4,
       backgroundColor: theme.colors.background.elevated,
@@ -310,34 +352,37 @@ export const DownloadsScreen: React.FC = () => {
 
   const handlePlayAll = async () => {
     const allTracks = Object.values(downloadedTracks).map(d => d.track);
-    
     if (allTracks.length === 0) {
       showToast('No downloaded tracks to play', 'info');
       return;
     }
-
     setQueue(allTracks, 0);
     setCurrentTrack(allTracks[0]);
-    await trackPlayerService.play();
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    showToast(`Playing ${allTracks.length} downloaded tracks`);
+    try {
+      await nitroPlayerService.play();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(`Playing ${allTracks.length} downloaded tracks`);
+    } catch {
+      showToast('Failed to start playback', 'error');
+    }
   };
 
   const handleShuffleAll = async () => {
     const allTracks = Object.values(downloadedTracks).map(d => d.track);
-    
     if (allTracks.length === 0) {
       showToast('No downloaded tracks to shuffle', 'info');
       return;
     }
-
     const shuffled = [...allTracks].sort(() => Math.random() - 0.5);
-    
     setQueue(shuffled, 0);
     setCurrentTrack(shuffled[0]);
-    await trackPlayerService.play();
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    showToast(`Shuffling ${shuffled.length} downloaded tracks`);
+    try {
+      await nitroPlayerService.play();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(`Shuffling ${shuffled.length} downloaded tracks`);
+    } catch {
+      showToast('Failed to start playback', 'error');
+    }
   };
 
   const handleClearAll = async () => {
@@ -345,16 +390,16 @@ export const DownloadsScreen: React.FC = () => {
       await downloadService.clearAllDownloads();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showToast('All downloads cleared');
-    } catch (error) {
+    } catch {
       showToast('Failed to clear downloads', 'error');
     }
   };
 
-  const handlePlayTrack = async (download: DownloadedTrack, index: number) => {
-    const allTracks = tracks.map(d => d.track);
+  const handlePlayTrack = async (download: CachedDownloadedTrack, index: number) => {
+    const allTracks = standaloneTracks.map(d => d.track);
     setQueue(allTracks, index);
     setCurrentTrack(download.track);
-    await trackPlayerService.play();
+    await nitroPlayerService.play();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
@@ -368,7 +413,7 @@ export const DownloadsScreen: React.FC = () => {
     }
   };
 
-  const handleAlbumPress = (album: DownloadedAlbum) => {
+  const handleAlbumPress = (album: CachedDownloadedAlbum) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     navigate({ name: 'album-detail', params: { albumId: album.album.id } });
   };
@@ -383,7 +428,7 @@ export const DownloadsScreen: React.FC = () => {
     }
   };
 
-  const handlePlaylistPress = (playlist: DownloadedPlaylist) => {
+  const handlePlaylistPress = (playlist: CachedDownloadedPlaylist) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     navigate({ name: 'playlist-detail', params: { playlistId: playlist.playlist.id } });
   };
@@ -395,6 +440,29 @@ export const DownloadsScreen: React.FC = () => {
       showToast('Playlist removed');
     } catch (error) {
       showToast('Failed to remove playlist', 'error');
+    }
+  };
+
+  const handleCancelTask = async (taskId: string) => {
+    try {
+      await downloadService.cancelDownload(taskId);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Download cancelled');
+    } catch (error) {
+      showToast('Failed to cancel download', 'error');
+    }
+  };
+
+  const handleCancelAllActive = async () => {
+    try {
+      await downloadService.cancelAllQueuedDownloads();
+      setActiveTasks([]);
+      setPendingGroups([]);
+      setQueuedTracks([]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('All downloads cancelled');
+    } catch {
+      showToast('Failed to cancel downloads', 'error');
     }
   };
 
@@ -415,8 +483,8 @@ export const DownloadsScreen: React.FC = () => {
         />
       </View>
       <View style={styles.storageActions}>
-        <TouchableOpacity 
-          style={[styles.actionButton, { flex: 1, marginRight: theme.spacing.xs }]} 
+        <TouchableOpacity
+          style={[styles.actionButton, { flex: 1, marginRight: theme.spacing.xs }]}
           onPress={handlePlayAll}
           disabled={Object.keys(downloadedTracks).length === 0}
         >
@@ -425,8 +493,8 @@ export const DownloadsScreen: React.FC = () => {
             Play All
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.actionButton, { flex: 1, marginLeft: theme.spacing.xs }]} 
+        <TouchableOpacity
+          style={[styles.actionButton, { flex: 1, marginLeft: theme.spacing.xs }]}
           onPress={handleShuffleAll}
           disabled={Object.keys(downloadedTracks).length === 0}
         >
@@ -436,7 +504,7 @@ export const DownloadsScreen: React.FC = () => {
           </Text>
         </TouchableOpacity>
       </View>
-      {(tracks.length > 0 || albums.length > 0 || playlists.length > 0) && (
+      {(standaloneTracks.length > 0 || albums.length > 0 || playlists.length > 0) && (
         <TouchableOpacity style={styles.clearAllButton} onPress={handleClearAll}>
           <Text style={styles.clearAllText}>Clear All Downloads</Text>
         </TouchableOpacity>
@@ -444,32 +512,62 @@ export const DownloadsScreen: React.FC = () => {
     </View>
   );
 
-  const handleCancelDownload = async (itemId: string) => {
-    try {
-      await downloadService.cancelDownload(itemId);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast('Download cancelled');
-    } catch (error) {
-      showToast('Failed to cancel download', 'error');
+  const renderActiveDownload = ({ item }: { item: DownloadTask }) => {
+    const progressPercent = Math.round(item.progress.progress * 100);
+    const isCancellable = item.state === 'downloading' || item.state === 'pending';
+    const meta = downloadService.getTrackDownloadMeta(item.trackId);
+    const groupInfo = meta?.groupId ? downloadService.getGroupInfo(meta.groupId) : undefined;
+
+    let subtitle = '';
+    if (item.state === 'failed' && item.error?.message) {
+      subtitle = item.error.message;
+    } else if (meta?.artist) {
+      subtitle = meta.artist;
     }
+
+    const coverUri = meta?.coverArtUri || groupInfo?.coverArtUri;
+
+    return (
+      <View style={styles.activeDownloadRow}>
+        {coverUri ? (
+          <Image source={{ uri: coverUri }} style={styles.activeDownloadCover} />
+        ) : (
+          <View style={[styles.activeDownloadCover, styles.activeDownloadCoverPlaceholder]}>
+            <Download size={20} color={theme.colors.text.tertiary} />
+          </View>
+        )}
+        <View style={styles.activeDownloadInfo}>
+          <Text style={styles.activeDownloadTitle} numberOfLines={1}>
+            {meta?.title || item.trackId}
+          </Text>
+          <Text style={styles.activeDownloadSubtitle} numberOfLines={1}>
+            {subtitle}
+          </Text>
+          <Text style={styles.activeDownloadStatus}>
+            {item.state === 'pending' ? 'Pending' : item.state === 'paused' ? 'Paused' : `${progressPercent}%`}
+          </Text>
+          {item.state === 'downloading' && (
+            <View style={styles.miniProgressBar}>
+              <View style={[styles.miniProgressFill, { width: `${progressPercent}%` }]} />
+            </View>
+          )}
+        </View>
+        {isCancellable && (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => handleCancelTask(item.downloadId)}
+          >
+            <X size={18} color={theme.colors.text.secondary} />
+          </TouchableOpacity>
+        )}
+      </View>
+    );
   };
 
-  const renderActiveDownload = ({ item }: { item: any }) => {
-    const progressPercent = Math.round(item.progress * 100);
-    const isComplete = item.status === 'completed';
-    const isFailed = item.status === 'failed';
-    const isCancellable = item.status === 'downloading' || item.status === 'pending';
-
-    const title = item.title || 'Downloading...';
-    let subtitle = '';
-    
-    if (item.type === 'album' && item.totalTracks) {
-      subtitle = `${item.artist || 'Album'} • ${item.completedTracks || 0}/${item.totalTracks} tracks`;
-    } else if (item.type === 'playlist' && item.totalTracks) {
-      subtitle = `${item.completedTracks || 0}/${item.totalTracks} tracks`;
-    } else if (item.type === 'track') {
-      subtitle = item.artist || 'Track';
-    }
+  const renderPendingGroup = ({ item }: { item: PendingGroupInfo }) => {
+    const progressPercent = item.totalTracks > 0
+      ? Math.round(((item.completedTracks + item.failedTracks) / item.totalTracks) * 100)
+      : 0;
 
     return (
       <View style={styles.activeDownloadRow}>
@@ -482,74 +580,66 @@ export const DownloadsScreen: React.FC = () => {
         )}
         <View style={styles.activeDownloadInfo}>
           <Text style={styles.activeDownloadTitle} numberOfLines={1}>
-            {title}
+            {item.name}
           </Text>
           <Text style={styles.activeDownloadSubtitle} numberOfLines={1}>
-            {subtitle}
+            {item.type === 'album' ? 'Album' : 'Playlist'}
           </Text>
-          {isFailed ? (
-            <Text style={styles.activeDownloadError}>{item.error || 'Failed'}</Text>
-          ) : (
-            <>
-              <Text style={styles.activeDownloadStatus}>
-                {isComplete ? 'Complete' : `${progressPercent}%`}
-              </Text>
-              {!isComplete && (
-                <View style={styles.miniProgressBar}>
-                  <View style={[styles.miniProgressFill, { width: `${progressPercent}%` }]} />
-                </View>
-              )}
-            </>
-          )}
+          <Text style={styles.activeDownloadStatus}>
+            {item.completedTracks}/{item.totalTracks} tracks
+            {item.failedTracks > 0 ? ` (${item.failedTracks} failed)` : ''}
+          </Text>
+          <View style={styles.miniProgressBar}>
+            <View style={[styles.miniProgressFill, { width: `${progressPercent}%` }]} />
+          </View>
         </View>
-        {isCancellable && (
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => handleCancelDownload(item.itemId)}
-          >
-            <X size={18} color={theme.colors.text.secondary} />
-          </TouchableOpacity>
-        )}
       </View>
     );
   };
 
-  const renderAlbum = ({ item }: { item: DownloadedAlbum }) => {
-    const coverUri = item.coverArtUri;
-
+  const renderQueuedTrack = ({ item, index }: { item: QueuedTrackInfo; index: number }) => {
     return (
-      <TouchableOpacity 
-        style={styles.itemRow} 
+      <View style={styles.activeDownloadRow}>
+        <View style={[styles.activeDownloadCover, styles.activeDownloadCoverPlaceholder]}>
+          <Download size={20} color={theme.colors.text.tertiary} />
+        </View>
+        <View style={styles.activeDownloadInfo}>
+          <Text style={styles.activeDownloadTitle} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <Text style={styles.activeDownloadSubtitle} numberOfLines={1}>
+            {item.artist}
+          </Text>
+          <Text style={styles.activeDownloadStatus}>
+            Queued #{index + 1}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderAlbum = ({ item }: { item: CachedDownloadedAlbum }) => {
+    const coverUri = item.coverArtUri;
+    return (
+      <TouchableOpacity
+        style={styles.itemRow}
         onPress={() => handleAlbumPress(item)}
         activeOpacity={0.7}
       >
         <View style={styles.itemLeft}>
           <Image
-            source={
-              coverUri
-                ? { uri: coverUri }
-                : require('../../../assets/images/album_art_placeholder.png')
-            }
+            source={coverUri ? { uri: coverUri } : require('../../../assets/images/album_art_placeholder.png')}
             style={styles.coverArt}
           />
           <View style={styles.itemInfo}>
-            <Text style={styles.itemTitle} numberOfLines={1}>
-              {item.album.name}
-            </Text>
-            <Text style={styles.itemSubtitle} numberOfLines={1}>
-              {item.album.artist || 'Unknown Artist'}
-            </Text>
-            <Text style={styles.itemDetails}>
-              {item.tracks.length} tracks • {formatBytes(item.totalSize)}
-            </Text>
+            <Text style={styles.itemTitle} numberOfLines={1}>{item.album.name}</Text>
+            <Text style={styles.itemSubtitle} numberOfLines={1}>{item.album.artist || 'Unknown Artist'}</Text>
+            <Text style={styles.itemDetails}>{item.tracks.length} tracks • {formatBytes(item.totalSize)}</Text>
           </View>
         </View>
         <TouchableOpacity
           style={styles.deleteButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleDeleteAlbum(item.album.id);
-          }}
+          onPress={(e) => { e.stopPropagation(); handleDeleteAlbum(item.album.id); }}
         >
           <Trash2 size={20} color={theme.colors.text.secondary} />
         </TouchableOpacity>
@@ -557,42 +647,28 @@ export const DownloadsScreen: React.FC = () => {
     );
   };
 
-  const renderPlaylist = ({ item }: { item: DownloadedPlaylist }) => {
+  const renderPlaylist = ({ item }: { item: CachedDownloadedPlaylist }) => {
     const coverUri = item.coverArtUri;
-
     return (
-      <TouchableOpacity 
-        style={styles.itemRow} 
+      <TouchableOpacity
+        style={styles.itemRow}
         onPress={() => handlePlaylistPress(item)}
         activeOpacity={0.7}
       >
         <View style={styles.itemLeft}>
           <Image
-            source={
-              coverUri
-                ? { uri: coverUri }
-                : require('../../../assets/images/album_art_placeholder.png')
-            }
+            source={coverUri ? { uri: coverUri } : require('../../../assets/images/album_art_placeholder.png')}
             style={styles.coverArt}
           />
           <View style={styles.itemInfo}>
-            <Text style={styles.itemTitle} numberOfLines={1}>
-              {item.playlist.name}
-            </Text>
-            <Text style={styles.itemSubtitle} numberOfLines={1}>
-              {item.tracks.length} tracks
-            </Text>
-            <Text style={styles.itemDetails}>
-              {formatBytes(item.totalSize)}
-            </Text>
+            <Text style={styles.itemTitle} numberOfLines={1}>{item.playlist.name}</Text>
+            <Text style={styles.itemSubtitle} numberOfLines={1}>{item.tracks.length} tracks</Text>
+            <Text style={styles.itemDetails}>{formatBytes(item.totalSize)}</Text>
           </View>
         </View>
         <TouchableOpacity
           style={styles.deleteButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleDeletePlaylist(item.playlist.id);
-          }}
+          onPress={(e) => { e.stopPropagation(); handleDeletePlaylist(item.playlist.id); }}
         >
           <Trash2 size={20} color={theme.colors.text.secondary} />
         </TouchableOpacity>
@@ -600,42 +676,28 @@ export const DownloadsScreen: React.FC = () => {
     );
   };
 
-  const renderTrack = ({ item, index }: { item: DownloadedTrack; index: number }) => {
+  const renderTrack = ({ item, index }: { item: CachedDownloadedTrack; index: number }) => {
     const coverUri = item.coverArtUri;
-
     return (
-      <TouchableOpacity 
-        style={styles.itemRow} 
+      <TouchableOpacity
+        style={styles.itemRow}
         onPress={() => handlePlayTrack(item, index)}
         activeOpacity={0.7}
       >
         <View style={styles.itemLeft}>
           <Image
-            source={
-              coverUri
-                ? { uri: coverUri }
-                : require('../../../assets/images/album_art_placeholder.png')
-            }
+            source={coverUri ? { uri: coverUri } : require('../../../assets/images/album_art_placeholder.png')}
             style={styles.coverArt}
           />
           <View style={styles.itemInfo}>
-            <Text style={styles.itemTitle} numberOfLines={1}>
-              {item.track.title}
-            </Text>
-            <Text style={styles.itemSubtitle} numberOfLines={1}>
-              {item.track.artist || 'Unknown Artist'}
-            </Text>
-            <Text style={styles.itemDetails}>
-              {formatBytes(item.size)}
-            </Text>
+            <Text style={styles.itemTitle} numberOfLines={1}>{item.track.title}</Text>
+            <Text style={styles.itemSubtitle} numberOfLines={1}>{item.track.artist || 'Unknown Artist'}</Text>
+            <Text style={styles.itemDetails}>{formatBytes(item.size)}</Text>
           </View>
         </View>
         <TouchableOpacity
           style={styles.deleteButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleDeleteTrack(item.track.id);
-          }}
+          onPress={(e) => { e.stopPropagation(); handleDeleteTrack(item.track.id); }}
         >
           <Trash2 size={20} color={theme.colors.text.secondary} />
         </TouchableOpacity>
@@ -645,22 +707,16 @@ export const DownloadsScreen: React.FC = () => {
 
   const renderSectionHeader = ({ section }: { section: DownloadSection }) => {
     if (section.data.length === 0) return null;
-
-    const isActiveSection = section.type === 'active';
-
     return (
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{section.title}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          {isActiveSection && completedCount > 0 && (
-            <TouchableOpacity 
+          {section.type === 'active' && (
+            <TouchableOpacity
               style={styles.clearCompletedButton}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                clearCompletedDownloads();
-              }}
+              onPress={handleCancelAllActive}
             >
-              <Text style={styles.clearCompletedText}>Clear Completed</Text>
+              <Text style={styles.clearCompletedText}>Cancel All</Text>
             </TouchableOpacity>
           )}
           <Text style={styles.sectionCount}>{section.data.length}</Text>
@@ -679,48 +735,45 @@ export const DownloadsScreen: React.FC = () => {
     </View>
   );
 
-  const sections: DownloadSection[] = [
-    {
-      title: 'Active Downloads',
-      data: activeDownloadsList,
-      type: 'active',
-    },
-    {
-      title: 'Albums',
-      data: albums,
-      type: 'album',
-    },
-    {
-      title: 'Playlists',
-      data: playlists,
-      type: 'playlist',
-    },
-    {
-      title: 'Individual Tracks',
-      data: tracks,
-      type: 'track',
-    },
+  const hasActiveDownloads = pendingGroups.length > 0 || activeTasks.length > 0 || queuedTracks.length > 0;
+
+  const activeData = [
+    ...pendingGroups as any[],
+    ...activeTasks as any[],
+    ...queuedTracks as any[],
   ];
 
-  const hasAnyContent = activeDownloadsList.length > 0 || albums.length > 0 || playlists.length > 0 || tracks.length > 0;
+  const sections: DownloadSection[] = [
+    { title: 'Active Downloads', data: activeData, type: 'active' },
+    { title: 'Albums', data: albums, type: 'album' },
+    { title: 'Playlists', data: playlists, type: 'playlist' },
+    { title: 'Individual Tracks', data: standaloneTracks, type: 'track' },
+  ];
+
+  const hasAnyContent = hasActiveDownloads || albums.length > 0 || playlists.length > 0 || standaloneTracks.length > 0;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.topBar}>
         <Text style={styles.screenTitle}>Downloads</Text>
       </View>
-
       <SectionList
         sections={sections}
         keyExtractor={(item, index) => {
-          if ('id' in item) return item.id;
+          if ('downloadId' in item) return item.downloadId;
+          if ('totalTracks' in item) return (item as PendingGroupInfo).id;
           if ('album' in item) return item.album.id;
           if ('playlist' in item) return item.playlist.id;
           if ('track' in item) return item.track.id;
-          return `item_${index}`;
+          return `queued_${index}`;
         }}
         renderItem={({ item, section, index }) => {
-          if (section.type === 'active') return renderActiveDownload({ item });
+          if (section.type === 'active') {
+            if ('totalTracks' in item) return renderPendingGroup({ item: item as PendingGroupInfo });
+            if ('downloadId' in item) return renderActiveDownload({ item: item as DownloadTask });
+            if ('groupId' in item) return renderQueuedTrack({ item: item as QueuedTrackInfo, index });
+            return null;
+          }
           if (section.type === 'album') return renderAlbum({ item });
           if (section.type === 'playlist') return renderPlaylist({ item });
           if (section.type === 'track') return renderTrack({ item, index });
