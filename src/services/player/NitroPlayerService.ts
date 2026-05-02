@@ -7,14 +7,10 @@ import { PermissionsAndroid, Platform } from 'react-native';
 import * as Network from 'expo-network';
 import { TrackPlayer, PlayerQueue, AndroidAutoMediaLibraryHelper, DownloadManager } from 'react-native-nitro-player';
 import type { TrackItem, RepeatMode as NitroRepeatMode } from 'react-native-nitro-player';
-import { getStreamUrl } from '../../api/opensubsonic/streaming';
-import { getCachedArtworkUri } from '../../utils/artworkCache';
-import { getSimilarSongs2 } from '../../api/opensubsonic/radio';
-import { getAlbumList2, getAlbum } from '../../api/opensubsonic/albums';
-import { getPlaylists, getPlaylist } from '../../api/opensubsonic/playlists';
-import { Track } from '../../api/opensubsonic/types';
-import { usePlayerStore, useQueueStore, useSettingsStore } from '../../stores';
+import { getCoverArtUrl, getStreamUrl } from '../../api/opensubsonic/streaming';
+import { getArtworkUri } from '../../utils/artworkCache';
 import { useDownloadStore } from '../../stores/downloadStore';
+import { usePlayerStore, useQueueStore, useSettingsStore } from '../../stores';
 import { setClearRestoredPositionCallback, setClearPreloadedTracksCallback, setResetPlayerCallback, setSkipToNextPlayerCallback, setPlayTrackCallback, setNativeAddToQueueCallback, setNativeRemoveFromQueueCallback, setNativeReorderQueueCallback, setNativeRebuildCallback } from '../../stores/queueStore';
 import { queueSyncManager } from './QueueSyncManager';
 import { scrobblingManager } from './ScrobblingManager';
@@ -495,7 +491,7 @@ class NitroPlayerService implements PlayerService {
   private async buildLazyTrackItem(track: Track, index: number): Promise<TrackItem> {
     let artwork: string | undefined;
     if (track.coverArt) {
-      try { artwork = (await getCachedArtworkUri(track.coverArt, 500)) ?? undefined; } catch {}
+      try { artwork = (await getArtworkUri(track.coverArt, 500)) ?? await getCoverArtUrl(track.coverArt, 500); } catch {}
     }
 
     return {
@@ -517,7 +513,7 @@ class NitroPlayerService implements PlayerService {
 
     let artwork: string | undefined;
     if (track.coverArt) {
-      try { artwork = (await getCachedArtworkUri(track.coverArt, 500)) ?? undefined; } catch {}
+      try { artwork = (await getArtworkUri(track.coverArt, 500)) ?? await getCoverArtUrl(track.coverArt, 500); } catch {}
     }
 
     return {

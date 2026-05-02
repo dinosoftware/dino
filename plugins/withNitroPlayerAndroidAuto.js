@@ -1,8 +1,64 @@
-const { withAndroidManifest } = require('@expo/config-plugins');
+const { withDangerousMod, withAndroidManifest } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
 const SERVICE_NAME = 'com.margelo.nitro.nitroplayer.media.NitroPlayerMediaBrowserService';
+const ARTWORK_AUTHORITY = 'sonic.dino.artwork.provider';
+const ARTWORK_PROVIDER_CLASS = 'sonic.dino.provider.ArtworkProvider';
+
+function withArtworkProvider(config) {
+  config = withAndroidManifest(config, (config) => {
+    const application = config.modResults.manifest.application[0];
+
+    if (!application.provider) {
+      application.provider = [];
+    }
+
+    const hasProvider = application.provider.some(
+      (p) => p.$['android:authorities'] === ARTWORK_AUTHORITY
+    );
+
+    if (!hasProvider) {
+      application.provider.push({
+        $: {
+          'android:name': ARTWORK_PROVIDER_CLASS,
+          'android:authorities': ARTWORK_AUTHORITY,
+          'android:exported': 'true',
+        },
+      });
+    }
+
+    return config;
+  });
+
+  config = withDangerousMod(config, [
+    'android',
+    async (config) => {
+      const kotlinDir = path.join(
+        config.modRequest.platformProjectRoot,
+        'app',
+        'src',
+        'main',
+        'java',
+        'sonic',
+        'dino',
+        'provider'
+      );
+      if (!fs.existsSync(kotlinDir)) {
+        fs.mkdirSync(kotlinDir, { recursive: true });
+      }
+
+      const srcFile = path.join(__dirname, 'ArtworkProvider.java');
+      const destFile = path.join(kotlinDir, 'ArtworkProvider.java');
+
+      fs.copyFileSync(srcFile, destFile);
+
+      return config;
+    },
+  ]);
+
+  return config;
+}
 
 function withAutomotiveAppDesc(config) {
   return withAndroidManifest(config, (config) => {
@@ -30,6 +86,7 @@ function withAutomotiveAppDesc(config) {
 
 const withNitroPlayerAndroidAuto = (config) => {
   config = withAutomotiveAppDesc(config);
+  config = withArtworkProvider(config);
 
   return withAndroidManifest(config, (config) => {
     const manifest = config.modResults.manifest;

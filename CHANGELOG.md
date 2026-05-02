@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [3.0.0] - 2026-05-01
+## [3.0.0] - 2026-05-02
 
 ### Added
+- **Artwork Cache System**: Disk-based artwork cache in Android cache directory (cleared by Android when user clears app cache)
+  - Custom `ArtworkProvider` ContentProvider serves cached artwork to Android Auto via `content://` URIs
+  - Background caching — artwork downloads fire without blocking playback
+  - Cache hit returns `content://` URI instantly, miss falls back to server URL and triggers background download
+- **Notification Permission**: App requests `POST_NOTIFICATIONS` on Android 13+ at startup
 - **Download Artist Discography**: New option in artist menu to download all albums by an artist
 - **Download Queue with Concurrency Control**: Manual queue system that properly respects the max concurrent downloads setting
   - Tracks are queued and started one at a time, only up to the configured limit
@@ -22,7 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Player Engine**: Replaced `react-native-track-player` with `react-native-nitro-player` for all audio playback
   - Gapless playback with precache system (resolves next track URLs at 50% progress)
   - Surgical queue sync — only updates changed tracks instead of full rebuild
-  - Track IDs encode queue index for reliable position tracking
+- **Queue Operations No Longer Rebuild**: Add to queue, remove from queue, and reorder now use nitro's surgical APIs (`addTrackToPlaylist`, `removeTrackFromPlaylist`, `reorderTrackInPlaylist`) — no audio interruption
+  - Only shuffle/unshuffle still does a full rebuild (unavoidable)
+- **Non-Blocking Playlist Creation**: `recreatePlaylist` only fetches stream URLs for current + next 2 tracks; remaining tracks use lazy `url: ''` resolved via `onTracksNeedUpdate`
+  - Track items built in parallel via `Promise.all`
+- **Surgical Native Queue Callbacks**: Replaced single `syncQueueCallback` with specific `nativeAddToQueueCallback`, `nativeRemoveFromQueueCallback`, `nativeReorderQueueCallback`, and `nativeRebuildCallback`
 - **Download System Overhaul**: Replaced expo-file-system downloads with native nitro DownloadManager
   - Background downloads via WorkManager (continues when app is minimized)
   - Full track metadata (including cover art) stored in download payload for offline hydration
@@ -36,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Progress Updates**: Throttled to 250ms intervals to reduce JS bridge overhead
 
 ### Fixed
+- **Queue Modifications Causing Audio Reset**: Add/remove/reorder no longer triggers full playlist rebuild — uses surgical nitro APIs instead
+- **Artwork Downloads Blocking Playback**: `buildTrackItem` uses fast server URL construction, artwork cache populates in background
+- **Android Auto Cover Art**: Artwork now displays on AA head unit via custom exported ContentProvider serving cached artwork files
 - **Quality Indicator Missing on Fresh Open**: Streaming info now updates when restoring queue from server/local storage on app launch
 - **Downloads Disappearing on Revisit**: All data types (groups, active tasks, queued tracks) now load on first poll instead of skipping
 - **Album Covers Missing After Restart**: Hydration now resolves cover art URLs from track metadata and server
