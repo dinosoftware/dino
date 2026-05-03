@@ -1,0 +1,60 @@
+diff --git a/node_modules/react-native-nitro-player/android/src/main/java/com/margelo/nitro/nitroplayer/media/PlaybackService.kt b/node_modules/react-native-nitro-player/android/src/main/java/com/margelo/nitro/nitroplayer/media/PlaybackService.kt
+index a5c10a2..3d208c4 100644
+--- a/node_modules/react-native-nitro-player/android/src/main/java/com/margelo/nitro/nitroplayer/media/PlaybackService.kt
++++ b/node_modules/react-native-nitro-player/android/src/main/java/com/margelo/nitro/nitroplayer/media/PlaybackService.kt
+@@ -1,5 +1,6 @@
+ package com.margelo.nitro.nitroplayer.media
+ 
++import android.app.PendingIntent
+ import android.content.Intent
+ import android.os.Binder
+ import android.os.Handler
+@@ -7,6 +8,7 @@ import android.os.IBinder
+ import android.os.Looper
+ import androidx.media3.common.util.UnstableApi
+ import androidx.media3.exoplayer.ExoPlayer
++import androidx.media3.session.DefaultMediaNotificationProvider
+ import androidx.media3.session.MediaSession
+ import androidx.media3.session.MediaSessionService
+ import com.margelo.nitro.nitroplayer.core.NitroPlayerLogger
+@@ -52,25 +54,37 @@ class NitroPlayerPlaybackService : MediaSessionService() {
+     // ── Lifecycle ───────────────────────────────────────────────────────────
+ 
+     override fun onCreate() {
++        val notificationIconResId = resources.getIdentifier(
++            "notification_icon", "drawable", packageName
++        )
++        val notificationProvider = DefaultMediaNotificationProvider(this)
++        notificationProvider.setSmallIcon(if (notificationIconResId != 0) notificationIconResId else applicationInfo.icon)
++        setMediaNotificationProvider(notificationProvider)
++
+         super.onCreate()
+         NitroPlayerLogger.log("PlaybackService") { "onCreate" }
+ 
+         // Build ExoPlayer on main looper (default)
+         player = ExoPlayerBuilder.build(this)
+ 
+-        // Build MediaSession
++        // Build MediaSession with session activity for notification click
+         val playlistManager = PlaylistManager.getInstance(this)
++        val sessionActivity = PendingIntent.getActivity(
++            this,
++            0,
++            packageManager.getLaunchIntentForPackage(packageName),
++            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
++        )
+         mediaSession = MediaSession
+             .Builder(this, player)
+             .setCallback(MediaSessionCallbackFactory.create(this, playlistManager))
++            .setSessionActivity(sessionActivity)
+             .build()
+ 
+         // Explicitly register the session with the service so that
+         // MediaNotificationManager (created in super.onCreate()) can
+         // connect its internal MediaController and post notifications.
+         addSession(mediaSession!!)
+-
+-        // Media3 automatically handles the notification via DefaultMediaNotificationProvider.
+     }
+ 
+     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =

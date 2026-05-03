@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-05-03
+
+### Added
+- **Notification Icon**: Media notification now uses transparent app icon as small icon (via `DefaultMediaNotificationProvider` with Expo-generated `notification_icon` drawable)
+- **Notification Click**: Tapping the media notification now opens the app (session activity set on MediaSession)
+
+### Fixed
+- **Paused State Carrying Over to New Songs**: Selecting a new song or creating a new queue now always starts playback, even if the previous song was paused
+- **Media Notification Click Not Working**: Notification click opened nothing — patched `PlaybackService.kt` to set `PendingIntent` launch intent as session activity on `MediaSession`
+- **Media Notification Wrong Icon**: Status bar showed generic system icon — patched to use app's notification icon resource
+
 ## [3.0.0] - 2026-05-02
 
 ### Added

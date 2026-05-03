@@ -3,7 +3,7 @@ module.exports = {
     name: "Dino",
     slug: "dino",
     scheme: "dino",
-    version: "3.0.0",
+    version: "3.0.1",
     orientation: "default",
     icon: "./assets/images/icon-square.png",
     userInterfaceStyle: "dark",
@@ -81,6 +81,10 @@ module.exports = {
           category: ["BROWSABLE", "DEFAULT"]
         }
       ]
+    },
+
+    notification: {
+      icon: "./assets/images/icon-transparent.png"
     },
 
     web: {

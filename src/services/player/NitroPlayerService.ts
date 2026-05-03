@@ -756,6 +756,7 @@ private async ensurePlaylistSynced(): Promise<void> {
       const trackId = currentTrack.id;
 
       await TrackPlayer.playSong(trackId, this.playlistId!);
+      await TrackPlayer.play();
 
       if (restoredPosition !== null && restoredPosition > 0) {
         console.log('[NitroPlayer] Restoring position:', restoredPosition);
@@ -861,6 +862,7 @@ private async ensurePlaylistSynced(): Promise<void> {
     this.isStartingPlayback = true;
     try {
       await TrackPlayer.playSong(trackId, this.playlistId!);
+      await TrackPlayer.play();
     } catch {
       this.isStartingPlayback = false;
       await this.play();
