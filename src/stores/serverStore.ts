@@ -14,6 +14,7 @@ export interface ServerCapabilities {
   supportsFormPost: boolean;
   supportsApiKeyAuth: boolean;
   supportsSongLyrics: boolean;
+  supportsSonicSimilarity: boolean;
   lastChecked: number;
 }
 

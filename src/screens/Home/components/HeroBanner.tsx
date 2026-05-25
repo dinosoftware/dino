@@ -20,7 +20,7 @@ import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { getRandomSongs } from '../../../api/opensubsonic/songs';
-import { getSimilarSongs2 } from '../../../api/opensubsonic/radio';
+import { getSmartSimilarTracks } from '../../../api/opensubsonic/radio';
 import { useCoverArt } from '../../../hooks/api/useAlbums';
 import { useNavigationStore } from '../../../stores/navigationStore';
 import { HeroBannerSkeleton } from '../../../components/common';
@@ -176,8 +176,7 @@ const HeroCard: React.FC<HeroCardProps> = ({ track, cardWidth }) => {
     try {
       // Get similar songs (instant mix)
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const response = await getSimilarSongs2(track.id);
-      const similarTracks = response.similarSongs2?.song || [];
+      const similarTracks = await getSmartSimilarTracks(track.id);
       
       if (similarTracks.length > 0) {
         // Start with the current track, then add similar tracks
@@ -201,8 +200,7 @@ const HeroCard: React.FC<HeroCardProps> = ({ track, cardWidth }) => {
     try {
       // Get similar songs and shuffle
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const response = await getSimilarSongs2(track.id);
-      const similarTracks = response.similarSongs2?.song || [];
+      const similarTracks = await getSmartSimilarTracks(track.id);
       
       if (similarTracks.length > 0) {
         // Shuffle the similar tracks

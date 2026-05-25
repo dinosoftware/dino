@@ -30,7 +30,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getSimilarSongs2 } from '../../api/opensubsonic/radio';
+import { getSmartSimilarTracks } from '../../api/opensubsonic/radio';
 import { createShare } from '../../api/opensubsonic/share';
 import { Artist, Track } from '../../api/opensubsonic/types';
 import { useCoverArt } from '../../hooks/api';
@@ -195,8 +195,7 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ visible, onClose, track, o
     onClose();
 
     try {
-      const response = await getSimilarSongs2(track.id);
-      const similarSongs = response.similarSongs2?.song || [];
+      const similarSongs = await getSmartSimilarTracks(track.id);
 
       if (similarSongs.length === 0) {
         showToast(`Could not find similar songs for "${track.title}"`, 'error');

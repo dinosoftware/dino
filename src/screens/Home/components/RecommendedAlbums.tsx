@@ -3,7 +3,7 @@
  * Horizontal carousel of newest/random albums
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { RefreshCw } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -22,6 +22,8 @@ export const RecommendedAlbums: React.FC = () => {
   const theme = useTheme();
   const { data: albums, isLoading, error, refetch } = useAlbums('newest', 20);
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollXRef = useRef(0);
 
   if (isLoading) {
     return (
@@ -81,9 +83,12 @@ export const RecommendedAlbums: React.FC = () => {
         </TouchableOpacity>
       </View>
       <ScrollView
+        ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        onScroll={(e) => { scrollXRef.current = e.nativeEvent.contentOffset.x; }}
+        scrollEventThrottle={16}
       >
         {albums.map((album) => (
           <AlbumCardWithArt key={album.id} album={album} />

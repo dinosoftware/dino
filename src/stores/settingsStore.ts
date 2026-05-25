@@ -37,6 +37,7 @@ interface Settings {
   autoSyncQueue: boolean;
   queueSyncInterval: number;
   autoExtendQueue: boolean;
+  useSonicSimilarity: boolean;
   enableScrobbling: boolean;
   scrobbleProgressInterval: number;
   includeShareMessage: boolean;

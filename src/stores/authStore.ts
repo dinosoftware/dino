@@ -11,7 +11,7 @@ import { STORAGE_KEYS } from '../config/constants';
 import { apiClient } from '../api/client';
 import { useServerStore } from './serverStore';
 import { useUserStore } from './userStore';
-import { getOpenSubsonicExtensions, supportsFormPost, supportsApiKeyAuth, supportsSongLyrics } from '../api/opensubsonic/extensions';
+import { getOpenSubsonicExtensions, supportsFormPost, supportsApiKeyAuth, supportsSongLyrics, supportsSonicSimilarity } from '../api/opensubsonic/extensions';
 
 interface Credentials {
   [serverId: string]: {
@@ -105,10 +105,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           supportsFormPost: supportsFormPost(extensions),
           supportsApiKeyAuth: supportsApiKeyAuth(extensions),
           supportsSongLyrics: supportsSongLyrics(extensions),
+          supportsSonicSimilarity: supportsSonicSimilarity(extensions),
           lastChecked: Date.now(),
         };
-        
-        console.log('[AuthStore.login] 🔍 Computed capabilities:', capabilities);
         useServerStore.getState().updateServerCapabilities(serverId, capabilities);
         console.log('[AuthStore.login] ✅ Server capabilities updated successfully');
       } catch (error) {
@@ -167,6 +166,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           supportsFormPost: supportsFormPost(extensions),
           supportsApiKeyAuth: supportsApiKeyAuth(extensions),
           supportsSongLyrics: supportsSongLyrics(extensions),
+          supportsSonicSimilarity: supportsSonicSimilarity(extensions),
           lastChecked: Date.now(),
         };
         useServerStore.getState().updateServerCapabilities(serverId, capabilities);
@@ -223,6 +223,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           supportsFormPost: supportsFormPost(extensions),
           supportsApiKeyAuth: supportsApiKeyAuth(extensions),
           supportsSongLyrics: supportsSongLyrics(extensions),
+          supportsSonicSimilarity: supportsSonicSimilarity(extensions),
           lastChecked: Date.now(),
         };
         useServerStore.getState().updateServerCapabilities(serverId, capabilities);

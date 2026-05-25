@@ -4,10 +4,11 @@
  */
 
 import * as Haptics from 'expo-haptics';
-import { ArrowLeft, Check, ChevronRight, Edit3, Plus, Server as ServerIcon, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, Check, ChevronRight, Edit3, Info, Link2, Plus, Server as ServerIcon, Shield, Trash2 } from 'lucide-react-native';
 import React, { useState, useMemo } from 'react';
 import {
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -80,6 +81,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
     enableScrobbling,
     autoSyncQueue,
     autoExtendQueue,
+    useSonicSimilarity,
     gaplessPlayback,
     includeShareMessage,
     wifiOnlyDownloads,
@@ -824,76 +826,17 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                 thumbColor="#FFFFFF"
               />
             </View>
-          </View>
-        </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>DOWNLOADS</Text>
-          <View style={styles.sectionCard}>
-            <View style={styles.settingItem}>
+            <View style={[styles.settingItem, styles.borderTop]}>
               <View style={styles.settingLeft}>
-                <Text style={styles.settingLabel}>WiFi Only Downloads</Text>
-                <Text style={styles.settingDescription}>Only download content when connected to WiFi</Text>
+                <Text style={styles.settingLabel}>Sonic Similarity</Text>
+                <Text style={styles.settingDescription}>Use audio-based similarity when server supports it</Text>
               </View>
               <Switch
-                value={wifiOnlyDownloads}
+                value={useSonicSimilarity}
                 onValueChange={(value) => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  updateSettings({ wifiOnlyDownloads: value });
-                }}
-                trackColor={{
-                  false: 'rgba(120, 120, 128, 0.16)',
-                  true: theme.colors.accent
-                }}
-                thumbColor="#FFFFFF"
-                ios_backgroundColor="rgba(120, 120, 128, 0.16)"
-              />
-            </View>
-
-            <TouchableOpacity
-              style={[styles.settingItem, styles.borderTop]}
-              onPress={() => setActiveModal('max-downloads')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.settingLeft}>
-                <Text style={styles.settingLabel}>Max Concurrent Downloads</Text>
-                <Text style={styles.settingValue}>{maxConcurrentDownloads}</Text>
-              </View>
-              <ChevronRight size={20} color={theme.colors.text.tertiary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>STORAGE</Text>
-          <View style={styles.sectionCard}>
-            <TouchableOpacity
-              style={styles.settingItem}
-              onPress={() => setActiveModal('storage-limit')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.settingLeft}>
-                <Text style={styles.settingLabel}>Download Storage Limit</Text>
-                <Text style={styles.settingValue}>{(storageLimit / 1024).toFixed(1)} GB</Text>
-              </View>
-              <ChevronRight size={20} color={theme.colors.text.tertiary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>PLAYBACK</Text>
-          <View style={styles.sectionCard}>
-            <View style={styles.settingItem}>
-              <View style={styles.settingLeft}>
-                <Text style={styles.settingLabel}>Scrobbling</Text>
-                <Text style={styles.settingDescription}>Track play counts and listening history</Text>
-              </View>
-              <Switch
-                value={enableScrobbling}
-                onValueChange={(value) => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  updateSettings({ enableScrobbling: value });
+                  updateSettings({ useSonicSimilarity: value });
                 }}
                 trackColor={{
                   false: 'rgba(120, 120, 128, 0.16)',
@@ -1111,6 +1054,55 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
                 <Text style={styles.settingLabel}>Version</Text>
                 <Text style={styles.settingValue}>{APP_VERSION}</Text>
               </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.settingItem, styles.borderTop]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                Linking.openURL('https://github.com/sonicdino/dino');
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Source Code</Text>
+                <Text style={styles.settingValue}>View on GitHub</Text>
+              </View>
+              <Link2 size={18} color={theme.colors.text.tertiary} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>BATTERY</Text>
+          <View style={styles.sectionCard}>
+            <TouchableOpacity
+              style={styles.settingItem}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                if (Platform.OS === 'android') {
+                  Linking.openSettings();
+                }
+              }}
+              activeOpacity={Platform.OS === 'android' ? 0.7 : 1}
+            >
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Battery Optimization</Text>
+                <Text style={styles.settingDescription}>
+                  {Platform.OS === 'android'
+                    ? 'Open app settings to set battery usage to Unrestricted for reliable background playback'
+                    : 'Managed by the system'}
+                </Text>
+              </View>
+              <Shield size={20} color={theme.colors.text.tertiary} strokeWidth={2} />
+            </TouchableOpacity>
+            <View style={[styles.settingItem, styles.borderTop]}>
+              <View style={styles.settingLeft}>
+                <Text style={styles.settingLabel}>Background Playback Tips</Text>
+                <Text style={styles.settingDescription}>
+                  Disable battery optimization, disable app battery restrictions, and lock the app in recent tasks for reliable background playback
+                </Text>
+              </View>
+              <Info size={20} color={theme.colors.text.tertiary} strokeWidth={2} />
             </View>
           </View>
         </View>

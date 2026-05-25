@@ -3,8 +3,8 @@
  * List view of all artists
  */
 
-import React, { useMemo } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { useArtists, useCoverArt } from '../../hooks/api';
 import { EmptyState, ErrorView, ArtistArtImage } from '../../components/common';
 import { ArtistRowSkeleton } from '../../components/Skeletons';
@@ -17,6 +17,7 @@ export const ArtistsTab: React.FC = () => {
   const theme = useTheme();
   const { data: artists, isLoading, error, refetch } = useArtists();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const [refreshing, setRefreshing] = useState(false);
 
   if (isLoading) {
     return (
@@ -45,6 +46,19 @@ export const ArtistsTab: React.FC = () => {
       renderItem={({ item }) => <ArtistItem artist={item} />}
       contentContainerStyle={styles.list}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={async () => {
+            setRefreshing(true);
+            await refetch();
+            setRefreshing(false);
+          }}
+          tintColor={theme.colors.accent}
+          colors={['#999999']}
+          progressViewOffset={50}
+        />
+      }
     />
   );
 };

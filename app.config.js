@@ -3,7 +3,7 @@ module.exports = {
     name: "Dino",
     slug: "dino",
     scheme: "dino",
-    version: "3.0.1",
+    version: "3.0.2",
     orientation: "default",
     icon: "./assets/images/icon-square.png",
     userInterfaceStyle: "dark",
@@ -63,7 +63,11 @@ module.exports = {
       permissions: [
         "android.permission.ACCESS_WIFI_STATE",
         "android.permission.CHANGE_WIFI_MULTICAST_STATE",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "android.permission.INTERNET",
+        "android.permission.WAKE_LOCK",
+        "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
       ],
       intentFilters: [
         {

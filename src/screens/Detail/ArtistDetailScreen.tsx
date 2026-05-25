@@ -534,6 +534,15 @@ export default function ArtistDetailScreen({ artistId }: ArtistDetailScreenProps
       }
     }
 
+    const sortByDate = (a: Album, b: Album) => {
+      const dateA = a.created ? new Date(a.created).getTime() : (a.year || 0) * 1;
+      const dateB = b.created ? new Date(b.created).getTime() : (b.year || 0) * 1;
+      return dateB - dateA;
+    };
+
+    realAlbums.sort(sortByDate);
+    singlesAndEPs.sort(sortByDate);
+
     return { realAlbums, singlesAndEPs };
   }, [albums]);
 

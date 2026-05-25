@@ -5,19 +5,13 @@
 
 import { apiClient } from '../client';
 import { GetLyricsResponse } from './types';
-import { useServerStore } from '../../stores/serverStore';
 
 /**
  * Get lyrics for a track by song ID
- * Checks if server supports songLyrics extension before making request
+ * Attempts the request regardless of extension support since many servers
+ * support getLyricsBySongId without advertising the songLyrics extension.
  */
 export const getLyricsBySongId = async (trackId: string): Promise<GetLyricsResponse> => {
-  // Check if server supports songLyrics extension
-  const capabilities = useServerStore.getState().getCurrentServerCapabilities();
-  if (capabilities && !capabilities.supportsSongLyrics) {
-    throw new Error('Server does not support lyrics (songLyrics extension not available)');
-  }
-
   return await apiClient.request<GetLyricsResponse>('getLyricsBySongId', {
     id: trackId,
   });

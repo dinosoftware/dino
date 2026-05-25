@@ -247,7 +247,7 @@ export const QueueScreen: React.FC<QueueScreenProps> = ({ onClose }) => {
   const { queue, currentIndex, removeFromQueue, reorderQueue, clearQueue } = useQueueStore();
   const { currentTrack, setCurrentTrack } = usePlayerStore();
   const { data: coverArtUrl } = useCoverArt(currentTrack?.coverArt, 500);
-  const albumColors = useAlbumColors(currentTrack?.coverArt);
+  const albumColors = useAlbumColors(coverArtUrl || undefined);
   const { showToast } = useToastStore();
   const trackMenuState = useTrackMenuState();
   const [showClearConfirm, setShowClearConfirm] = useState(false);

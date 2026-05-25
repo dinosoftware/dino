@@ -111,3 +111,7 @@ export const supportsApiKeyAuth = (extensions: OpenSubsonicExtension[] | null): 
 export const supportsSongLyrics = (extensions: OpenSubsonicExtension[] | null): boolean => {
   return hasExtension(extensions, 'songLyrics');
 };
+
+export const supportsSonicSimilarity = (extensions: OpenSubsonicExtension[] | null): boolean => {
+  return hasExtension(extensions, 'sonicSimilarity');
+};

@@ -93,7 +93,7 @@ export const PlaylistsTab: React.FC = () => {
                 refreshing={isRefetching}
                 onRefresh={handleRefresh}
                 tintColor={theme.colors.accent}
-                colors={[theme.colors.accent]}
+                colors={['#999999']}
               />
             }
           />

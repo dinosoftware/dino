@@ -114,6 +114,7 @@ export const DEFAULT_SETTINGS = {
   autoSyncQueue: true,
   queueSyncInterval: 30000, // 30 seconds
   autoExtendQueue: false, // Auto-extend queue with similar songs when near end
+  useSonicSimilarity: true, // Use getSonicSimilarTracks when server supports it
 
   // Scrobbling
   enableScrobbling: true,

@@ -176,6 +176,27 @@ export default function AlbumDetailScreen({ albumId }: AlbumDetailScreenProps) {
       paddingHorizontal: theme.spacing.sm,
       gap: theme.spacing.xs,
     },
+    discHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.sm,
+      marginTop: theme.spacing.md,
+      marginBottom: theme.spacing.xs,
+      gap: theme.spacing.sm,
+    },
+    discHeaderText: {
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.semibold,
+      color: theme.colors.text.secondary,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    discHeaderLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: theme.colors.border,
+    },
     emptyContainer: {
       padding: theme.spacing.xl,
       alignItems: 'center',
@@ -410,24 +431,53 @@ export default function AlbumDetailScreen({ albumId }: AlbumDetailScreenProps) {
 
         <View style={styles.trackList}>
           {album.song && album.song.length > 0 ? (
-            album.song.map((track: Track, index: number) => (
-              <TrackRow
-                key={track.id}
-                track={track}
-                onPress={() => handleTrackPress(track, index)}
-                onLongPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  trackMenuState.openTrackMenu(track);
-                }}
-                showArtwork={false}
-                showMenu={true}
-                showTrackNumber={true}
-                onMenuPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  trackMenuState.openTrackMenu(track);
-                }}
-              />
-            ))
+            (() => {
+              const discs: Map<number, { tracks: Track[]; startIndex: number }> = new Map();
+              let globalIndex = 0;
+              for (const track of album.song) {
+                const disc = track.discNumber || 1;
+                if (!discs.has(disc)) {
+                  discs.set(disc, { tracks: [], startIndex: globalIndex });
+                }
+                discs.get(disc)!.tracks.push(track);
+                globalIndex++;
+              }
+
+              const discNumbers = [...discs.keys()].sort((a, b) => a - b);
+              const multipleDiscs = discNumbers.length > 1;
+
+              return discNumbers.map((discNum) => {
+                const disc = discs.get(discNum)!;
+                return (
+                  <View key={`disc-${discNum}`}>
+                    {multipleDiscs && (
+                      <View style={styles.discHeader}>
+                        <Text style={styles.discHeaderText}>Disc {discNum}</Text>
+                        <View style={styles.discHeaderLine} />
+                      </View>
+                    )}
+                    {disc.tracks.map((track: Track, i: number) => (
+                      <TrackRow
+                        key={track.id}
+                        track={track}
+                        onPress={() => handleTrackPress(track, disc.startIndex + i)}
+                        onLongPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                          trackMenuState.openTrackMenu(track);
+                        }}
+                        showArtwork={false}
+                        showMenu={true}
+                        showTrackNumber={true}
+                        onMenuPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          trackMenuState.openTrackMenu(track);
+                        }}
+                      />
+                    ))}
+                  </View>
+                );
+              });
+            })()
           ) : (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No tracks available</Text>

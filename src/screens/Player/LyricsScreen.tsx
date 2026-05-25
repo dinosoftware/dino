@@ -17,6 +17,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Lock, Unlock } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLyrics } from '../../hooks/useLyrics';
 import { usePlayer } from '../../hooks/usePlayer';
 import { EmptyState } from '../../components/common';
@@ -190,12 +191,31 @@ export const LyricsScreen: React.FC<LyricsScreenProps> = ({ onClose }) => {
       return <View style={[StyleSheet.absoluteFill, { backgroundColor: baseBackgroundColor }]} />;
     }
 
-    if (backgroundStyle === 'gradient') {
+    if (backgroundStyle === 'dynamicColor') {
       const bgColor = albumColors.background || baseBackgroundColor;
       return (
         <>
           <View style={[StyleSheet.absoluteFill, { backgroundColor: baseBackgroundColor }]} />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: bgColor }]} />
+        </>
+      );
+    }
+
+    if (backgroundStyle === 'gradient') {
+      const isDark = theme.mode !== 'light';
+      return (
+        <>
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: baseBackgroundColor }]} />
+          <LinearGradient
+            colors={
+              isDark
+                ? [albumColors.primary + '40', albumColors.secondary + '60', albumColors.background + '90', baseBackgroundColor]
+                : [albumColors.primary + '20', albumColors.secondary + '30', albumColors.background + '60', baseBackgroundColor]
+            }
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+          />
         </>
       );
     }

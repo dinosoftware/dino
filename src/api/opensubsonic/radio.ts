@@ -5,12 +5,9 @@
 
 import { apiClient } from '../client';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { GetSimilarSongs2Response } from './types';
+import { useServerStore } from '../../stores/serverStore';
+import { GetSimilarSongs2Response, GetSonicSimilarTracksResponse, Track } from './types';
 
-/**
- * Get similar songs for a track (ID3 tags)
- * Uses instantMixSize from settings if count not provided
- */
 export const getSimilarSongs2 = async (
   trackId: string,
   count?: number
@@ -21,4 +18,44 @@ export const getSimilarSongs2 = async (
     id: trackId,
     count: resolvedCount,
   });
+};
+
+export const getSonicSimilarTracks = async (
+  trackId: string,
+  count?: number
+): Promise<GetSonicSimilarTracksResponse> => {
+  const resolvedCount = count ?? useSettingsStore.getState().instantMixSize;
+
+  return await apiClient.request<GetSonicSimilarTracksResponse>('getSonicSimilarTracks', {
+    id: trackId,
+    count: resolvedCount,
+  });
+};
+
+export const getSmartSimilarTracks = async (
+  trackId: string,
+  count?: number
+): Promise<Track[]> => {
+  const settings = useSettingsStore.getState();
+
+  if (settings.useSonicSimilarity) {
+    try {
+      const response = await getSonicSimilarTracks(trackId, count);
+      console.log('[Radio] getSonicSimilarTracks response keys:', Object.keys(response));
+      console.log('[Radio] getSonicSimilarTracks response:', JSON.stringify(response).substring(0, 500));
+
+      const matches = (response as any).sonicMatch || (response as any).sonicSimilarTracks
+        || (response as any).match;
+      if (Array.isArray(matches) && matches.length > 0) {
+        return matches.map((match: any) => match.entry || match);
+      }
+
+      console.log('[Radio] getSonicSimilarTracks returned empty, falling back');
+    } catch (error) {
+      console.warn('[Radio] getSonicSimilarTracks failed, falling back to getSimilarSongs2:', error);
+    }
+  }
+
+  const response = await getSimilarSongs2(trackId, count);
+  return response.similarSongs2?.song || [];
 };

@@ -857,6 +857,13 @@ export class DownloadService {
           try { coverArtUri = await getCoverArtUrl(track.coverArt, 500); } catch {}
         }
 
+        const lyricsPath = `${FileSystem.documentDirectory}metadata/lyrics_${nt.trackId}.json`;
+        let lyricsUri: string | undefined;
+        try {
+          const lyricsInfo = await FileSystem.getInfoAsync(lyricsPath);
+          if (lyricsInfo.exists) lyricsUri = lyricsPath;
+        } catch {}
+
         cachedTracks[nt.trackId] = {
           track,
           localUri: nt.localPath,
@@ -865,6 +872,7 @@ export class DownloadService {
           size: nt.fileSize,
           bitRate: track.bitRate || (nt.originalTrack.extraPayload?.bitRate as number | undefined),
           suffix: track.suffix || (nt.originalTrack.extraPayload?.suffix as string | undefined),
+          lyricsUri,
         };
       }
 
@@ -927,9 +935,33 @@ export class DownloadService {
         Object.keys(cachedTracks).length, 'tracks,',
         Object.keys(cachedAlbums).length, 'albums,',
         Object.keys(cachedPlaylists).length, 'playlists');
+
+      this.backfillMissingLyrics(cachedTracks);
     } catch (e) {
       console.error('[DownloadService] Failed to hydrate from nitro:', e);
       useDownloadStore.getState().setHydrated(true);
+    }
+  }
+
+  private backfillMissingLyrics(cachedTracks: Record<string, CachedDownloadedTrack>) {
+    const tracksNeedingLyrics = Object.values(cachedTracks).filter(t => !t.lyricsUri);
+    if (tracksNeedingLyrics.length === 0) return;
+
+    console.log('[DownloadService] Backfilling lyrics for', tracksNeedingLyrics.length, 'downloaded tracks');
+
+    let delay = 0;
+    for (const cached of tracksNeedingLyrics) {
+      delay += 500;
+      setTimeout(() => {
+        this.downloadLyrics(cached.track.id).then((lyricsUri) => {
+          if (lyricsUri) {
+            useDownloadStore.getState().upsertTrack({
+              ...cached,
+              lyricsUri,
+            });
+          }
+        }).catch(() => {});
+      }, delay);
     }
   }
 }

@@ -3,7 +3,7 @@
  * Displays most frequently played albums
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
 import { RefreshCw } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -31,6 +31,8 @@ export const MostPlayedAlbums: React.FC = () => {
 
   const albums = response?.albumList2?.album || [];
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const scrollXRef = useRef(0);
+  const flatListRef = useRef<FlatList>(null);
 
   if (isLoading) {
     return <HorizontalAlbumListSkeleton />;
@@ -49,18 +51,22 @@ export const MostPlayedAlbums: React.FC = () => {
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             refetch();
+            flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
           }}
         >
           <RefreshCw size={20} color={theme.colors.text.secondary} />
         </TouchableOpacity>
       </View>
       <FlatList
+        ref={flatListRef}
         horizontal
         data={albums}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <AlbumCard album={item} />}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
+        onScroll={(e) => { scrollXRef.current = e.nativeEvent.contentOffset.x; }}
+        scrollEventThrottle={16}
       />
     </View>
   );

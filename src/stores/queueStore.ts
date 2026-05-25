@@ -53,19 +53,19 @@ export const setClearPreloadedTracksCallback = (callback: () => void) => {
   clearPreloadedTracksCallback = callback;
 };
 
-let nativeAddToQueueCallback: ((trackId: string, position: 'next' | 'end') => Promise<void>) | null = null;
-let nativeRemoveFromQueueCallback: ((nativeIndex: number) => Promise<void>) | null = null;
-let nativeReorderQueueCallback: ((fromNativeIndex: number, toNativeIndex: number) => Promise<void>) | null = null;
+let nativeAddCallback: ((trackIds: string[], position: 'next' | 'end') => Promise<void>) | null = null;
+let nativeRemoveCallback: ((fromIndex: number) => Promise<void>) | null = null;
+let nativeReorderCallback: ((fromIndex: number, toIndex: number) => Promise<void>) | null = null;
 let nativeRebuildCallback: (() => Promise<void>) | null = null;
 
-export const setNativeAddToQueueCallback = (cb: (trackId: string, position: 'next' | 'end') => Promise<void>) => {
-  nativeAddToQueueCallback = cb;
+export const setNativeAddCallback = (cb: (trackIds: string[], position: 'next' | 'end') => Promise<void>) => {
+  nativeAddCallback = cb;
 };
-export const setNativeRemoveFromQueueCallback = (cb: (nativeIndex: number) => Promise<void>) => {
-  nativeRemoveFromQueueCallback = cb;
+export const setNativeRemoveCallback = (cb: (fromIndex: number) => Promise<void>) => {
+  nativeRemoveCallback = cb;
 };
-export const setNativeReorderQueueCallback = (cb: (fromNativeIndex: number, toNativeIndex: number) => Promise<void>) => {
-  nativeReorderQueueCallback = cb;
+export const setNativeReorderCallback = (cb: (fromIndex: number, toIndex: number) => Promise<void>) => {
+  nativeReorderCallback = cb;
 };
 export const setNativeRebuildCallback = (cb: () => Promise<void>) => {
   nativeRebuildCallback = cb;
@@ -256,19 +256,17 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     
     get().saveToStorage();
     
-    // If adding to 'next', the immediate next track changed - update preloaded track
     if (position === 'next') {
       clearPreloadedTracks();
     }
     
     triggerSync(true);
 
-    if (nativeAddToQueueCallback) {
-      for (const t of tracksArray) {
-        nativeAddToQueueCallback(t.id, position).catch((err: Error) => {
-          console.error('[QueueStore] Failed to add track to native queue:', err);
-        });
-      }
+    if (nativeAddCallback) {
+      const trackIds = tracksArray.map(t => t.id);
+      nativeAddCallback(trackIds, position).catch((err: Error) => {
+        console.error('[QueueStore] Failed to add tracks to native queue:', err);
+      });
     }
   },
 
@@ -280,17 +278,11 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
       const newQueue = state.queue.filter((_, i) => i !== index);
       let newIndex = state.currentIndex;
       
-      // Adjust current index if needed
       if (index < state.currentIndex) {
-        // Removed track was before current, shift index down
         newIndex = state.currentIndex - 1;
       } else if (index === state.currentIndex) {
-        // Removing current track
-        // Keep same index - this will point to the track that was "next"
-        // But clamp to valid range
         newIndex = Math.min(state.currentIndex, newQueue.length - 1);
       }
-      // If index > currentIndex, no change needed
       
       return {
         queue: newQueue,
@@ -301,7 +293,6 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     get().saveToStorage();
     
     if (removingCurrentTrack && get().queue.length > 0) {
-      // Removing current track - skip to next
       console.log('[QueueStore] Removed current track, skipping to next');
       if (skipToNextPlayerCallback) {
         skipToNextPlayerCallback().catch(err => {
@@ -314,8 +305,8 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     
     triggerSync(true);
 
-    if (!removingCurrentTrack && nativeRemoveFromQueueCallback) {
-      nativeRemoveFromQueueCallback(index).catch((err: Error) => {
+    if (!removingCurrentTrack && nativeRemoveCallback) {
+      nativeRemoveCallback(index).catch((err: Error) => {
         console.error('[QueueStore] Failed to remove track from native queue:', err);
       });
     }
@@ -329,7 +320,6 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
       const [movedTrack] = newQueue.splice(fromIndex, 1);
       newQueue.splice(toIndex, 0, movedTrack);
       
-      // Adjust current index
       let newIndex = state.currentIndex;
       if (fromIndex === state.currentIndex) {
         newIndex = toIndex;
@@ -347,13 +337,11 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     
     get().saveToStorage();
     
-    // Clear preloaded tracks if the move could change what plays next.
-    // Use oldCurrentIndex because preloaded track was based on that position.
     const oldNextPosition = oldCurrentIndex + 1;
     const moveTouchedNextSlot =
-      fromIndex === oldCurrentIndex ||   // current track itself was moved
-      fromIndex === oldNextPosition ||   // the preloaded next track was moved away
-      toIndex === oldNextPosition;       // something new was moved into next position
+      fromIndex === oldCurrentIndex ||
+      fromIndex === oldNextPosition ||
+      toIndex === oldNextPosition;
     
     if (moveTouchedNextSlot) {
       console.log('[QueueStore] Reorder changed next track, clearing preloaded tracks');
@@ -362,8 +350,8 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     
     triggerSync(true);
 
-    if (nativeReorderQueueCallback) {
-      nativeReorderQueueCallback(fromIndex, toIndex).catch((err: Error) => {
+    if (nativeReorderCallback) {
+      nativeReorderCallback(fromIndex, toIndex).catch((err: Error) => {
         console.error('[QueueStore] Failed to reorder native queue:', err);
       });
     }
@@ -405,22 +393,18 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
 
   shuffleQueue: () => {
     set((state) => {
-      // Save original order
       const originalQueue = [...state.queue];
       const currentTrack = state.queue[state.currentIndex];
       
-      // Shuffle remaining tracks (excluding current)
       const before = state.queue.slice(0, state.currentIndex);
       const after = state.queue.slice(state.currentIndex + 1);
       const toShuffle = [...before, ...after];
       
-      // Fisher-Yates shuffle
       for (let i = toShuffle.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [toShuffle[i], toShuffle[j]] = [toShuffle[j], toShuffle[i]];
       }
       
-      // Rebuild queue with current track first
       const shuffledQueue = currentTrack
         ? [currentTrack, ...toShuffle]
         : toShuffle;

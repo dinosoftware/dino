@@ -61,6 +61,7 @@ export interface Track {
   artists?: Artist[]; // OpenSubsonic multiple artists support
   displayArtist?: string; // Formatted artist display string
   track?: number;
+  discNumber?: number;
   year?: number;
   genre?: string;
   coverArt?: string;
@@ -291,6 +292,17 @@ export interface GetSimilarSongs2Response {
   similarSongs2: {
     song: Track[];
   };
+}
+
+export interface SonicMatch {
+  entry: Track;
+  similarity: number;
+}
+
+export interface GetSonicSimilarTracksResponse {
+  sonicMatch?: SonicMatch[];
+  sonicSimilarTracks?: SonicMatch[];
+  match?: SonicMatch[];
 }
 
 export interface GetRandomSongsResponse {

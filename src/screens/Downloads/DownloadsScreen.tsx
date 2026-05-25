@@ -94,22 +94,23 @@ export const DownloadsScreen: React.FC = () => {
     return () => { mounted = false; clearInterval(interval); };
   }, []);
 
-  const albums = Object.values(downloadedAlbums);
-  const playlists = Object.values(downloadedPlaylists);
+  const albums = useMemo(() => Object.values(downloadedAlbums), [downloadedAlbums]);
+  const playlists = useMemo(() => Object.values(downloadedPlaylists), [downloadedPlaylists]);
 
-  const albumTrackIds = new Set(
-    albums.flatMap(album => album.tracks.map(t => t.track.id))
-  );
-  const playlistTrackIds = new Set(
-    playlists.flatMap(playlist => playlist.tracks.map(t => t.track.id))
-  );
-
-  const standaloneTracks = Object.values(downloadedTracks).filter(
-    t => !albumTrackIds.has(t.track.id) && !playlistTrackIds.has(t.track.id)
-  );
+  const standaloneTracks = useMemo(() => {
+    const albumTrackIds = new Set(
+      albums.flatMap(album => album.tracks.map(t => t.track.id))
+    );
+    const playlistTrackIds = new Set(
+      playlists.flatMap(playlist => playlist.tracks.map(t => t.track.id))
+    );
+    return Object.values(downloadedTracks).filter(
+      t => !albumTrackIds.has(t.track.id) && !playlistTrackIds.has(t.track.id)
+    );
+  }, [downloadedTracks, albums, playlists]);
 
   const storageLimitBytes = storageLimit * 1024 * 1024;
-  const storagePercentage = storageLimitBytes > 0 ? (totalStorageUsed / storageLimitBytes) * 100 : 0;
+  const storagePercentage = useMemo(() => storageLimitBytes > 0 ? (totalStorageUsed / storageLimitBytes) * 100 : 0, [totalStorageUsed, storageLimitBytes]);
 
   const styles = useMemo(() => StyleSheet.create({
     container: {
@@ -737,18 +738,24 @@ export const DownloadsScreen: React.FC = () => {
 
   const hasActiveDownloads = pendingGroups.length > 0 || activeTasks.length > 0 || queuedTracks.length > 0;
 
-  const activeData = [
-    ...pendingGroups as any[],
-    ...activeTasks as any[],
-    ...queuedTracks as any[],
-  ];
+  const sortedActiveTasks = useMemo(() => [...activeTasks].sort((a, b) => {
+    if (a.state === 'downloading' && b.state !== 'downloading') return -1;
+    if (a.state !== 'downloading' && b.state === 'downloading') return 1;
+    return 0;
+  }), [activeTasks]);
 
-  const sections: DownloadSection[] = [
+  const activeData = useMemo(() => [
+    ...sortedActiveTasks as any[],
+    ...pendingGroups as any[],
+    ...queuedTracks as any[],
+  ], [sortedActiveTasks, pendingGroups, queuedTracks]);
+
+  const sections: DownloadSection[] = useMemo(() => [
     { title: 'Active Downloads', data: activeData, type: 'active' },
     { title: 'Albums', data: albums, type: 'album' },
     { title: 'Playlists', data: playlists, type: 'playlist' },
     { title: 'Individual Tracks', data: standaloneTracks, type: 'track' },
-  ];
+  ], [activeData, albums, playlists, standaloneTracks]);
 
   const hasAnyContent = hasActiveDownloads || albums.length > 0 || playlists.length > 0 || standaloneTracks.length > 0;
 

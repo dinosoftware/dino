@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { View, FlatList, StyleSheet, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, FlatList, StyleSheet, Text, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
 import { useAlbums, useCoverArt } from '../../hooks/api';
 import { AlbumCard } from '../../components/Cards';
 import { AlbumMenuWrapper } from '../../components/Menus';
@@ -32,6 +32,7 @@ export const AlbumsTab: React.FC = () => {
   const [sortType, setSortType] = useState<SortType>('newest');
   const { data: albums, isLoading, error, refetch } = useAlbums(sortType, 100);
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const [refreshing, setRefreshing] = useState(false);
 
   if (isLoading) {
     return (
@@ -59,45 +60,56 @@ export const AlbumsTab: React.FC = () => {
   }
 
   return (
-    <View style={styles.container}>
-      {/* Sort Options */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.sortContainer}
-      >
-        {sortOptions.map((option) => (
-          <TouchableOpacity
-            key={option.value}
-            style={[
-              styles.sortButton,
-              sortType === option.value && styles.sortButtonActive,
-            ]}
-            onPress={() => setSortType(option.value)}
-            activeOpacity={0.7}
-          >
-            <Text
+    <FlatList
+      data={albums}
+      numColumns={2}
+      keyExtractor={(item) => item.id}
+      renderItem={({ item }) => <AlbumItem album={item} />}
+      contentContainerStyle={styles.list}
+      showsVerticalScrollIndicator={false}
+      ListHeaderComponent={
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.sortContainer}
+        >
+          {sortOptions.map((option) => (
+            <TouchableOpacity
+              key={option.value}
               style={[
-                styles.sortButtonText,
-                sortType === option.value && styles.sortButtonTextActive,
+                styles.sortButton,
+                sortType === option.value && styles.sortButtonActive,
               ]}
+              onPress={() => setSortType(option.value)}
+              activeOpacity={0.7}
             >
-              {option.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Albums Grid */}
-      <FlatList
-        data={albums}
-        numColumns={2}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <AlbumItem album={item} />}
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-      />
-    </View>
+              <Text
+                style={[
+                  styles.sortButtonText,
+                  sortType === option.value && styles.sortButtonTextActive,
+                ]}
+              >
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      }
+      stickyHeaderIndices={[0]}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={async () => {
+            setRefreshing(true);
+            await refetch();
+            setRefreshing(false);
+          }}
+          tintColor={theme.colors.accent}
+          colors={['#999999']}
+          progressViewOffset={50}
+        />
+      }
+    />
   );
 };
 

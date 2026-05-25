@@ -9,11 +9,9 @@ import { useQueueStore } from '@/src/stores/queueStore';
 import { useSettingsStore } from '@/src/stores/settingsStore';
 import * as Haptics from 'expo-haptics';
 import {
-  Code,
   Dices,
   Download,
   FolderDown,
-  Info,
   LogOut,
   RefreshCw,
   Settings,
@@ -23,7 +21,6 @@ import {
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Linking,
   Modal,
   PanResponder,
   Pressable,
@@ -48,7 +45,6 @@ interface UserSettingsMenuProps {
   visible: boolean;
   onClose: () => void;
   onLogout: () => void;
-  onOpenAppInfo: () => void;
 }
 
 interface MenuItemProps {
@@ -98,7 +94,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon, label, onPress, destructive, 
   );
 };
 
-export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onClose, onLogout, onOpenAppInfo }) => {
+export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onClose, onLogout }) => {
   const theme = useTheme();
   const translateY = useRef(new Animated.Value(0)).current;
   const getCurrentServerAuth = useAuthStore((state) => state.getCurrentServerAuth);
@@ -244,16 +240,6 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
     navigate({ name: 'shares' });
   };
 
-  const handleAppInfo = () => {
-    onClose();
-    setTimeout(() => onOpenAppInfo(), 100);
-  };
-
-  const handleSourceCode = () => {
-    Linking.openURL('https://github.com/sonicdino/dino');
-    onClose();
-  };
-
   const handleScanLibrary = async () => {
     try {
       await startScan();
@@ -361,12 +347,6 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
                 theme={theme}
               />
               <MenuItem
-                icon={<RefreshCw size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-                label="Scan Library"
-                onPress={handleScanLibrary}
-                theme={theme}
-              />
-              <MenuItem
                 icon={<Download size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                 label="Get Server Queue"
                 onPress={handleGetServerQueue}
@@ -379,21 +359,15 @@ export const UserSettingsMenu: React.FC<UserSettingsMenuProps> = ({ visible, onC
                 theme={theme}
               />
               <MenuItem
+                icon={<RefreshCw size={22} color={theme.colors.text.primary} strokeWidth={2} />}
+                label="Scan Library"
+                onPress={handleScanLibrary}
+                theme={theme}
+              />
+              <MenuItem
                 icon={<Share2 size={22} color={theme.colors.text.primary} strokeWidth={2} />}
                 label="Shares"
                 onPress={handleMyShares}
-                theme={theme}
-              />
-              <MenuItem
-                icon={<Info size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-                label="App Info"
-                onPress={handleAppInfo}
-                theme={theme}
-              />
-              <MenuItem
-                icon={<Code size={22} color={theme.colors.text.primary} strokeWidth={2} />}
-                label="Source Code"
-                onPress={handleSourceCode}
                 theme={theme}
               />
               <MenuItem

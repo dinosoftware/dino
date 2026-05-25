@@ -80,7 +80,11 @@ class QueueSyncManager {
       return;
     }
 
-    // Debounce: Don't sync more frequently than SYNC_DEBOUNCE
+    const { playbackState } = usePlayerStore.getState();
+    if (!force && playbackState !== 'playing' && !currentPosition) {
+      return;
+    }
+
     const now = Date.now();
     if (now - this.lastSyncTime < QUEUE_SYNC_CONFIG.SYNC_DEBOUNCE && !currentPosition) {
       console.log('[QueueSync] Sync debounced (too frequent)');

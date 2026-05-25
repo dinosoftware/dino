@@ -10,7 +10,7 @@ import { AlbumsTab } from './AlbumsTab';
 import { ArtistsTab } from './ArtistsTab';
 import { PlaylistsTab } from './PlaylistsTab';
 import { FavoritesTab } from './FavoritesTab';
-import { UserSettingsMenu, AppInfoSheet } from '../../components/Menus';
+import { UserSettingsMenu } from '../../components/Menus';
 import { Avatar } from '../../components/common';
 import { useAuthStore, useServerStore, useUserStore } from '../../stores';
 import { useTheme } from '../../hooks/useTheme';
@@ -28,7 +28,6 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ onLogout }) => {
   const theme = useTheme();
   const [activeTab, setActiveTab] = useState<Tab>('albums');
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showAppInfo, setShowAppInfo] = useState(false);
   
   // Get credentials and current server separately to avoid re-renders
   const credentials = useAuthStore((state) => state.credentials);
@@ -141,13 +140,6 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ onLogout }) => {
           visible={showUserMenu}
           onClose={() => setShowUserMenu(false)}
           onLogout={onLogout}
-          onOpenAppInfo={() => setShowAppInfo(true)}
-        />
-
-        {/* App Info Sheet */}
-        <AppInfoSheet
-          visible={showAppInfo}
-          onClose={() => setShowAppInfo(false)}
         />
       </View>
     </QueryClientProvider>

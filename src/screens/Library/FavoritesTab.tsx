@@ -176,7 +176,7 @@ const StarredTracks: React.FC<{
             refreshing={isRefreshing}
             onRefresh={onRefresh}
             tintColor={theme.colors.accent}
-            colors={[theme.colors.accent]}
+            colors={['#999999']}
           />
         }
       />
@@ -273,7 +273,7 @@ const StarredAlbums: React.FC<{
             refreshing={isRefreshing}
             onRefresh={onRefresh}
             tintColor={theme.colors.accent}
-            colors={[theme.colors.accent]}
+            colors={['#999999']}
           />
         }
       />
@@ -373,7 +373,7 @@ const StarredArtists: React.FC<{
           refreshing={isRefreshing}
           onRefresh={onRefresh}
           tintColor={theme.colors.accent}
-          colors={[theme.colors.accent]}
+          colors={['#999999']}
         />
       }
     />

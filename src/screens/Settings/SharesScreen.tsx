@@ -292,7 +292,7 @@ export const SharesScreen: React.FC = () => {
               refreshing={isRefetching}
               onRefresh={refetch}
               tintColor={theme.colors.accent}
-              colors={[theme.colors.accent]}
+              colors={['#999999']}
             />
           }
         />

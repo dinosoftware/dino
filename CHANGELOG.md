@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.2] - 2026-05-26
+
+### Added
+- **Sonic Similarity Extension**: Support for OpenSubsonic `getSonicSimilarTracks` endpoint for better instant mix results
+  - Falls back to `getSimilarSongs2` if server doesn't support it or request fails
+  - Toggle in Settings → Playback (enabled by default)
+  - Server capability auto-detected via `getOpenSubsonicExtensions`
+- **Disc Number Grouping**: Album detail screen groups tracks by disc number with "Disc N" headers
+  - Divider line between disc groups
+  - Tracks sorted within each disc
+- **Pull-to-Refresh**: Pull down to refresh on Home, Albums, and Artists screens
+  - Invalidates all queries and refetches from server
+  - Loading indicator shown during refresh
+- **Background Server Queue Sync**: Server queue syncs every 30 seconds via native progress callback
+  - Works while app is backgrounded (not dependent on JS timers)
+  - Syncs on track change, pause, and seek events
+- **Lyrics Download Fix**: Lyrics are now fetched regardless of `supportsSongLyrics` extension capability
+  - Many servers support lyrics without advertising the extension
+- **Lyrics Backfill**: Previously downloaded tracks without lyrics get lyrics fetched automatically
+  - Staggered 500ms between requests to avoid server rate limiting
+  - Restores `lyricsUri` from disk on hydrate
+
+### Changed
+- **Queue Operations Non-Interrupting**: Add, remove, and reorder no longer restart the currently playing song
+  - Uses surgical native APIs (`addTracksToPlaylist`, `removeTrackFromPlaylist`, `reorderTrackInPlaylist`)
+  - Only shuffle/unshuffle rebuilds the playlist (without restarting audio via `skipToIndex`)
+- **Skip Next/Previous**: Uses native `skipToNext`/`skipToPrevious` with `playSong` fallback
+  - Seek-to-start on previous if position > 3 seconds
+  - JS queue index and current track updated before native call
+- **Artist Discography Sorting**: Albums and singles/EPs sorted newest-first by `created` date (falls back to `year`)
+- **Downloads Screen Performance**: Memoized expensive computations (albums, playlists, sections, storage calculation)
+- **Home Screen Refresh Indicator**: Uses `refetchQueries({ type: 'active' })` instead of `invalidateQueries` so spinner shows for the full duration
+- **Library Refresh Indicator**: Local `refreshing` state ensures native spinner stays visible during refetch
+
+### Fixed
+- **Shuffle Restarting Playback**: Shuffle/unshuffle now reorders native playlist in-place instead of recreating it
+  - Falls back to full rebuild if playlist is out of sync
+  - No audio interruption during shuffle toggle
+- **Queue Reorder Breaking Next Track**: Reorder now passes indices to native operations that look up the exact track at that position
+- **Horizontal Scroll Reset on Refresh**: Album sections preserve scroll position using `useEffect` + `scrollTo`/`scrollToOffset` instead of mount-only `contentOffset`
+- **Lyrics Screen Background**: Fixed `LinearGradient` import and proper `dynamicColor`/`gradient` mode handling
+- **Queue Screen Background**: Fixed `useAlbumColors` to pass resolved URL instead of raw coverArt ID
+- **App Source Links**: Now includes Codeberg (codeberg.org/dinosoftware/dino) and Forgejo (git.fuge.dev/dinosoftware/dino) alongside GitHub
+
 ## [3.0.1] - 2026-05-03
 
 ### Added
